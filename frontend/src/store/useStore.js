@@ -21,7 +21,11 @@ export const DEF = {
   // than reaching in here: a profile written by an older build is missing keys.
   coachProfile: null,
   // The plan the coach replaced, kept for a week so an AI-generated week is reversible.
-  coachUndo: null
+  coachUndo: null,
+  // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates
+  // ("my breakfast") and myFoods are the user's own entries — the same relationship
+  // customEx has with the exercise catalogue.
+  meals: [], myMeals: [], myFoods: []
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 

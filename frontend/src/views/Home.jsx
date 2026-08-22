@@ -10,6 +10,9 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import { coachWizardSheet } from '../coach-sheets.jsx'
+import { foodMap } from '../lib/foods.js'
+import { dayTotals, hasMeals } from '../lib/nutrition.js'
+import { quickLogSheet, mealSheet } from '../food-sheets.jsx'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -73,6 +76,33 @@ export default function Home() {
           : routine ? <span className="tag acc">{t('Start')}</span>
           : <Icon name="plus" className="chev" />}
       </div>
+    </div>
+
+    {/* Food, two taps from the home screen. Anything further away does not get logged. */}
+    <div className="card">
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <h2 style={{ margin: 0 }}>{t('Food')}</h2>
+        <div className="row" style={{ gap: 8 }}>
+          <Button size="sm" icon="star" onClick={quickLogSheet}>{t('My meals')}</Button>
+          <Button size="sm" icon="plus" onClick={() => mealSheet()}>{t('Log')}</Button>
+        </div>
+      </div>
+      {(() => {
+        const foods = foodMap(S)
+        const tot = dayTotals(S, todayISO(), foods)
+        if (!hasMeals(S, todayISO())) {
+          return <div className="muted small">{t('Nothing logged today.')}</div>
+        }
+        return <button className="row between" style={{ width: '100%', background: 'none', border: 0, padding: 0, textAlign: 'left' }}
+          onClick={() => nav('/food')}>
+          <span>
+            <span className="big" style={{ fontSize: 28 }}>{fmtNum(tot.carb)}</span>
+            <span className="dim" style={{ fontSize: 14, marginLeft: 4 }}>g {t('Carbs')}</span>
+            <span className="dim small" style={{ marginLeft: 10 }}>{fmtNum(tot.kcal)} kcal</span>
+          </span>
+          <Icon name="chevronRight" className="dim" />
+        </button>
+      })()}
     </div>
 
     {!S.routines.length && !S.active && (
