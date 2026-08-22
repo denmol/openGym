@@ -22,7 +22,7 @@
 // the repair prompt sends the English straight to the model.
 
 import { EXIDX } from './exercises.js'
-import { musclesOf } from './muscles.js'
+import { musclesOf, MUSCLE_NAME } from './muscles.js'
 import { modeOf } from './history.js'
 import { POLICIES_FOR } from './progression.js'
 
@@ -168,9 +168,10 @@ export function validateCoachPlan(data, profile) {
       }
     }
   }
+  const muscle = slug => MUSCLE_NAME[slug] || slug
   for (const [slug, sets] of Object.entries(load)) {
     const n = Math.round(sets)
-    if (n > WEEKLY_SETS.max) warnings.push(P('{0} gets about {1} sets a week — more than the {2} this checks against.', slug, n, WEEKLY_SETS.max))
+    if (n > WEEKLY_SETS.max) warnings.push(P('{0} gets about {1} sets a week — more than the {2} this checks against.', muscle(slug), n, WEEKLY_SETS.max))
   }
   // The floor applies only to muscles the plan actually aims at. Every pressing movement
   // puts fractional load on half a dozen supporting muscles, so holding those to a
@@ -179,7 +180,7 @@ export function validateCoachPlan(data, profile) {
   // primary target but still gets four sets a week is the real mistake.
   for (const slug of targeted) {
     const n = Math.round(load[slug] || 0)
-    if (n > 0 && n < WEEKLY_SETS.min) warnings.push(P('{0} gets only about {1} sets a week.', slug, n))
+    if (n > 0 && n < WEEKLY_SETS.min) warnings.push(P('{0} gets only about {1} sets a week.', muscle(slug), n))
   }
 
   return { errors, warnings, ok: errors.length === 0 }

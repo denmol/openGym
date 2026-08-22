@@ -11,6 +11,8 @@ import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
+import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
+import { coachProfileOf, isCoachReady } from '../lib/coach-profile.js'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
@@ -97,6 +99,22 @@ export default function Settings() {
       )}
     </Section>
     {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
+
+    {/* ---------- AI coach ---------- */}
+    <Section title={t('AI coach')} footer={t('Your answers stay on this device. Nothing is sent anywhere unless you paste the prompt into a chat yourself.')}>
+      <Row icon="sparkles" iconTint="var(--acc)" accessory="chevron"
+        title={isCoachReady(coachProfileOf(S)) ? t('Training profile') : t('Set up my training profile')}
+        subtitle={isCoachReady(coachProfileOf(S)) ? t('Age, goal, equipment and limitations') : null}
+        onClick={coachWizardSheet} />
+      {coachUndoAvailable(S) && <Row icon="reset" iconTint="var(--blue)" title={t('Undo the AI plan')}
+        subtitle={t('Puts back the routines you had before')} accessory="chevron"
+        onClick={() => confirmSheet({
+          title: t('Undo the AI plan?'),
+          message: t('Your previous routines and weekly schedule come back. The AI routines are removed.'),
+          confirmText: t('Undo'),
+          onConfirm: undoCoachPlan
+        })} />}
+    </Section>
 
     {/* ---------- general ---------- */}
     <Section title={t('General')} footer={t('Note: switching units only changes the label — logged numbers are not converted.')}>

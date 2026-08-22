@@ -133,7 +133,9 @@ describe('warnings that do not block', () => {
     }, { ...profile, days: 1 })
     const floors = texts(r.warnings).filter(w => w.includes('only about'))
     expect(floors).toHaveLength(1)
-    expect(floors[0]).toContain('chest')
+    // Named the way the muscle map names it, so the UI can translate it and the repair
+    // prompt reads as a sentence rather than a slug.
+    expect(floors[0]).toContain('Chest')
   })
 
   it('flags an exercise loading a joint the user called out', () => {
