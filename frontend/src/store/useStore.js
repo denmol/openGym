@@ -15,7 +15,13 @@ export const DEF = {
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
   // keeps the column it had. See effortOf.
-  reminder: { on: false, time: '08:00', tz: null }, effort: null
+  reminder: { on: false, time: '08:00', tz: null }, effort: null,
+  // Who is training, for the AI coach (lib/coach-profile.js). null until the onboarding
+  // wizard runs — read it through coachProfileOf, which overlays the defaults, rather
+  // than reaching in here: a profile written by an older build is missing keys.
+  coachProfile: null,
+  // The plan the coach replaced, kept for a week so an AI-generated week is reversible.
+  coachUndo: null
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
