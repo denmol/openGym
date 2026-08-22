@@ -25,6 +25,25 @@ const INVITE_ONLY = /^(1|true|yes|on)$/i.test(process.env.INVITE_ONLY || '');
 // baked into each cookie when it's issued, so lowering this never cuts an existing session short.
 const SESSION_DAYS = Math.max(1, +(process.env.SESSION_DAYS || 90) || 90);
 const MAX_BODY = 5 * 1024 * 1024;
+/* ---------- AI coach (optional) ----------
+   Off unless OPENAI_API_KEY is set: the key lives here, in the server's environment, and
+   never reaches a browser. The client sends the prompt it built from the exercise catalogue
+   — which it has and the server does not — and this endpoint adds the key, pins the model,
+   forces the reply into the plan schema and counts the calls.
+
+   What this is NOT: an airtight guard against a signed-in user on this instance burning
+   credit. The daily cap is the whole defence, and it is deliberately per user per day. For a
+   personal or family instance that is the right size of lock; an instance open to strangers
+   should keep the key unset and let people paste into a chat themselves. */
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+const COACH_MODEL = process.env.COACH_MODEL || 'gpt-5.6-luna';
+// Overridable for an OpenAI-compatible endpoint (Azure, a local gateway) — and it is what
+// makes this path testable without spending anything.
+const OPENAI_BASE = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+const COACH_REASONING = process.env.COACH_REASONING || 'low';
+const COACH_DAILY_LIMIT = Math.max(1, +(process.env.COACH_DAILY_LIMIT || 20) || 20);
+const COACH_MAX_PROMPT = 40000;           // characters; a real prompt is ~9,500
+const COACH_TIMEOUT_MS = 120000;          // reasoning models can take a while
 // Secure cookies require HTTPS; over plain http://localhost the flag would drop the cookie
 const SECURE = /^https:/i.test(ORIGIN) ? ' Secure;' : '';
 
@@ -251,9 +270,174 @@ function livePresence(uid) {
 }
 setInterval(() => { for (const [k, v] of presence) if (Date.now() - v.updatedAt > PRESENCE_TTL) presence.delete(k); }, 30000).unref();
 
+/* ---------- AI coach ---------- */
+
+// Structured Outputs need every property listed in `required`, so anything optional is typed
+// as nullable instead. This mirrors the bundle plan-share.js already imports.
+const PLAN_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'week', 'routines'],
+  properties: {
+    name: { type: 'string' },
+    week: {
+      type: 'array',
+      description: 'One entry per training day.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['day', 'routine'],
+        properties: {
+          day: { type: 'integer', description: '0=Sunday … 6=Saturday' },
+          routine: { type: 'string', description: 'id of a routine below' }
+        }
+      }
+    },
+    routines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'name', 'emoji', 'ex'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          emoji: { type: 'string' },
+          ex: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'sets', 'reps', 'prog', 'inc', 'repsMin', 'repsMax'],
+              properties: {
+                id: { type: 'string', description: 'exercise id from the supplied list' },
+                sets: { type: 'integer' },
+                reps: { type: 'integer' },
+                prog: { type: 'string', enum: ['linear', 'greyskull', 'double', 'off'] },
+                inc: { type: ['number', 'null'] },
+                repsMin: { type: ['integer', 'null'] },
+                repsMax: { type: ['integer', 'null'] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+// `week` travels as a list because Structured Outputs cannot express an object with unknown
+// keys. Back to the {day: routineId} map the app reads.
+function weekToMap(week) {
+  const out = {};
+  for (const w of Array.isArray(week) ? week : []) {
+    if (w && Number.isInteger(w.day) && w.day >= 0 && w.day <= 6 && w.routine) out[w.day] = w.routine;
+  }
+  return out;
+}
+
+// Calls per user per UTC day. In memory on purpose: a restart forgiving the count is a far
+// smaller problem than another file to keep in ./data, and the cap exists to stop a runaway
+// loop rather than a determined person.
+const coachCalls = new Map();             // uid -> { day, n }
+function coachQuota(uid) {
+  const day = new Date().toISOString().slice(0, 10);
+  const rec = coachCalls.get(uid);
+  if (!rec || rec.day !== day) { coachCalls.set(uid, { day, n: 0 }); return { used: 0, left: COACH_DAILY_LIMIT }; }
+  return { used: rec.n, left: Math.max(0, COACH_DAILY_LIMIT - rec.n) };
+}
+function coachSpend(uid) {
+  const day = new Date().toISOString().slice(0, 10);
+  const rec = coachCalls.get(uid);
+  if (!rec || rec.day !== day) coachCalls.set(uid, { day, n: 1 });
+  else rec.n++;
+}
+
+async function askOpenAI(messages) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), COACH_TIMEOUT_MS);
+  try {
+    const r = await fetch(OPENAI_BASE + '/chat/completions', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + OPENAI_KEY },
+      body: JSON.stringify({
+        model: COACH_MODEL,
+        reasoning_effort: COACH_REASONING,
+        messages,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'opengym_plan', strict: true, schema: PLAN_SCHEMA }
+        }
+      })
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      // Surface the provider's own words: "insufficient_quota" is a different problem from a
+      // bad key, and a generic failure message would send you looking in the wrong place.
+      const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
+      const err = new Error(msg);
+      err.status = r.status === 401 || r.status === 429 ? r.status : 502;
+      throw err;
+    }
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
 /* ---------- routes ---------- */
 const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
+
+  // Does this instance have a key, and how many calls has the caller got left today?
+  'GET /api/coach/status': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const q = coachQuota(user.id);
+    json(res, 200, { enabled: !!OPENAI_KEY, model: OPENAI_KEY ? COACH_MODEL : null, limit: COACH_DAILY_LIMIT, ...q });
+  },
+
+  'POST /api/coach': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+    const q = coachQuota(user.id);
+    if (q.left <= 0) return json(res, 429, { error: 'daily limit reached', ...q });
+
+    const body = await readBody(req);
+    const prompt = String(body.prompt || '');
+    const repair = String(body.repair || '');
+    if (!prompt || prompt.length > COACH_MAX_PROMPT) return json(res, 400, { error: 'bad prompt' });
+    if (repair.length > 4000) return json(res, 400, { error: 'bad repair' });
+
+    // The system message is set here, not by the caller — it is the one instruction the
+    // client cannot talk the model out of.
+    const messages = [
+      { role: 'system', content: 'You write weekly strength training plans as JSON for the openGym app. Use only exercise ids from the list you are given. Never set a weight. Reply with the JSON object only.' },
+      { role: 'user', content: prompt }
+    ];
+    // A repair round carries the first answer and the validator's complaints, so the model
+    // fixes what was wrong instead of starting over.
+    if (repair && body.previous) {
+      messages.push({ role: 'assistant', content: String(body.previous).slice(0, 40000) });
+      messages.push({ role: 'user', content: repair });
+    }
+
+    try {
+      coachSpend(user.id);
+      const data = await askOpenAI(messages);
+      const text = data?.choices?.[0]?.message?.content || '';
+      let plan;
+      try { plan = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      json(res, 200, {
+        plan: { opengym_plan: 1, name: plan.name, week: weekToMap(plan.week), routines: plan.routines },
+        raw: text,
+        usage: data.usage || null,
+        ...coachQuota(user.id)
+      });
+    } catch (e) {
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
 
   // Public config the login screen needs before anyone is signed in.
   'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY }),

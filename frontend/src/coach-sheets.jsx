@@ -9,7 +9,7 @@
 // The reply lands in the same import sheet a plan from a friend does, so approving an
 // AI-written week and approving a shared one are the same gesture, with the same preview.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { t, getLang } from './lib/i18n.js'
@@ -26,6 +26,7 @@ import { EQ_PRESETS, ALL_EQUIPMENT, eqOfPreset } from './lib/coach-catalog.js'
 import { buildPrompt, buildRepairPrompt } from './lib/coach-prompt.js'
 import { parseCoachReply } from './lib/coach-parse.js'
 import { validateCoachPlan, problemText } from './lib/coach-validate.js'
+import { coachStatus, generatePlan } from './lib/coach-api.js'
 import { parsePlan, mergePlan } from './lib/plan-share.js'
 
 const S = () => useStore.getState().S
@@ -189,14 +190,46 @@ const copy = async text => {
   }
 }
 
+// What the sheet says while the model is working. These calls take tens of seconds with
+// reasoning on, and a button that just sits there dimmed reads as broken.
+const STEP_TEXT = {
+  asking: 'Writing your program…',
+  checking: 'Checking it over…',
+  fixing: 'Fixing what did not add up…'
+}
+
 function CoachBridge({ profile, close }) {
   const st = useStore(s => s.S)
   const [reply, setReply] = useState('')
   const [problems, setProblems] = useState(null)   // { errors, warnings, data } once checked
+  const [direct, setDirect] = useState(null)       // server status, null while unknown
+  const [busy, setBusy] = useState(null)           // current step while generating
   const flagged = medicalFlag(profile.limits)
 
   const bw = lastBW(st)
   const prompt = buildPrompt(profile, { lang: getLang(), unit: st.unit, bodyweight: bw ? bw.w : null })
+
+  // Does this instance hold a key? Guests and keyless instances just get the paste flow.
+  useEffect(() => {
+    let live = true
+    coachStatus().then(s => { if (live) setDirect(s) })
+    return () => { live = false }
+  }, [])
+
+  const runDirect = async () => {
+    setProblems(null)
+    try {
+      const res = await generatePlan(profile, {
+        lang: getLang(), unit: st.unit, bodyweight: bw ? bw.w : null, onStep: setBusy
+      })
+      // Keep the remaining-today count honest: a stale number is worse than none.
+      if (res.left != null) setDirect(d => ({ ...d, left: res.left }))
+      if (res.errors.length || res.warnings.length) { setProblems({ ...res, data: res.data }); return }
+      hand(res.data)
+    } catch (e) {
+      toast(t(e.message))
+    } finally { setBusy(null) }
+  }
 
   const check = () => {
     let data
@@ -220,6 +253,39 @@ function CoachBridge({ profile, close }) {
       {t('What you wrote under limitations is something a physiotherapist or doctor should program around, not an app. Build the plan with them — openGym will happily track it.')}
     </div>
     <Button variant="primary" onClick={() => { close(); coachWizardSheet() }}>{t('Edit my answers')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </>
+
+  // With a key on the server this is one button; the paste route stays underneath, because
+  // it costs nothing to keep and it is the only route when the quota runs out.
+  if (direct && direct.enabled) return <>
+    <h3>{t('Build my program')}</h3>
+    <div className="muted small" style={{ marginBottom: 16, lineHeight: 1.45 }}>
+      {t('Your answers go to the model your server is configured with, and the plan comes back checked. Nothing else about you is sent.')}
+    </div>
+    <Button variant="primary" icon="sparkles" onClick={runDirect} disabled={!!busy}>
+      {busy ? t(STEP_TEXT[busy]) : t('Create my program')}
+    </Button>
+    {busy && <div className="dim small" style={{ margin: '8px 2px 0', lineHeight: 1.4 }}>
+      {t('This takes up to a minute. Leave the screen open.')}
+    </div>}
+    {direct.left != null && !busy && <div className="dim small" style={{ margin: '8px 2px 0' }}>
+      {t('{0} of {1} left today', direct.left, direct.limit)}
+    </div>}
+
+    {problems && <ProblemList res={problems} onUse={() => hand(problems.data)} onRetry={runDirect} />}
+
+    <h4 className="sec">{t('Or do it yourself')}</h4>
+    <div className="dim small" style={{ marginBottom: 10, lineHeight: 1.4 }}>
+      {t('Copy the prompt into any chat and paste the answer back. Works when the daily limit is reached.')}
+    </div>
+    <Button icon="clipboard" onClick={() => copy(prompt)}>{t('Copy prompt')}</Button>
+    <div style={{ height: 10 }} />
+    <textarea className="input" rows={3} value={reply} onChange={e => setReply(e.target.value)}
+      placeholder={t('The whole reply is fine — code fences and all')} />
+    <div style={{ height: 10 }} />
+    <Button onClick={check} disabled={!reply.trim()}>{t('Read the plan')}</Button>
     <div style={{ height: 8 }} />
     <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
   </>
@@ -252,7 +318,7 @@ function CoachBridge({ profile, close }) {
  * same chat — the fix loop still works without an API, it just goes through the user.
  * Warnings are shown and the plan can be used anyway.
  */
-function ProblemList({ res, onUse }) {
+function ProblemList({ res, onUse, onRetry }) {
   const { errors, warnings } = res
   const all = [...errors, ...warnings].map(problemText)
   // Muscle and equipment names arrive as their English source strings, which are also
@@ -273,12 +339,18 @@ function ProblemList({ res, onUse }) {
         <span style={{ lineHeight: 1.4 }}>{say(p)}</span>
       </div>)}
     </div>
-    <Button variant={errors.length ? 'primary' : 'tinted'} icon="clipboard" onClick={() => copy(buildRepairPrompt(all))}>
-      {t('Copy a fix request')}
-    </Button>
-    <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>
-      {t('Paste it into the same chat, then paste the new answer above.')}
-    </div>
+    {/* The paste flow needs the user to carry the fix across; the direct one has already
+        tried twice on its own, so offering a clipboard round there would just confuse. */}
+    {onRetry ? (
+      <Button variant="primary" icon="reset" onClick={onRetry}>{t('Try again')}</Button>
+    ) : <>
+      <Button variant={errors.length ? 'primary' : 'tinted'} icon="clipboard" onClick={() => copy(buildRepairPrompt(all))}>
+        {t('Copy a fix request')}
+      </Button>
+      <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>
+        {t('Paste it into the same chat, then paste the new answer above.')}
+      </div>
+    </>}
     {!errors.length && <>
       <div style={{ height: 10 }} />
       <Button onClick={onUse}>{t('Use it anyway')}</Button>
