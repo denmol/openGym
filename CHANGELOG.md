@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- 🇸🇪 **Swedish (Svenska)** joins the UI languages, bringing the count to 13. Pick it under
+  Settings → Appearance → Language. Like German and Portuguese, exercise instructions stay in
+  English — the upstream dataset doesn't cover Swedish yet — and the language chip in the
+  exercise sheet says so.
+
 ## v1.2.4 — 2026-08-01
 
 The effort ratings you have been recording since v1.2.3 now answer questions, and bodyweight
