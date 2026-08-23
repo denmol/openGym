@@ -8,6 +8,7 @@ import {
   bmrEstimate,
   cleanNutritionProfile,
   finalizeNutritionProfile,
+  nutritionAiGate,
   needsClinicianTargets,
   nutritionReferenceState,
   nutritionSafetyToday,
@@ -30,6 +31,11 @@ const SAFE = {
 const CURRENT_GLP = {
   goal: 'lose', targets: completeTargets,
   incretinUse: 'weight', weightPhase: 'active_loss', fiberReference: 'range',
+  safety: SAFE, safetyReviewedAt: '2026-05-25', targetReviewRequired: false
+}
+const AI_SAFE = {
+  goal: 'health', targets: {}, condition: false, medication: false,
+  incretinUse: 'none', weightPhase: null, fiberReference: 'range',
   safety: SAFE, safetyReviewedAt: '2026-05-25', targetReviewRequired: false
 }
 const reference = (state, id) => state.references.find(item => item.id === id)
@@ -183,6 +189,21 @@ describe('medical target gate', () => {
     expect(needsClinicianTargets({ condition: true })).toBe(true)
     expect(needsClinicianTargets({ medication: true })).toBe(true)
     expect(needsClinicianTargets({}, { diabetes: false })).toBe(false)
+  })
+})
+
+describe('nutrition AI gate', () => {
+  it('opens AI only for an explicitly current, non-medical adult profile', () => {
+    expect(nutritionAiGate(AI_SAFE, { age: 40, today: '2026-08-23', diabetes: false })).toBe(false)
+    expect(nutritionAiGate({ ...AI_SAFE, incretinUse: 'weight' }, { age: 40, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate({ ...AI_SAFE, safetyReviewedAt: '2026-05-24' }, { age: 40, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate({ ...AI_SAFE, safety: { ...SAFE, severeGI: true } }, { age: 40, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate({ ...AI_SAFE, targetReviewRequired: true }, { age: 40, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate(AI_SAFE, { age: 17, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate(AI_SAFE, { age: 100, today: '2026-08-23' })).toBe(false)
+    expect(nutritionAiGate(AI_SAFE, { age: 101, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate(AI_SAFE, { age: null, today: '2026-08-23' })).toBe(true)
+    expect(nutritionAiGate(AI_SAFE, { age: 40, today: '2026-08-23', diabetes: true })).toBe(true)
   })
 })
 

@@ -1,7 +1,7 @@
 import { api } from './api.js'
 import { NUTRIENTS } from './foods.js'
 import { nutrientTotal } from './nutrition.js'
-import { cleanNutritionProfile, bmrEstimate, needsClinicianTargets, weightKgOf } from './nutrition-goals.js'
+import { cleanNutritionProfile, bmrEstimate, nutritionAiGate, nutritionSafetyToday, weightKgOf } from './nutrition-goals.js'
 import { coachProfileOf } from './coach-profile.js'
 import { diabetesOn } from './diabetes.js'
 import { lastBW } from './history.js'
@@ -9,7 +9,7 @@ import { lastBW } from './history.js'
 const present = value => !!(typeof value === 'number' || (typeof value === 'string' && value.trim())) && Number.isFinite(Number(value))
 
 /** The complete, inspectable object shown before it is sent to the configured AI provider. */
-export function nutritionAssistContext(S, totals, date = null) {
+export function nutritionAssistContext(S, totals, date = null, today = nutritionSafetyToday()) {
   const profile = cleanNutritionProfile(S && S.nutritionGoals)
   const person = coachProfileOf(S || {})
   const bw = lastBW({ bodyweight: S?.bodyweight || [] })
@@ -26,7 +26,8 @@ export function nutritionAssistContext(S, totals, date = null) {
     diabetes: diabetesOn(S || {}),
     condition: profile.condition,
     medication: profile.medication,
-    under18: present(person.age) && Number(person.age) < 18
+    under18: present(person.age) && Number(person.age) < 18,
+    nutritionSafety: nutritionAiGate(profile, { age: person.age, today, diabetes: diabetesOn(S || {}) })
   }
   return {
     language: S?.lang === 'sv' ? 'sv' : 'en',
@@ -43,7 +44,7 @@ export function nutritionAssistContext(S, totals, date = null) {
     day,
     incomplete,
     medical,
-    clinicianReview: needsClinicianTargets(profile, { diabetes: medical.diabetes }) || medical.under18
+    clinicianReview: Object.values(medical).some(Boolean)
   }
 }
 

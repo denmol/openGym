@@ -238,5 +238,17 @@ export function weightKgOf(entry) {
 }
 
 /** Medical contexts must use a complete target set supplied by the person's clinician. */
-export const needsClinicianTargets = (profile, { diabetes = false } = {}) =>
-  diabetes === true || (profile && (profile.condition === true || profile.medication === true)) || false
+export const needsClinicianTargets = (profile, { diabetes = false } = {}) => {
+  const clean = cleanNutritionProfile(profile)
+  return diabetes === true || clean.condition || clean.medication ||
+    (clean.incretinUse != null && clean.incretinUse !== 'none') ||
+    NUTRITION_SAFETY_KEYS.some(key => clean.safety[key] === true)
+}
+
+export function nutritionAiGate(profile, { age, today, diabetes = false } = {}) {
+  const clean = cleanNutritionProfile(profile)
+  return ageOf(age) == null || diabetes === true || clean.condition || clean.medication ||
+    clean.incretinUse !== 'none' || clean.weightPhase !== null ||
+    !NUTRITION_SAFETY_KEYS.every(key => clean.safety[key] === false) ||
+    !safetyReviewCurrent(clean.safetyReviewedAt, today) || clean.targetReviewRequired
+}
