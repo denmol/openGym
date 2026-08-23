@@ -6,8 +6,8 @@
 // half-empty series. So everything aggregates in RIR and is converted back for display.
 // RIR is the internal unit because it has a real zero — a set taken to failure — where RPE's
 // floor of 6 is only a convention about which sets are worth rating. RPE 8 == RIR 2.
-import { EFFORT, effortOf } from './history.js'
-import { weekKey } from './format.js'
+import { EFFORT, effortOf, inWindow } from './history.js'
+import { weekKey, mondayOf } from './format.js'
 
 // At or below this a set is close enough to failure to be the kind that drives adaptation.
 // 3 rather than 2: the line is a convention, and drawn one rep too generously it still
@@ -46,11 +46,6 @@ function eachDoneSet(S, fn) {
     (w.entries || []).forEach(e =>
       (e.sets || []).forEach(s => { if (s.done) fn(s, w, e) })))
 }
-
-// A window in days, counted back from now. 0 = everything, which is also what an empty
-// history means for every caller here.
-const inWindow = (w, days) =>
-  !days || (w.start || new Date(w.d).getTime()) > Date.now() - days * 86400000
 
 export const avgRir = sets => {
   const vs = (sets || []).map(rirOf).filter(v => v != null)
@@ -108,13 +103,6 @@ export function effortWeeks(S, days) {
     .map(e => ({ t: e.t, rir: e.sum / e.n, n: e.n, sets: e.sets }))
 }
 // The Monday of an ISO date, as ms — the x position a week's point sits at.
-function mondayOf(iso) {
-  const d = new Date(iso + 'T12:00:00')
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  d.setHours(12, 0, 0, 0)
-  return +d
-}
-
 /**
  * How the rated sets spread across the scale, in whole steps with everything past the top
  * bucket collapsed into it. This is the chart that answers "am I training too far from

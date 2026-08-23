@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': '超过上限 {0} {1}',
   '{0} {1} to go': '还差 {0} {1}',
   'Daily target for {0}. Suggested: {1} {2}': '{0} 的每日目标。建议：{1} {2}',
+  // --- cardio ---
+  'Distance (km)': '距离（公里）',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': '标记 ≈ 的距离是由记录的速度推算的，并非实测。',
+  'Heart rate': '心率',
+  'Longest: {0} min': '最长：{0} 分钟',
+  'No cardio in this period.': '此期间没有有氧运动。',
+  'So far': '目前',
+  'distance': '距离',
+  'over {0} sessions': '共 {0} 次训练',
+  'time and distance': '时间与距离',
+  '{0} bpm across {1} min': '{1} 分钟内平均 {0} bpm',
+  '{0} km': '{0} 公里',
+  '{0} sessions': '{0} 次训练',
 }

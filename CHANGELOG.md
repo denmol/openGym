@@ -7,6 +7,43 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### Cardio, in the units it was measured in
+
+Cardio was already a logging mode — 29 exercises, its own two-stepper row — but it could only
+describe a treadmill, and it vanished from every summary the moment it was logged.
+
+- 🏃 **Distance instead of speed.** A cardio set now records a duration and a distance, and
+  pace falls out of the two: "46 min · 8 km · 5:45/km". Speed in km/h is what a treadmill
+  displays; the number a person writes down afterwards is the distance, and the number they
+  judge themselves on is the pace. Sets logged before this are read unchanged — their distance
+  is derived back out of the old speed and marked ≈, because it was never measured.
+- ❤️ **Heart rate per set**, in the column effort occupies for weighted work. Optional in the
+  same sense: an unrecorded pulse is not a pulse of zero. Averages are weighted by duration,
+  so a five-minute warm-up and a forty-minute run do not average out to a figure describing
+  neither, and the minutes it actually covers are shown beside it.
+- 📊 **A Cardio card in Stats** over 30d / 90d / 1Y / all time: total minutes and distance,
+  the period's pace, the longest single session, and minutes week by week. Pace is the
+  period's distance over its duration rather than an average of session paces.
+- **Cardio stops being invisible in the summaries.** Volume is weight × reps and says nothing
+  about a run, so a cardio session used to read as "0 kg" — and as "NaN kg" for anything
+  logged before the volume figure existed. Workout rows, the workout detail sheet and the
+  calendar's monthly line now show minutes and distance alongside volume, and each half is
+  left out when there is none of it.
+- 📥 **Import cardio from a watch.** An Apple Health `export.xml` now brings its workouts
+  across, not only its body weight — read by scanning rather than parsing, because the file
+  runs to hundreds of megabytes and a DOM would take the tab with it. Both shapes Health has
+  written are handled: the older one with duration and distance on the element, and the iOS 16
+  one that moved distance into a child alongside the heart rate. Miles, metres and seconds are
+  converted on the way in.
+- **Garmin and Strava activity CSVs keep their distance.** The importer already read cardio
+  rows, but collapsed the measured distance into a speed — the one figure the file was sure
+  of, thrown away. It is stored as measured now, and an average heart-rate column comes with
+  it. Activities the exercise library has no entry for become one of your own, as they do for
+  strength imports.
+- Cardio still does not join the volume figure, and should not: multiplying a duration into a
+  weight × reps total would make two incomparable things look like one number.
+- Translated into all 13 UI languages.
+
 ### The app is now Dagsnav
 
 - 🧭 **Renamed from openGym**, with new icons, manifest and iOS/Android resources. The old name
