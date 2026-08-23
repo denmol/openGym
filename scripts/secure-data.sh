@@ -109,12 +109,29 @@ if [ "$DRY" = 1 ]; then say "  läge     : TORRKÖRNING — ingenting ändras"; 
 STAGE="förkontroll"
 step "0. Förkontroll"
 
-DIRTY=$(git -C "$ROOT" status --porcelain | grep -v '^.. data/' || true)
+# Only what could actually stop a fast-forward. Tracked files with local edits, yes — those
+# get overwritten. Untracked files, no: a deployment keeps its own docker-compose.override.yml
+# and .env next to the checkout and git will never touch them. The exception is an untracked
+# file sitting exactly where the incoming commit wants to put one, which is the only case git
+# itself refuses, so that is the only case checked here.
+DIRTY=$(git -C "$ROOT" status --porcelain --untracked-files=no | grep -v '^.. data/' || true)
 if [ -n "$DIRTY" ]; then
   say "$DIRTY"
-  die "checkouten har lokala ändringar utanför data/. Committa eller släng dem först — skriptet vill inte gissa vad de är."
+  die "checkouten har ändrade filer utanför data/. Committa eller släng dem först — skriptet vill inte gissa vad de är."
 fi
-ok "inga lokala ändringar utanför data/"
+ok "inga ändrade filer utanför data/"
+
+if [ "$DRY" = 0 ] || git -C "$ROOT" rev-parse -q --verify FETCH_HEAD >/dev/null 2>&1; then
+  COLLIDE=$(comm -12 \
+    <(git -C "$ROOT" ls-files --others --exclude-standard | sort) \
+    <(git -C "$ROOT" diff --name-only HEAD FETCH_HEAD 2>/dev/null | sort) || true)
+  if [ -n "$COLLIDE" ]; then
+    say "$COLLIDE"
+    die "de otrackade filerna ovan ligger där pullen vill lägga sina — flytta undan dem först."
+  fi
+fi
+UNTRACKED=$(git -C "$ROOT" ls-files --others --exclude-standard | wc -l)
+[ "$UNTRACKED" = 0 ] || ok "$UNTRACKED otrackade filer, ingen i vägen för pullen"
 
 BRANCH=$(git -C "$ROOT" symbolic-ref --short -q HEAD || true)
 [ -n "$BRANCH" ] || die "checkouten står inte på någon gren (detached HEAD). Kör:  git checkout <gren>"
@@ -180,11 +197,21 @@ fi
 # ------------------------------------------------------------------ 4. pull --
 STAGE="git pull"
 step "4. Hämta ändringen som slutar spåra data/"
-if git -C "$ROOT" ls-files --error-unmatch data/secret >/dev/null 2>&1; then
+# Gated on being behind the remote, not on whether data/ is still tracked. An instance that
+# already pulled the untracking commit by hand is not finished — it is just further along —
+# and the earlier version of this skipped the pull for exactly those, leaving them behind
+# forever on everything that came after.
+TRACKED_BEFORE=$(git -C "$ROOT" ls-files data/ | wc -l)
+if [ "$(git -C "$ROOT" rev-parse HEAD)" = "$(git -C "$ROOT" rev-parse FETCH_HEAD)" ]; then
+  skip "redan à jour med fjärren"
+else
   run "git -C '$ROOT' merge --ff-only FETCH_HEAD"
   ok "hämtat"
+fi
+if [ "$TRACKED_BEFORE" != 0 ]; then
+  ok "data/ spåras inte längre av git"
 else
-  skip "data/ spåras inte längre"
+  skip "data/ spårades inte redan innan"
 fi
 
 # ---------------------------------------------------------------- 5. rotate --
