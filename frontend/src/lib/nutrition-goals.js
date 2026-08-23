@@ -7,6 +7,7 @@ export const NUTRIENT_TARGETS = [...NUTRIENTS]
 export const INCRETIN_USES = ['none', 'weight', 'diabetes', 'both', 'other']
 export const WEIGHT_PHASES = ['active_loss', 'maintenance']
 export const FIBER_REFERENCES = ['range', 'female', 'male']
+export const NUTRITION_ACTIVITY_LEVELS = ['range', 'low', 'moderate', 'active']
 export const NUTRITION_SAFETY_KEYS = [
   'kidneyOrProteinRestriction', 'fluidOrSodiumRestriction',
   'pregnancyOrBreastfeeding', 'eatingDisorder', 'severeGI',
@@ -88,6 +89,7 @@ export function cleanNutritionProfile(profile = {}) {
   return {
     goal: NUTRITION_GOALS.includes(profile.goal) ? profile.goal : null,
     targets: Object.fromEntries(NUTRIENT_TARGETS.map(key => [key, nonnegative(targets[key])])),
+    activityLevel: NUTRITION_ACTIVITY_LEVELS.includes(profile.activityLevel) ? profile.activityLevel : 'range',
     condition: profile.condition === true,
     medication: profile.medication === true,
     incretinUse: INCRETIN_USES.includes(profile.incretinUse) ? profile.incretinUse : null,
@@ -233,6 +235,84 @@ export function bmrEstimate({ sex, age, heightCm, weightKg } = {}) {
   const [adultAge, height, weight] = values
   if ((sex !== 'male' && sex !== 'female') || !values.every(Number.isFinite) || adultAge < 18 || height <= 0 || weight <= 0) return null
   return bmr({ sex, age: adultAge, heightCm: height, weightKg: weight })
+}
+
+const ACTIVITY_PAL = {
+  range: { min: 1.4, max: 1.8 },
+  low: { min: 1.4, max: 1.4 },
+  moderate: { min: 1.6, max: 1.6 },
+  active: { min: 1.8, max: 1.8 }
+}
+const round10 = value => Math.round(value / 10) * 10
+const roundGram = value => Math.round(value * 10) / 10
+const energyRange = (min, max) => ({ min: round10(min), max: round10(max) })
+const macroGrams = ({ min, max }) => {
+  const carbohydrate = (energy, percent) =>
+    (energy * percent / 100 - 3 * (energy / 239) * 2) / 4
+  return {
+    carb: { min: roundGram(carbohydrate(min, 45)), max: roundGram(carbohydrate(max, 60)) },
+    prot: { min: roundGram(min * 0.10 / 4), max: roundGram(max * 0.20 / 4) },
+    fat: { min: roundGram(min * 0.25 / 9), max: roundGram(max * 0.40 / 9) },
+    sat: { max: roundGram(max * 0.10 / 9), operator: '<' },
+    sugar: null
+  }
+}
+
+/** Approximate energy and NNR macro ranges; manual targets remain authoritative and untouched. */
+export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weightKg } = {}) {
+  const profile = cleanNutritionProfile(rawProfile)
+  if (!profile.goal || ageOf(age) == null) return null
+  const basal = bmrEstimate({ sex, age, heightCm, weightKg })
+  const height = numberOf(heightCm), weight = numberOf(weightKg)
+  if (!(basal > 0) || !Number.isFinite(height) || height <= 0 || !Number.isFinite(weight) || weight <= 0) return null
+
+  const pal = ACTIVITY_PAL[profile.activityLevel]
+  const maintenanceKcal = energyRange(basal * pal.min, basal * pal.max)
+  const bmi = weight / ((height / 100) ** 2)
+  let goalKcal = { ...maintenanceKcal }, goalBasis = 'maintenance', goalStatus = 'maintenance_estimate'
+  if (profile.goal === 'lose' && bmi >= 25) {
+    goalKcal = energyRange(maintenanceKcal.min - 750, maintenanceKcal.max - 500)
+    goalBasis = 'loss_deficit'
+    goalStatus = 'planning_example'
+    if (goalKcal.min < 1200) {
+      goalKcal = null
+      goalStatus = 'low_energy_review'
+    }
+  } else if (profile.goal === 'lose') {
+    goalBasis = 'loss_not_applied_bmi_below_25'
+    goalStatus = 'loss_not_applied_bmi_below_25'
+  } else if (profile.goal === 'muscle') {
+    goalKcal = energyRange(maintenanceKcal.min * 1.05, maintenanceKcal.max * 1.20)
+    goalBasis = 'muscle_surplus'
+    goalStatus = 'planning_example'
+  }
+
+  const ownEnergy = profile.targets.kcal > 0 ? profile.targets.kcal : null
+  const macroBasisKcal = ownEnergy != null
+    ? { min: ownEnergy, max: ownEnergy, source: 'own_target' }
+    : goalKcal && { ...goalKcal, source: 'estimated_goal' }
+  const planningExample = goalBasis === 'loss_deficit' || goalBasis === 'muscle_surplus'
+  return {
+    approximate: true,
+    activityLevel: profile.activityLevel,
+    pal: { ...pal },
+    maintenanceKcal,
+    goalKcal,
+    goalBasis,
+    goalStatus,
+    macroBasisKcal,
+    grams: macroBasisKcal ? macroGrams(macroBasisKcal) : null,
+    basis: {
+      maintenance: { kind: 'estimate', sources: ['mifflin_st_jeor', 'nnr_2023_pal'] },
+      goal: planningExample
+        ? { kind: goalStatus === 'low_energy_review' ? 'review' : 'planning_example', source: 'nnr_2023', rule: goalBasis }
+        : { kind: 'estimate', sources: ['mifflin_st_jeor', 'nnr_2023_pal'] },
+      macros: {
+        kind: 'population_reference_conversion', source: 'nnr_2023',
+        carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj'
+      }
+    }
+  }
 }
 
 /** Convert only a weight whose unit was stored with the measurement. */

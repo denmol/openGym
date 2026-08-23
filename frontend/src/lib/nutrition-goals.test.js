@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NNR_REFERENCE,
   NUTRITION_REFERENCE_CATALOG,
+  NUTRITION_ACTIVITY_LEVELS,
   NUTRIENT_TARGETS,
   NUTRITION_SAFETY_KEYS,
   NUTRITION_GOALS,
@@ -11,6 +12,7 @@ import {
   finalizeNutritionProfile,
   nutritionAiGate,
   needsClinicianTargets,
+  nutritionPlanningValues,
   nutritionReferenceState,
   nutritionSafetyToday,
   safetyReviewCurrent,
@@ -48,11 +50,13 @@ describe('cleanNutritionProfile', () => {
     expect(cleanNutritionProfile({
       goal: 'muscle',
       targets: { ...completeTargets, kcal: '2200', prot: -1, fib: Infinity, extra: 4 },
+      activityLevel: 'active',
       condition: true,
       medication: 'yes'
     })).toEqual({
       goal: 'muscle',
       targets: { ...completeTargets, kcal: 2200, prot: null, fib: null },
+      activityLevel: 'active',
       condition: true,
       medication: false,
       incretinUse: null,
@@ -71,6 +75,7 @@ describe('cleanNutritionProfile', () => {
     })).toEqual({
       goal: null,
       targets: { kcal: null, carb: null, sugar: null, prot: null, fat: null, sat: null, fib: null, salt: null },
+      activityLevel: 'range',
       condition: false,
       medication: false,
       incretinUse: null,
@@ -93,6 +98,7 @@ describe('cleanNutritionProfile', () => {
       safetyReviewedAt: '2026-02-30', targetReviewRequired: true
     })
     expect(profile.incretinUse).toBe('weight')
+    expect(profile.activityLevel).toBe('range')
     expect(profile.weightPhase).toBe('active_loss')
     expect(profile.fiberReference).toBe('female')
     expect(profile.safety.severeGI).toBeNull()
@@ -105,6 +111,7 @@ describe('cleanNutritionProfile', () => {
   it('migrates missing fields fail-closed without touching manual targets', () => {
     const profile = cleanNutritionProfile({ goal: 'health', targets: completeTargets })
     expect(profile.incretinUse).toBeNull()
+    expect(profile.activityLevel).toBe('range')
     expect(profile.weightPhase).toBeNull()
     expect(profile.fiberReference).toBe('range')
     expect(profile.safety).toEqual(Object.fromEntries(NUTRITION_SAFETY_KEYS.map(key => [key, null])))
@@ -172,6 +179,94 @@ describe('bmrEstimate', () => {
     expect(bmrEstimate({ sex: 'female', age: 30, heightCm: Infinity, weightKg: 70 })).toBeNull()
     expect(bmrEstimate({ sex: 'female', age: 30, heightCm: 175, weightKg: 0 })).toBeNull()
     expect(bmrEstimate()).toBeNull()
+  })
+})
+
+describe('nutritionPlanningValues', () => {
+  const person = { sex: 'male', age: 30, heightCm: 175, weightKg: 70 }
+
+  it('maps explicit NNR PAL choices and keeps legacy profiles at an honest range', () => {
+    expect(NUTRITION_ACTIVITY_LEVELS).toEqual(['range', 'low', 'moderate', 'active'])
+    expect(nutritionPlanningValues({ goal: 'health' }, person)).toMatchObject({
+      activityLevel: 'range', pal: { min: 1.4, max: 1.8 },
+      maintenanceKcal: { min: 2310, max: 2970 }, goalKcal: { min: 2310, max: 2970 }
+    })
+    expect(nutritionPlanningValues({ goal: 'health', activityLevel: 'low' }, person).maintenanceKcal)
+      .toEqual({ min: 2310, max: 2310 })
+    expect(nutritionPlanningValues({ goal: 'health', activityLevel: 'moderate' }, person).maintenanceKcal)
+      .toEqual({ min: 2640, max: 2640 })
+    expect(nutritionPlanningValues({ goal: 'health', activityLevel: 'active' }, person).maintenanceKcal)
+      .toEqual({ min: 2970, max: 2970 })
+    expect(nutritionPlanningValues({ goal: 'maintain', activityLevel: 'moderate' }, person).goalKcal)
+      .toEqual({ min: 2640, max: 2640 })
+    expect(cleanNutritionProfile({ activityLevel: 'unknown' }).activityLevel).toBe('range')
+  })
+
+  it('keeps maintenance below BMI 25, applies the deficit at BMI 25, and uses the muscle surplus range', () => {
+    expect(nutritionPlanningValues({ goal: 'lose', activityLevel: 'moderate' }, person)).toMatchObject({
+      goalKcal: { min: 2640, max: 2640 }, goalBasis: 'loss_not_applied_bmi_below_25',
+      goalStatus: 'loss_not_applied_bmi_below_25'
+    })
+    expect(nutritionPlanningValues({ goal: 'lose', activityLevel: 'moderate' },
+      { ...person, weightKg: 76.5625 })).toMatchObject({
+      maintenanceKcal: { min: 2740, max: 2740 },
+      goalKcal: { min: 1990, max: 2240 }, goalBasis: 'loss_deficit', goalStatus: 'planning_example',
+      basis: { goal: { kind: 'planning_example', source: 'nnr_2023', rule: 'loss_deficit' } }
+    })
+    expect(nutritionPlanningValues({ goal: 'muscle', activityLevel: 'moderate' }, person)).toMatchObject({
+      goalKcal: { min: 2770, max: 3170 }, goalBasis: 'muscle_surplus', goalStatus: 'planning_example',
+      basis: { goal: { kind: 'planning_example', source: 'nnr_2023', rule: 'muscle_surplus' } }
+    })
+  })
+
+  it('returns maintenance and a review status instead of a sub-1,200 kcal loss range', () => {
+    expect(nutritionPlanningValues({ goal: 'lose', activityLevel: 'low' },
+      { sex: 'female', age: 70, heightCm: 160, weightKg: 80 })).toMatchObject({
+      maintenanceKcal: { min: 1800, max: 1800 },
+      goalKcal: null,
+      goalBasis: 'loss_deficit',
+      goalStatus: 'low_energy_review',
+      macroBasisKcal: null,
+      grams: null,
+      basis: { goal: { kind: 'review', source: 'nnr_2023', rule: 'loss_deficit' } }
+    })
+  })
+
+  it.each([['plain', {}], ['condition', { condition: true }], ['medication', { medication: true }]])(
+    'uses an exact 2,000 kcal own target for EU-comparable macro grams with %s profile', (_name, medical) => {
+      const profile = { goal: 'health', activityLevel: 'moderate', targets: { kcal: 2000 }, ...medical }
+      const before = structuredClone(profile)
+      expect(nutritionPlanningValues(profile, person)).toMatchObject({
+        goalKcal: { min: 2640, max: 2640 },
+        macroBasisKcal: { min: 2000, max: 2000, source: 'own_target' },
+        grams: {
+          carb: { min: 212.4, max: 287.4 },
+          prot: { min: 50, max: 100 },
+          fat: { min: 55.6, max: 88.9 },
+          sat: { max: 22.2, operator: '<' },
+          sugar: null
+        },
+        basis: { macros: {
+          kind: 'population_reference_conversion', source: 'nnr_2023',
+          carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj'
+        } }
+      })
+      expect(profile).toEqual(before)
+    })
+
+  it.each([null, false, 0, -1, Infinity])('does not turn %s into an own energy basis', kcal => {
+    expect(nutritionPlanningValues({ goal: 'health', activityLevel: 'moderate', targets: { kcal } }, person)
+      .macroBasisKcal).toEqual({ min: 2640, max: 2640, source: 'estimated_goal' })
+  })
+
+  it.each([
+    [{ goal: 'health' }, { ...person, age: null }],
+    [{ goal: 'health' }, { ...person, age: true }],
+    [{ goal: 'health' }, { ...person, heightCm: null }],
+    [{ goal: 'health' }, { ...person, weightKg: false }],
+    [{ goal: null }, person]
+  ])('fails closed for incomplete or wrong-typed planning inputs', (profile, details) => {
+    expect(nutritionPlanningValues(profile, details)).toBeNull()
   })
 })
 
