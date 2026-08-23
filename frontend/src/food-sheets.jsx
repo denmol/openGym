@@ -11,9 +11,9 @@ import { t } from './lib/i18n.js'
 import { uid, fmtNum } from './lib/format.js'
 import { Button, Segmented, Stepper } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
-import { searchFoods, foodMap, foodOf, hasFoodDb, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
+import { searchFoods, foodMap, foodOf, hasFoodDb, cleanPer100, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import { scanSheet } from './barcode-sheets.jsx'
-import { totalsOf, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
+import { totalsOf, nutrientTotal, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
 import {
   unitsFor, unitById, gramsOf, lastAmounts, defaultAmount, amountLabel,
   newPortion, densityFor, UNIT_LABEL
@@ -22,17 +22,25 @@ import {
 const update = (...a) => useStore.getState().update(...a)
 const ui = () => useUI.getState()
 const toast = m => ui().toast(m)
+const totalText = (totals, key) => {
+  const value = nutrientTotal(totals, key)
+  return value == null ? '—' : fmtNum(value)
+}
+const foodText = (food, key) => {
+  const value = food?.per100?.[key]
+  return value == null || String(value).trim() === '' ? '—' : fmtNum(value)
+}
 
 /** Carbohydrate first and large, everything else after — the order this app reads in. */
 export function Macros({ totals, big }) {
   return <div className="row" style={{ gap: big ? 14 : 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
     <div>
-      <span style={{ fontSize: big ? 26 : 17, fontWeight: 700 }}>{fmtNum(totals.carb)}</span>
+      <span style={{ fontSize: big ? 26 : 17, fontWeight: 700 }}>{totalText(totals, 'carb')}</span>
       <span className="dim" style={{ fontSize: big ? 14 : 12, marginLeft: 3 }}>g {t('Carbs')}</span>
     </div>
-    <span className="dim small">{fmtNum(totals.kcal)} kcal</span>
-    <span className="dim small">{t('Protein')} {fmtNum(totals.prot)} g</span>
-    <span className="dim small">{t('Fat')} {fmtNum(totals.fat)} g</span>
+    <span className="dim small">{totalText(totals, 'kcal')} kcal</span>
+    <span className="dim small">{t('Protein')} {totalText(totals, 'prot')} g</span>
+    <span className="dim small">{t('Fat')} {totalText(totals, 'fat')} g</span>
   </div>
 }
 
@@ -186,7 +194,7 @@ function MealForm({ existing, preset, close }) {
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="tt" style={{ fontSize: 15 }}>{f ? f.n : t('Unknown food')}</div>
               <div className="small dim">
-                {fmtNum(one.carb)} g {t('Carbs')} · {fmtNum(one.kcal)} kcal
+                {totalText(one, 'carb')} g {t('Carbs')} · {totalText(one, 'kcal')} kcal
                 {/* The grams are always on screen, so a portion weight that is wrong is
                     something you can see rather than something you find out later. */}
                 {!isG && ' · ' + grams(unit, it.g)}
@@ -225,7 +233,7 @@ function MealForm({ existing, preset, close }) {
             <span className="lrow-t">{f.n}</span>
             <span className="lrow-s">
               {!d.unit.base && <>{fmtNum(d.q)} {unitName(d.unit)} · </>}
-              {fmtNum(f.per100.carb ?? 0)} g {t('Carbs')} · {fmtNum(f.per100.kcal ?? 0)} kcal {t('per 100 g')}
+              {foodText(f, 'carb')} g {t('Carbs')} · {foodText(f, 'kcal')} kcal {t('per 100 g')}
             </span>
           </span>
         </button>
@@ -318,7 +326,7 @@ function QuickLog({ close }) {
       return <button key={m.id} className="lrow tap" onClick={() => log(m)}>
         <span className="lrow-m">
           <span className="lrow-t">{m.n}</span>
-          <span className="lrow-s">{fmtNum(tot.carb)} g {t('Carbs')} · {fmtNum(tot.kcal)} kcal</span>
+          <span className="lrow-s">{totalText(tot, 'carb')} g {t('Carbs')} · {totalText(tot, 'kcal')} kcal</span>
         </span>
         <Icon name="plus" className="lrow-k" />
       </button>
@@ -351,11 +359,8 @@ function OwnFoodForm({ existing, prefill, onDone, close }) {
   const save = () => {
     const name = n.trim()
     if (!name) { toast(t('Give it a name')); return }
-    const per100 = {}
-    for (const k of NUTRIENTS) {
-      const num = Number(String(v[k]).replace(',', '.'))
-      if (Number.isFinite(num) && String(v[k]).trim() !== '') per100[k] = num
-    }
+    const per100 = cleanPer100(v)
+    if (!per100) { toast(t('Nutrient values must be zero or more.')); return }
     if (per100.kcal == null && per100.carb == null) { toast(t('Fill in at least calories or carbs')); return }
     const id = existing?.id || 'u' + uid()
     if (existing) update(s => {
@@ -415,7 +420,7 @@ function MealDetail({ meal, close }) {
       return <div key={i} className="row between" style={{ padding: '8px 0', borderTop: '1px solid var(--sep)' }}>
         <span className="grow">{f ? f.n : t('Unknown food')}
           <span className="dim small"> · {amountLabel(it, unitName(u))}</span></span>
-        <span className="small dim">{fmtNum(one.carb)} g</span>
+        <span className="small dim">{totalText(one, 'carb')} g</span>
       </div>
     })}
     <div style={{ height: 16 }} />

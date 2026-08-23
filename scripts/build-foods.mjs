@@ -226,9 +226,11 @@ function pick(flat, names, reject) {
 const field = (flat, key) => pick(flat, WANT[key], REJECT[key])
 
 const num = v => {
-  if (v == null) return null
-  const n = Number(String(v).replace(',', '.').replace(/[^\d.-]/g, ''))
-  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null
+  if (v == null || String(v).trim() === '') return null
+  const clean = String(v).replace(',', '.').replace(/[^\d.-]/g, '')
+  if (!/\d/.test(clean)) return null
+  const n = Number(clean)
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null
 }
 
 /* ---------------------------------------------------------------- build -- */

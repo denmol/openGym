@@ -17,7 +17,7 @@ import { nav } from './lib/nav.js'
 import { todayISO } from './lib/format.js'
 import { Button, Segmented, Stepper, Switch } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
-import { lastBW } from './lib/history.js'
+import { lastBW, weightIn } from './lib/history.js'
 import {
   coachProfileOf, cleanCoachProfile, isCoachReady, medicalFlag,
   LEVELS, GOALS, LEVEL_NAME, GOAL_NAME, DAYS_RANGE, MINUTES_RANGE
@@ -207,7 +207,8 @@ function CoachBridge({ profile, close }) {
   const flagged = medicalFlag(profile.limits)
 
   const bw = lastBW(st)
-  const prompt = buildPrompt(profile, { lang: getLang(), unit: st.unit, bodyweight: bw ? bw.w : null })
+  const bodyweight = weightIn(bw, st.unit)
+  const prompt = buildPrompt(profile, { lang: getLang(), unit: st.unit, bodyweight })
 
   // Does this instance hold a key? Guests and keyless instances just get the paste flow.
   useEffect(() => {
@@ -220,7 +221,7 @@ function CoachBridge({ profile, close }) {
     setProblems(null)
     try {
       const res = await generatePlan(profile, {
-        lang: getLang(), unit: st.unit, bodyweight: bw ? bw.w : null, onStep: setBusy
+        lang: getLang(), unit: st.unit, bodyweight, onStep: setBusy
       })
       // Keep the remaining-today count honest: a stale number is worse than none.
       if (res.left != null) setDirect(d => ({ ...d, left: res.left }))

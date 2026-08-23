@@ -18,26 +18,37 @@ const zero = () => NUTRIENTS.reduce((o, k) => { o[k] = 0; return o }, {})
 // One decimal is the resolution that matters: 41.5 g of carbohydrate is a different dose
 // decision from 41 g, while 41.53 is false precision on a food weighed to the nearest gram.
 const round1 = n => Math.round(n * 10) / 10
+const numberOf = value => typeof value === 'number'
+  ? value
+  : typeof value === 'string' && value.trim() ? Number(value) : NaN
 
 /**
  * Nutrients for a list of { fid, g } items.
- * A food the catalogue no longer knows contributes nothing rather than throwing — a meal
- * logged before a rebuild should still show the rest of its plate.
+ * Numeric fields keep the known sum; complete says whether that sum covers every item.
  */
 export function totalsOf(items, foods) {
   const out = zero()
+  out.complete = Object.fromEntries(NUTRIENTS.map(k => [k, true]))
   for (const it of items || []) {
-    const f = foods && foods[it.fid]
-    const g = Number(it.g) || 0
-    if (!f || !f.per100 || !g) continue
+    const f = it && foods && foods[it.fid]
+    const g = numberOf(it?.g)
+    if (!f || !f.per100 || !Number.isFinite(g) || g <= 0) {
+      for (const k of NUTRIENTS) out.complete[k] = false
+      continue
+    }
     for (const k of NUTRIENTS) {
-      const v = Number(f.per100[k])
-      if (Number.isFinite(v)) out[k] += v * g / 100
+      const v = numberOf(f.per100[k])
+      if (Number.isFinite(v) && v >= 0) out[k] += v * g / 100
+      else out.complete[k] = false
     }
   }
   for (const k of NUTRIENTS) out[k] = round1(out[k])
   return out
 }
+
+/** A total only when every logged item supplied that nutrient. */
+export const nutrientTotal = (totals, key) =>
+  totals?.complete?.[key] === false ? null : totals?.[key] ?? null
 
 /** Nutrients for one logged meal. */
 export const mealTotals = (meal, foods) => totalsOf(meal && meal.items, foods)
@@ -110,7 +121,7 @@ export function kindForNow(d = new Date()) {
  */
 export function bmr({ sex, age, heightCm, weightKg }) {
   const w = Number(weightKg), h = Number(heightCm), a = Number(age)
-  if (!(w > 0 && h > 0 && a > 0)) return null
+  if (!['male', 'female'].includes(sex) || ![w, h, a].every(n => Number.isFinite(n) && n > 0)) return null
   const base = 10 * w + 6.25 * h - 5 * a
   return Math.round(base + (sex === 'female' ? -161 : 5))
 }

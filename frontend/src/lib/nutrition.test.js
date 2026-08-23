@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  totalsOf, mealTotals, mealsOn, dayTotals, hasMeals,
+  totalsOf, nutrientTotal, mealTotals, mealsOn, dayTotals, hasMeals,
   scaleItems, newMeal, kindForNow, bmr, MEAL_KINDS
 } from './nutrition.js'
 
@@ -22,6 +22,8 @@ describe('totalsOf', () => {
     const t = totalsOf([{ fid: 'oat', g: 60 }, { fid: 'milk', g: 200 }, { fid: 'banana', g: 100 }], foods)
     expect(t.carb).toBe(64.0)      // 34.8 + 9.2 + 20
     expect(t.prot).toBe(15.7)      // 7.8 + 6.8 + 1.1
+    expect(t.complete.carb).toBe(true)
+    expect(t.complete.salt).toBe(true) // a known zero is still complete
   })
 
   it('keeps one decimal and no more', () => {
@@ -30,16 +32,54 @@ describe('totalsOf', () => {
     expect(Number.isInteger(t.carb * 10)).toBe(true)
   })
 
-  it('ignores a food the catalogue no longer knows instead of throwing', () => {
+  it('keeps known values but marks totals incomplete for an unknown food', () => {
     const t = totalsOf([{ fid: 'oat', g: 60 }, { fid: 'gone', g: 100 }], foods)
     expect(t.carb).toBe(34.8)
+    expect(t.complete.carb).toBe(false)
+    expect(t.complete.kcal).toBe(false)
   })
 
-  it('survives empty and malformed input', () => {
-    expect(totalsOf(null, foods).carb).toBe(0)
-    expect(totalsOf([{ fid: 'oat' }], foods).carb).toBe(0)
-    expect(totalsOf([{ fid: 'oat', g: 'x' }], foods).carb).toBe(0)
-    expect(() => totalsOf([{ fid: 'oat', g: 60 }], null)).not.toThrow()
+  it('keeps empty totals complete but marks missing, null and invalid grams incomplete', () => {
+    const empty = totalsOf(null, foods)
+    expect(empty.carb).toBe(0)
+    expect(empty.complete.carb).toBe(true)
+
+    for (const g of [undefined, null, 'x', true]) {
+      const t = totalsOf([{ fid: 'oat', g: 60 }, { fid: 'banana', g }], foods)
+      expect(t.carb).toBe(34.8)
+      expect(t.complete.carb).toBe(false)
+    }
+
+    const missingCatalogue = totalsOf([{ fid: 'oat', g: 60 }], null)
+    expect(missingCatalogue.carb).toBe(0)
+    expect(missingCatalogue.complete.carb).toBe(false)
+  })
+
+  it('tracks completeness per nutrient without turning missing or null into zero', () => {
+    const partialFoods = {
+      ...foods,
+      partial: { per100: { kcal: 100, carb: 10, prot: null, fat: 2 } }
+    }
+    const t = totalsOf([{ fid: 'oat', g: 60 }, { fid: 'partial', g: 100 }], partialFoods)
+
+    expect(t.carb).toBe(44.8)
+    expect(t.prot).toBe(7.8)
+    expect(t.fat).toBe(6.2)
+    expect(t.complete.carb).toBe(true)
+    expect(t.complete.prot).toBe(false)
+    expect(t.complete.sugar).toBe(false)
+    expect(nutrientTotal(t, 'carb')).toBe(44.8)
+    expect(nutrientTotal(t, 'prot')).toBeNull()
+  })
+
+  it('rejects boolean nutrient values instead of treating true as one', () => {
+    const t = totalsOf([{ fid: 'bad', g: 100 }], {
+      bad: { per100: { kcal: 100, carb: true } }
+    })
+    expect(t.kcal).toBe(100)
+    expect(t.complete.kcal).toBe(true)
+    expect(t.carb).toBe(0)
+    expect(t.complete.carb).toBe(false)
   })
 })
 
@@ -144,6 +184,12 @@ describe('bmr', () => {
 
   it('returns null rather than a number when a field is missing', () => {
     expect(bmr({ sex: 'female', age: null, heightCm: 165, weightKg: 62 })).toBeNull()
+    expect(bmr({ age: 30, heightCm: 175, weightKg: 70 })).toBeNull()
     expect(bmr({})).toBeNull()
+  })
+
+  it('rejects unknown sex and non-finite measurements', () => {
+    expect(bmr({ sex: 'other', age: 30, heightCm: 175, weightKg: 70 })).toBeNull()
+    expect(bmr({ sex: 'male', age: 30, heightCm: Infinity, weightKg: 70 })).toBeNull()
   })
 })

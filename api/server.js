@@ -9,6 +9,7 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse
 } from '@simplewebauthn/server';
 import webpush from 'web-push';
+import { cleanNutritionContext, nutritionAnswer, nutritionFactCodes } from './nutrition-context.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -341,6 +342,16 @@ const PLAN_SCHEMA = {
   }
 };
 
+// The model may only select server-verified fact codes. It has no free-text field.
+const nutritionSchema = facts => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['highlights'],
+  properties: {
+    highlights: { type: 'array', minItems: 1, maxItems: 5, uniqueItems: true, items: { type: 'string', enum: facts } }
+  }
+});
+
 // `week` travels as a list because Structured Outputs cannot express an object with unknown
 // keys. Back to the {day: routineId} map the app reads.
 function weekToMap(week) {
@@ -354,18 +365,17 @@ function weekToMap(week) {
 // Calls per user per UTC day. In memory on purpose: a restart forgiving the count is a far
 // smaller problem than another file to keep in ./data, and the cap exists to stop a runaway
 // loop rather than a determined person.
-const coachCalls = new Map();             // uid -> { day, n }
-function coachQuota(uid) {
+const aiCalls = new Map();                // uid -> { day, n }, shared by coach and nutrition
+function aiQuota(uid) {
   const day = new Date().toISOString().slice(0, 10);
-  const rec = coachCalls.get(uid);
-  if (!rec || rec.day !== day) { coachCalls.set(uid, { day, n: 0 }); return { used: 0, left: COACH_DAILY_LIMIT }; }
+  const rec = aiCalls.get(uid);
+  if (!rec || rec.day !== day) { aiCalls.set(uid, { day, n: 0 }); return { used: 0, left: COACH_DAILY_LIMIT }; }
   return { used: rec.n, left: Math.max(0, COACH_DAILY_LIMIT - rec.n) };
 }
-function coachSpend(uid) {
-  const day = new Date().toISOString().slice(0, 10);
-  const rec = coachCalls.get(uid);
-  if (!rec || rec.day !== day) coachCalls.set(uid, { day, n: 1 });
-  else rec.n++;
+function aiReserve(uid) {
+  if (aiQuota(uid).left <= 0) return false;
+  aiCalls.get(uid).n++;
+  return true;
 }
 
 /* ---------- Open Food Facts ---------- */
@@ -447,23 +457,25 @@ function offQuota(uid) {
   return { n, left: OFF_DAILY_LIMIT - n, ok: n <= OFF_DAILY_LIMIT };
 }
 
-async function askOpenAI(messages) {
+async function askOpenAI(messages, name, schema, maxCompletionTokens = null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), COACH_TIMEOUT_MS);
   try {
+    const request = {
+      model: COACH_MODEL,
+      reasoning_effort: COACH_REASONING,
+      messages,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name, strict: true, schema }
+      }
+    };
+    if (maxCompletionTokens) request.max_completion_tokens = maxCompletionTokens;
     const r = await fetch(OPENAI_BASE + '/chat/completions', {
       method: 'POST',
       signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + OPENAI_KEY },
-      body: JSON.stringify({
-        model: COACH_MODEL,
-        reasoning_effort: COACH_REASONING,
-        messages,
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'opengym_plan', strict: true, schema: PLAN_SCHEMA }
-        }
-      })
+      body: JSON.stringify(request)
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -486,7 +498,7 @@ const routes = {
   'GET /api/coach/status': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    const q = coachQuota(user.id);
+    const q = aiQuota(user.id);
     json(res, 200, { enabled: !!OPENAI_KEY, model: OPENAI_KEY ? COACH_MODEL : null, limit: COACH_DAILY_LIMIT, ...q });
   },
 
@@ -527,9 +539,6 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
-    const q = coachQuota(user.id);
-    if (q.left <= 0) return json(res, 429, { error: 'daily limit reached', ...q });
-
     const body = await readBody(req);
     const prompt = String(body.prompt || '');
     const repair = String(body.repair || '');
@@ -550,8 +559,8 @@ const routes = {
     }
 
     try {
-      coachSpend(user.id);
-      const data = await askOpenAI(messages);
+      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      const data = await askOpenAI(messages, 'opengym_plan', PLAN_SCHEMA);
       const text = data?.choices?.[0]?.message?.content || '';
       let plan;
       try { plan = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
@@ -559,8 +568,72 @@ const routes = {
         plan: { opengym_plan: 1, name: plan.name, week: weekToMap(plan.week), routines: plan.routines },
         raw: text,
         usage: data.usage || null,
-        ...coachQuota(user.id)
+        ...aiQuota(user.id)
       });
+    } catch (e) {
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
+
+  'POST /api/nutrition/assist': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+
+    const body = await readBody(req);
+    const context = cleanNutritionContext(body.context);
+    if (!context) return json(res, 400, { error: 'bad nutrition context' });
+
+    // A stale or hand-written client cannot hide a saved health flag from the consent view.
+    const stored = readState(user.id) || {};
+    const storedMedical = {
+      diabetes: stored.health?.on === true,
+      condition: stored.nutritionGoals?.condition === true,
+      medication: stored.nutritionGoals?.medication === true,
+      under18: Number(stored.coachProfile?.age) > 0 && Number(stored.coachProfile.age) < 18
+    };
+    if (Object.entries(storedMedical).some(([key, value]) => value && !context.medical[key])) {
+      return json(res, 409, { error: 'health context changed' });
+    }
+    const review = Object.values(context.medical).some(Boolean);
+
+    // Health flags never leave this server. This care-team note is fixed text, not AI text.
+    if (review) {
+      const sv = context.language === 'sv';
+      const answer = {
+        status: 'clinician_review',
+        summary: sv
+          ? 'Dagsnav använder inte AI för personliga kostmål när en hälsomarkering är aktiv. Dina sparade mål har inte ändrats.'
+          : 'Dagsnav does not use AI for personal nutrition targets when a health flag is active. Your saved targets have not changed.',
+        observations: [context.incomplete.length
+          ? (sv ? 'En eller flera näringsuppgifter saknas i dagens logg.' : 'One or more nutrient values are missing from the day log.')
+          : (sv ? 'Dagens registrerade näringsvärden kan tas med till vårdteamet.' : 'The logged nutrient values can be taken to your care team.')],
+        questions: sv
+          ? ['Vilka energi- och näringsmål är lämpliga för mig?', 'Hur vill ni att jag följer upp vikt, matlogg och behandling tillsammans?']
+          : ['Which energy and nutrient targets are appropriate for me?', 'How should I track weight, food logs and treatment together?']
+      };
+      return json(res, 200, { answer, local: true, usage: null, ...aiQuota(user.id) });
+    }
+
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+
+    const facts = nutritionFactCodes(context);
+    const messages = [
+      {
+        role: 'system',
+        content: 'Select one to five supplied fact codes that are most useful to highlight. Prefer the selected goal, missing data and user-entered targets. You can only return codes from the supplied list. Return the required JSON object only.'
+      },
+      { role: 'user', content: JSON.stringify({ language: context.language, facts }) }
+    ];
+
+    try {
+      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      const data = await askOpenAI(messages, 'dagsnav_nutrition_highlights', nutritionSchema(facts), 200);
+      const text = data?.choices?.[0]?.message?.content || '';
+      let selected;
+      try { selected = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      const answer = nutritionAnswer(selected?.highlights, context);
+      if (!answer) return json(res, 502, { error: 'model returned an invalid explanation' });
+      json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
     } catch (e) {
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }

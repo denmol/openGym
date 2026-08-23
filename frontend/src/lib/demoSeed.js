@@ -82,7 +82,7 @@ export function buildDemoState() {
     // weigh-ins: Monday and Thursday mornings
     if (day.getDay() === 1 || day.getDay() === 4) {
       const w = BW_FROM + (BW_TO - BW_FROM) * p + (rnd() - 0.5) * 0.7
-      bodyweight.push({ d: iso, w: Math.round(w * 10) / 10, t: at(day, 7, 30) })
+      bodyweight.push({ d: iso, w: Math.round(w * 10) / 10, u: 'kg', t: at(day, 7, 30) })
     }
 
     const routine = byWeekday[day.getDay()]
@@ -153,7 +153,7 @@ export function buildDemoState() {
     week: { 1: push.id, 3: pull.id, 5: legs.id },
     dayPlan,
     workouts, bodyweight, exWeights,
-    targetW: TARGET_W,
+    targetW: TARGET_W, targetWU: 'kg',
     // The history is rated, so the demo turns the column on and the stats get a scale to
     // label their aggregates with instead of guessing one (see displayScale).
     effort: 'rir'

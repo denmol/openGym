@@ -15,7 +15,7 @@ import { useStore } from '../store/useStore.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { todayISO, fmtNum } from '../lib/format.js'
 import { foodMap } from '../lib/foods.js'
-import { dayTotals } from '../lib/nutrition.js'
+import { dayTotals, hasMeals, nutrientTotal } from '../lib/nutrition.js'
 import {
   healthOf, glucoseBetween, dosesBetween, glucoseOn, dosesOn,
   glucoseStats, doseTotals, showGlucose, daysBack,
@@ -47,9 +47,9 @@ export default function Report() {
   const rows = dates.map(d => {
     const rs = glucoseOn(S, d)
     const ds = dosesOn(S, d)
-    const carbs = dayTotals(S, d, foods).carb
-    return { d, st: glucoseStats(rs, h.target), ins: doseTotals(ds), carbs }
-  }).filter(r => r.st.n > 0 || r.ins.total > 0 || r.carbs > 0)
+    const totals = dayTotals(S, d, foods)
+    return { d, st: glucoseStats(rs, h.target), ins: doseTotals(ds), carbs: nutrientTotal(totals, 'carb'), meal: hasMeals(S, d) }
+  }).filter(r => r.st.n > 0 || r.ins.total > 0 || r.meal)
 
   const when = iso => new Date(iso + 'T12:00:00').toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })
 
@@ -75,7 +75,7 @@ export default function Report() {
         {h.meds.length ? ' · ' + h.meds.map(m => t(MED_NAME[m])).join(', ') : ''}
       </p>
 
-      {stats.n === 0 && insulin.n === 0
+      {rows.length === 0
         ? <p className="rnone">{t('Nothing was logged in this period.')}</p>
         : <>
           <table className="rtab">
@@ -119,7 +119,7 @@ export default function Report() {
                   <td>{r.st.n ? g(r.st.min) : '—'}</td>
                   <td>{r.st.n ? g(r.st.max) : '—'}</td>
                   <td>{r.ins.total ? fmtNum(r.ins.total) : '—'}</td>
-                  <td>{r.carbs ? fmtNum(r.carbs) : '—'}</td>
+                  <td>{r.carbs == null ? '—' : fmtNum(r.carbs)}</td>
                 </tr>)}
               </tbody>
             </table>
@@ -131,7 +131,7 @@ export default function Report() {
       <ul className="rnotes">
         <li>{t('“In range” is the share of readings inside the target range, not a share of time. Spot readings are not evenly spaced, so this rises and falls with when someone happened to test.')}</li>
         <li>{t('Insulin is what was logged in this app. Basal delivered by a pump is not included — a pump reports basal as a rate rather than an amount, and adding rates up would invent a figure.')}</li>
-        <li>{t('Carbohydrate comes from the food log in this app and covers only meals that were logged.')}</li>
+        <li>{t('Carbohydrate comes from the food log in this app and covers only meals that were logged. A dash means at least one logged food was missing a carbohydrate value.')}</li>
         <li>{t('There is no estimated HbA1c here. It is defined over a continuous sensor trace, and calculating one from spot readings would look like a lab result without being one.')}</li>
         <li>{t('Dagsnav is a logbook. It does not calculate doses and nothing in it is medical advice.')}</li>
       </ul>

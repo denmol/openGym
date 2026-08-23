@@ -8,10 +8,12 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { todayISO, isoOf, fmtNum } from '../lib/format.js'
-import { foodMap, hasFoodDb, FOODS_SOURCE } from '../lib/foods.js'
-import { mealsOn, dayTotals, mealTotals, MEAL_NAME } from '../lib/nutrition.js'
+import { foodMap, hasFoodDb, FOODS_SOURCE, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from '../lib/foods.js'
+import { mealsOn, dayTotals, mealTotals, nutrientTotal, MEAL_NAME } from '../lib/nutrition.js'
+import { cleanNutritionProfile } from '../lib/nutrition-goals.js'
 import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
 import { mealSheet, quickLogSheet, mealDetailSheet, ownFoodSheet, deleteMyMeal, Macros } from '../food-sheets.jsx'
+import { nutritionAssistSheet, nutritionGoalsSheet } from '../nutrition-sheets.jsx'
 import { glucoseSheet, doseSheet, entrySheet, Reading } from '../glucose-sheets.jsx'
 import { Button } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
@@ -22,15 +24,46 @@ const shift = (iso, days) => {
   return isoOf(d)
 }
 
+const foodValue = (food, key) => {
+  const value = food?.per100?.[key]
+  return value == null || String(value).trim() === '' ? '—' : fmtNum(value)
+}
+
+function NutrientDetails({ totals, goals }) {
+  const incomplete = NUTRIENTS.some(key => nutrientTotal(totals, key) == null)
+  return <details className="nutrient-details">
+    <summary>
+      <span>{t('All nutrients')}</span>
+      {incomplete && <span className="nutrient-incomplete">{t('Incomplete')}</span>}
+    </summary>
+    <dl>
+      {NUTRIENTS.map(key => {
+        const value = nutrientTotal(totals, key)
+        const target = goals.targets[key]
+        return <div key={key} className={value == null ? 'incomplete' : ''}>
+          <dt>{t(NUTRIENT_NAME[key])}</dt>
+          <dd>
+            {value == null ? <><span>—</span><small>{t('Some logged foods are missing this value.')}</small></>
+              : <><span>{fmtNum(value)} {NUTRIENT_UNIT[key]}</span>
+                {target != null && <small>{t('Target: {0} {1}', fmtNum(target), NUTRIENT_UNIT[key])}</small>}</>}
+          </dd>
+        </div>
+      })}
+    </dl>
+  </details>
+}
+
 export default function Food() {
   const S = useStore(s => s.S)
   const [day, setDay] = useState(todayISO())
   const foods = foodMap(S)
   const meals = mealsOn(S, day)
   const totals = dayTotals(S, day, foods)
+  const goals = cleanNutritionProfile(S.nutritionGoals)
   const isToday = day === todayISO()
 
   const dia = diabetesOn(S)
+  const localNotes = dia || goals.condition || goals.medication || (Number(S.coachProfile?.age) > 0 && Number(S.coachProfile.age) < 18)
   const h = healthOf(S)
   const readings = dia ? glucoseOn(S, day) : []
   const doses = dia ? dosesOn(S, day) : []
@@ -41,7 +74,8 @@ export default function Food() {
     <div className="hdr"><div>
       <h1>{t('Food')}</h1>
       <div className="sub">{new Date(day + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-    </div></div>
+    </div><button className="iconbtn" onClick={nutritionGoalsSheet} aria-label={t('Nutrition goals')}
+      style={goals.goal ? { color: 'var(--acc)' } : undefined}><Icon name="target" /></button></div>
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 8 }}>
@@ -55,6 +89,12 @@ export default function Food() {
         </button>
       </div>
       <Macros totals={totals} big />
+      {meals.length > 0 && <NutrientDetails totals={totals} goals={goals} />}
+      {meals.length > 0 && goals.goal && <div style={{ marginTop: 10 }}>
+        <Button size="sm" variant="tinted" icon={localNotes ? 'shield' : 'sparkles'} onClick={() => nutritionAssistSheet(day, totals)}>
+          {t(localNotes ? 'Care-team notes' : 'Explain with AI')}
+        </Button>
+      </div>}
       {dia && (readings.length > 0 || dTot.total > 0) && <div className="row" style={{ gap: 14, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--sep)' }}>
         {readings.length > 0 && <span className="dim small">
           {t(readings.length === 1 ? '{0} reading' : '{0} readings', readings.length)} · {t('{0}% in range', fmtNum(tir.withinPct))}
@@ -89,7 +129,7 @@ export default function Food() {
             </span>
           </span>
           <span style={{ textAlign: 'right', flex: 'none' }}>
-            <span style={{ fontWeight: 600 }}>{fmtNum(tot.carb)}</span>
+            <span style={{ fontWeight: 600 }}>{nutrientTotal(tot, 'carb') == null ? '—' : fmtNum(tot.carb)}</span>
             <span className="dim small"> g</span>
           </span>
         </button>
@@ -139,7 +179,7 @@ export default function Food() {
       {(S.myFoods || []).map(f => <button key={f.id} className="lrow tap" onClick={() => ownFoodSheet(f)}>
         <span className="lrow-m">
           <span className="lrow-t">{f.n}</span>
-          <span className="lrow-s">{fmtNum(f.per100.carb ?? 0)} g {t('Carbs')} · {fmtNum(f.per100.kcal ?? 0)} kcal {t('per 100 g')}</span>
+          <span className="lrow-s">{foodValue(f, 'carb')} g {t('Carbs')} · {foodValue(f, 'kcal')} kcal {t('per 100 g')}</span>
         </span>
         <Icon name="chevronRight" className="lrow-k" />
       </button>)}

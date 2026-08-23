@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { searchFoods, allFoods, foodOf, foodMap, hasFoodDb, NUTRIENTS } from './foods.js'
+import { searchFoods, allFoods, foodOf, foodMap, hasFoodDb, cleanPer100, NUTRIENTS } from './foods.js'
 
 // The bundled catalogue is generated and untracked: empty on a fresh clone, 2 600 foods on a
 // machine that ran scripts/build-foods.mjs. These assert what holds either way — asserting an
@@ -79,5 +79,12 @@ describe('the nutrient set', () => {
   it('leads with the two numbers this app is about', () => {
     expect(NUTRIENTS[0]).toBe('kcal')
     expect(NUTRIENTS[1]).toBe('carb')
+  })
+
+  it('keeps a real zero, omits blanks and rejects invalid label values', () => {
+    expect(cleanPer100({ kcal: '120', carb: '0', prot: '', fat: null })).toEqual({ kcal: 120, carb: 0 })
+    expect(cleanPer100({ carb: '4,6' })).toEqual({ carb: 4.6 })
+    expect(cleanPer100({ kcal: -1 })).toBeNull()
+    expect(cleanPer100({ kcal: 'not a number' })).toBeNull()
   })
 })

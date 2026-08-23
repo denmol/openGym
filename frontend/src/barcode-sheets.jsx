@@ -13,7 +13,7 @@ import { fmtNum } from './lib/format.js'
 import { api } from './lib/api.js'
 import { Button } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
-import { NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
+import { cleanPer100, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import { newPortion } from './lib/portions.js'
 import {
   support, openCamera, closeCamera, scanLoop, decodeBlob, loadDecoder
@@ -52,11 +52,8 @@ function Confirm({ found, close, onSaved }) {
   const save = () => {
     const name = n.trim()
     if (!name) { toast(t('Give it a name')); return }
-    const per100 = {}
-    for (const k of NUTRIENTS) {
-      const num = Number(String(v[k]).replace(',', '.'))
-      if (Number.isFinite(num) && String(v[k]).trim() !== '') per100[k] = num
-    }
+    const per100 = cleanPer100(v)
+    if (!per100) { toast(t('Nutrient values must be zero or more.')); return }
     if (per100.kcal == null && per100.carb == null) { toast(t('Fill in at least calories or carbs')); return }
     const food = { ...foodFromProduct(found, per100), n: name }
     update(s => {

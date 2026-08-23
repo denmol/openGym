@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore, DEF, hasData } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { ACCENTS, todayISO, localTZ } from '../lib/format.js'
-import { effortOf } from '../lib/history.js'
+import { effortOf, weightIn } from '../lib/history.js'
 import { api, webauthnOK, passkeyLogin, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush } from '../lib/push.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
@@ -172,7 +172,7 @@ export default function Settings() {
     </Section>
 
     {/* ---------- general ---------- */}
-    <Section title={t('General')} footer={t('Note: switching units only changes the label — logged numbers are not converted.')}>
+    <Section title={t('General')} footer={t('Training weights already logged are not converted. Body weight and its target keep their meaning when the unit changes.')}>
       <SelectRow
         icon="globe" iconTint="var(--blue)" title={t('Language')}
         value={S.lang || 'en'} onChange={v => update(s => { s.lang = v })}
@@ -184,7 +184,14 @@ export default function Settings() {
       <Row icon="scale" iconTint="var(--teal)" title={t('Weight unit')}>
         <Segmented className="seg-inline"
           options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
-          value={S.unit} onChange={v => update(s => { s.unit = v })} />
+          value={S.unit} onChange={v => update(s => {
+            for (const entry of s.bodyweight) if (!entry.u) entry.u = s.unit
+            for (const workout of s.workouts) if (workout.bw && !workout.bwu) workout.bwu = s.unit
+            if (s.active?.bw && !s.active.bwu) s.active.bwu = s.unit
+            if (s.targetW != null) s.targetW = weightIn({ w: s.targetW, u: s.targetWU || s.unit }, v) ?? s.targetW
+            s.targetWU = s.targetW == null ? null : v
+            s.unit = v
+          })} />
       </Row>
     </Section>
 

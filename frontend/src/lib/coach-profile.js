@@ -55,6 +55,7 @@ export const coachProfileOf = S => ({
 export const isCoachReady = p => !!(p && Array.isArray(p.equipment) && p.equipment.length)
 
 const clampNum = (v, [lo, hi]) => {
+  if (v == null || typeof v === 'boolean' || (typeof v === 'string' && !v.trim())) return null
   const n = Number(v)
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : null
 }

@@ -26,6 +26,19 @@ export const NUTRIENT_NAME = {
 }
 export const NUTRIENT_UNIT = { kcal: 'kcal', carb: 'g', sugar: 'g', prot: 'g', fat: 'g', sat: 'g', fib: 'g', salt: 'g' }
 
+/** Per-100-g values typed from a label. Blank stays missing; an invalid value rejects all. */
+export function cleanPer100(values = {}) {
+  const out = {}
+  for (const key of NUTRIENTS) {
+    const raw = values[key]
+    if (raw == null || String(raw).trim() === '') continue
+    const value = Number(String(raw).replace(',', '.'))
+    if (!Number.isFinite(value) || value < 0) return null
+    out[key] = value
+  }
+  return out
+}
+
 /** Is the bundled database present? The UI says so plainly when it is not. */
 export const hasFoodDb = () => FOODS.length > 0
 

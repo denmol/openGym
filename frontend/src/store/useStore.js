@@ -8,7 +8,7 @@ import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 const KEY = 'gym_state_v1'
 export const DEF = {
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
-  theme: 'dark', accent: 'lime', body: 'male', targetW: null,
+  theme: 'dark', accent: 'lime', body: 'male', targetW: null, targetWU: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
@@ -29,6 +29,9 @@ export const DEF = {
   // Portions the user weighed once, per food (lib/portions.js): "1 st = 61 g" for their
   // eggs, their bread. What makes logging possible without a scale on the counter.
   portions: [],
+  // Personal nutrition objective and optional daily targets. Demographics stay in the
+  // shared coach profile; these values are always typed and confirmed by the user.
+  nutritionGoals: null,
   // Diabetes mode (lib/diabetes.js). null until someone turns it on in Settings — read it
   // through healthOf, which overlays the defaults, rather than reaching in here.
   health: null,
@@ -47,7 +50,11 @@ function loadState() {
   return clone(DEF)
 }
 
-const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length)
+const hasData = st => !!(st && (
+  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses']
+    .some(key => (st[key] || []).length) ||
+  st.coachProfile || st.health || st.nutritionGoals || st.targetW != null || st.active
+))
 
 export const useStore = create((set, get) => {
   let pushTm = null
