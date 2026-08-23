@@ -219,20 +219,24 @@ describe('NNR reference', () => {
 describe('nutrition reference engine', () => {
   describe('dailyNutritionReferences', () => {
     const ids = (state, nutrient) => dailyNutritionReferences(state, nutrient).map(item => item.id)
+    const dailyMap = state => Object.fromEntries(NUTRIENT_TARGETS.map(key => [key,
+      dailyNutritionReferences(state, key).map(({ id, value, operator }) => ({ id, value, operator: operator || null }))
+    ]))
 
-    it('returns the exact comparable adult references without inventing calorie or sugar targets', () => {
-      const state = nutritionReferenceState({ ...AI_SAFE, medication: true }, { age: 40, today: '2026-08-23' })
-      expect(Object.fromEntries(NUTRIENT_TARGETS.map(key => [key, ids(state, key)]))).toEqual({
-        kcal: [], carb: ['nnr-carb'], sugar: [], prot: ['nnr-protein'],
-        fat: ['nnr-fat'], sat: ['nnr-saturated'], fib: ['nnr-fiber-range'], salt: ['nnr-salt']
+    it.each([['condition', { condition: true }], ['medication', { medication: true }]])(
+      'returns the exact comparable adult references with %s without inventing calorie or sugar targets', (_name, medical) => {
+        const state = nutritionReferenceState({ ...AI_SAFE, ...medical }, { age: 40, today: '2026-08-23' })
+        expect(dailyMap(state)).toEqual({
+          kcal: [],
+          carb: [{ id: 'nnr-carb', value: { min: 45, max: 60 }, operator: null }],
+          sugar: [],
+          prot: [{ id: 'nnr-protein', value: { min: 10, max: 20 }, operator: null }],
+          fat: [{ id: 'nnr-fat', value: { min: 25, max: 40 }, operator: null }],
+          sat: [{ id: 'nnr-saturated', value: 10, operator: '<' }],
+          fib: [{ id: 'nnr-fiber-range', value: { min: 25, max: 35 }, operator: null }],
+          salt: [{ id: 'nnr-salt', value: 5.75, operator: '≤' }]
+        })
       })
-      expect(dailyNutritionReferences(state, 'carb')[0].value).toEqual({ min: 45, max: 60 })
-      expect(dailyNutritionReferences(state, 'prot')[0].value).toEqual({ min: 10, max: 20 })
-      expect(dailyNutritionReferences(state, 'fat')[0].value).toEqual({ min: 25, max: 40 })
-      expect(dailyNutritionReferences(state, 'sat')[0]).toMatchObject({ value: 10, operator: '<' })
-      expect(dailyNutritionReferences(state, 'fib')[0].value).toEqual({ min: 25, max: 35 })
-      expect(dailyNutritionReferences(state, 'salt')[0].value).toBe(5.75)
-    })
 
     it('adds only the exact daily GLP-1 references for active obesity treatment', () => {
       const state = nutritionReferenceState(CURRENT_GLP, { age: 40, today: '2026-08-23' })

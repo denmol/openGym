@@ -250,14 +250,15 @@ h4.sec{
 .nbmr-value{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:2px 0 4px;font-variant-numeric:tabular-nums}
 .nmedical{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px;border-radius:var(--r);background:color-mix(in srgb,var(--orange) 12%,var(--surface));color:var(--orange);font-size:13px;line-height:1.45}
 .nmedical>.icn{font-size:19px;flex:none;margin-top:1px}
-.ntargets{border-radius:var(--r);background:var(--surface);padding:0 12px}
-.ntargets label{min-height:52px;border-top:var(--hair) solid var(--sep);font-size:14px;flex-wrap:wrap;padding:8px 0}
+.ntargets{margin-top:6px;border-radius:var(--r);background:var(--surface);padding:0 12px}
+.ntargets label{min-height:60px;align-items:flex-start;border-top:var(--hair) solid var(--sep);font-size:14px;padding:8px 0}
 .ntargets label:first-child{border-top:0}
-.ntargets .nwith-unit{width:132px}
-.ntargets .input{padding:8px 10px}
-.ntarget-reference{display:block;width:100%;color:var(--label-3);font-size:11px;line-height:1.4}
+.ntarget-copy{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.ntarget-name{line-height:1.35}
+.ntargets .nwith-unit{width:132px;flex:none}
+.ntargets .input{min-height:44px;padding:8px 10px}
+.ntarget-reference{display:block;color:var(--label-3);font-size:11px;line-height:1.4}
 .ntarget-reference-value{font-variant-numeric:tabular-nums;color:var(--label-2)}
-.ntarget-reference a{color:var(--acc)}
 .nreference-note{margin-top:10px;padding:0 4px;color:var(--label-2);font-size:12px;line-height:1.45}
 .nreference{margin-top:12px;border-radius:var(--r);background:var(--surface);padding:0 12px}
 .nreference summary{min-height:44px;display:flex;align-items:center;color:var(--label-2);cursor:pointer;font-size:13px}
@@ -273,7 +274,7 @@ h4.sec{
 .nsafety-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:0 0 174px}
 .nsafety-buttons button{min-height:44px;padding:6px 8px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--label-2);font-size:12px}
 .nsafety-buttons button.on{background:var(--acc-soft);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc-line)}
-.ntarget-paused{display:block;width:100%;color:var(--orange);font-size:11px;line-height:1.4}
+.ntarget-paused{display:block;color:var(--orange);font-size:11px;line-height:1.4}
 .nref-list{display:grid;gap:10px;margin-top:10px}
 .nref-card{padding:12px;border-radius:var(--r);background:var(--surface)}
 .nref-head,.nref-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}

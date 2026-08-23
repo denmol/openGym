@@ -251,14 +251,35 @@ function GoalsSheet({ close }) {
       {t('References are general source values, not personal treatment targets or medical advice. Your care plan and advice from your care team take priority.')}
     </div>
 
-    <h4 className="sec">{t('Own targets and automatic references')}</h4>
-    <div className="dim small" style={{ marginBottom: 6 }}>{t('Empty fields mean that you have not entered an own target. Applicable scientific references appear automatically below each nutrient.')}</div>
+    <h4 className="sec">{t('Recommendations and own targets')}</h4>
+    <div className="nreference-note">
+      {t('The values are shown before each field as general population references, not personal recommendations. Nothing is copied into your own target.')}{' '}
+      <a href="https://pub.norden.org/nord2023-003/recommendations.html" target="_blank" rel="noopener">
+        {t('Source: Nordic Nutrition Recommendations 2023')}
+      </a>
+    </div>
     <div className="ntargets">
       {NUTRIENT_TARGETS.map(key => {
         const paused = referenceState.pausedTargets.includes(key)
         const references = dailyNutritionReferences(referenceState, key)
         return <label key={key} className={paused ? 'paused' : ''}>
-          <span>{t(NUTRIENT_NAME[key])}</span>
+          <span className="ntarget-copy">
+            <span className="ntarget-name">{t(NUTRIENT_NAME[key])}</span>
+            {references.map(reference => <small className="ntarget-reference" key={reference.id}>
+              <span className="ntarget-reference-value">{t(reference.layer === 'adult'
+                ? 'General adult reference: {0}'
+                : reference.kind === 'example' ? 'Source example: {0}' : 'Weight-treatment reference: {0}',
+              formatNutritionReference(reference, dateLocale(), t(reference.unit)))}</span>
+              <span> · {t(reference.source)}</span>
+            </small>)}
+            {!paused && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
+              {t('No automatic calorie target — energy expenditure has not been measured.')}
+            </small>}
+            {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
+              {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}
+            </small>}
+            {paused && <small className="ntarget-paused">{t('Paused — needs review')}</small>}
+          </span>
           <span className="nwith-unit">
             <NumberField id={`nutrition-target-${key}`} className="input" value={profile.targets[key]} nullable
               placeholder={t('Own target')}
@@ -266,18 +287,6 @@ function GoalsSheet({ close }) {
               onChange={value => setTarget(key, value)} />
             <i>{NUTRIENT_UNIT[key]}</i>
           </span>
-          {references.map(reference => <small className="ntarget-reference" key={reference.id}>
-            <span className="ntarget-reference-value">{t(reference.kind === 'example' ? 'Source example: {0}' : 'Reference: {0}',
-              formatNutritionReference(reference, dateLocale(), t(reference.unit)))}</span>
-            <span> · <a href={reference.sourceUrl} target="_blank" rel="noopener">{t(reference.source)}</a></span>
-          </small>)}
-          {!paused && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
-            {t('No automatic calorie target — energy expenditure has not been measured.')}
-          </small>}
-          {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
-            {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}
-          </small>}
-          {paused && <small className="ntarget-paused">{t('Paused — needs review')}</small>}
         </label>
       })}
     </div>
