@@ -136,6 +136,12 @@ on that repository's secret, because the server only generates one when the file
 `db.json` for accounts you do not recognise while you are there — a committed `db.json` brings its
 author's registered passkey along with it, and that credential works against your server.
 
+`scripts/secure-data.sh` does the whole migration for an instance in that position: backs up,
+moves `data/` out of the checkout, rotates the two secrets if they are still the committed ones,
+removes the imported account, and grants the remaining profile the admin panel. Run it with
+`--dry-run` first; it changes nothing and prints what it would do. It is a one-off and can be
+deleted once it has run.
+
 ## 6. Notifications
 
 openGym can push two kinds of alert to your phone/desktop, even when the app isn't open:
