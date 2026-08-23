@@ -1,4 +1,8 @@
-// The day's food. Carbohydrate is the headline everywhere on this screen.
+// The day's food, and — where diabetes mode is on — the day's readings and doses beside it.
+//
+// Carbohydrate is the headline everywhere on this screen. Glucose sits next to it rather
+// than on a screen of its own, because the question worth answering is what happened after
+// a meal, and two screens is where that question goes to die.
 
 import { useState } from 'react'
 import { useStore } from '../store/useStore.js'
@@ -6,7 +10,9 @@ import { t, dateLocale } from '../lib/i18n.js'
 import { todayISO, isoOf, fmtNum } from '../lib/format.js'
 import { foodMap, hasFoodDb, FOODS_SOURCE } from '../lib/foods.js'
 import { mealsOn, dayTotals, mealTotals, MEAL_NAME } from '../lib/nutrition.js'
+import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
 import { mealSheet, quickLogSheet, mealDetailSheet, ownFoodSheet, deleteMyMeal, Macros } from '../food-sheets.jsx'
+import { glucoseSheet, doseSheet, entrySheet, Reading } from '../glucose-sheets.jsx'
 import { Button } from '../components/ui.jsx'
 import Icon from '../components/Icon.jsx'
 
@@ -23,6 +29,13 @@ export default function Food() {
   const meals = mealsOn(S, day)
   const totals = dayTotals(S, day, foods)
   const isToday = day === todayISO()
+
+  const dia = diabetesOn(S)
+  const h = healthOf(S)
+  const readings = dia ? glucoseOn(S, day) : []
+  const doses = dia ? dosesOn(S, day) : []
+  const dTot = doseTotals(doses)
+  const tir = timeInRange(readings, h.target)
 
   return <>
     <div className="hdr"><div>
@@ -42,17 +55,30 @@ export default function Food() {
         </button>
       </div>
       <Macros totals={totals} big />
-      {!meals.length && <div className="dim small" style={{ marginTop: 10 }}>{t('Nothing logged yet')}</div>}
+      {dia && (readings.length > 0 || dTot.total > 0) && <div className="row" style={{ gap: 14, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--sep)' }}>
+        {readings.length > 0 && <span className="dim small">
+          {t(readings.length === 1 ? '{0} reading' : '{0} readings', readings.length)} · {t('{0}% in range', fmtNum(tir.withinPct))}
+        </span>}
+        {dTot.total > 0 && <span className="dim small">{t('{0} units of insulin', fmtNum(dTot.total))}</span>}
+      </div>}
+      {!meals.length && !readings.length && !doses.length &&
+        <div className="dim small" style={{ marginTop: 10 }}>{t('Nothing logged yet')}</div>}
     </div>
 
     {isToday && <div className="card">
       <Button variant="primary" icon="star" onClick={quickLogSheet}>{t('My meals')}</Button>
       <div style={{ height: 8 }} />
       <Button icon="plus" onClick={() => mealSheet()}>{t('Log a meal')}</Button>
+      {dia && <>
+        <div style={{ height: 8 }} />
+        <Button icon="dot" onClick={() => glucoseSheet()}>{t('Log a reading')}</Button>
+        <div style={{ height: 8 }} />
+        <Button icon="plus" onClick={() => doseSheet()}>{t('Log a dose')}</Button>
+      </>}
     </div>}
 
     {meals.length > 0 && <div className="card">
-      <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Today')}</h2>
+      <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Meals')}</h2>
       {meals.map(m => {
         const tot = mealTotals(m, foods)
         return <button key={m.id} className="lrow tap" onClick={() => mealDetailSheet(m)}>
@@ -68,6 +94,34 @@ export default function Food() {
           </span>
         </button>
       })}
+    </div>}
+
+    {dia && readings.length > 0 && <div className="card">
+      <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Readings')}</h2>
+      {readings.map(g => <button key={g.id} className="lrow tap" onClick={() => entrySheet(g, 'glucose')}>
+        <span className="lrow-m">
+          <span className="lrow-t">{g.t}</span>
+          {g.tag && <span className="lrow-s">{t(TAG_NAME[g.tag])}</span>}
+        </span>
+        <Reading v={g.v} unit={h.gUnit} target={h.target} />
+      </button>)}
+      <div className="dim small" style={{ marginTop: 8 }}>
+        {t('{0} in range, {1} below, {2} above', tir.within, tir.below, tir.above)}
+      </div>
+    </div>}
+
+    {dia && doses.length > 0 && <div className="card">
+      <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Insulin')}</h2>
+      {doses.map(x => <button key={x.id} className="lrow tap" onClick={() => entrySheet(x, 'dose')}>
+        <span className="lrow-m">
+          <span className="lrow-t">{x.t}</span>
+          <span className="lrow-s">{t(DOSE_NAME[x.kind] || 'Meal dose')}</span>
+        </span>
+        <span style={{ fontWeight: 600 }}>{fmtNum(x.u)}<span className="dim small"> {t('units')}</span></span>
+      </button>)}
+      <div className="dim small" style={{ marginTop: 8 }}>
+        {t('{0} units in total', fmtNum(dTot.total))}
+      </div>
     </div>}
 
     {(S.myMeals || []).length > 0 && <div className="card">

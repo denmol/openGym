@@ -917,3 +917,48 @@ h4.sec{
   .exmedia img{height:380px}
   .hm-wrap{display:flex;flex-direction:column;align-items:center}
 }
+
+/* ============================ the care-team report ============================
+
+   Two audiences on one page. On screen it is another openGym view; on paper it is a
+   document a nurse reads in ten seconds, so printing drops the app entirely — tab bar,
+   the period picker, the print button itself — and switches to black on white. The
+   colours in this app are chosen for a phone at night and turn to mud on a laser
+   printer, so print does not try to keep them.                                       */
+
+.report .rsheet { padding: 2px 0 24px }
+.report .rt { font-size: 20px; font-weight: 700; margin: 0 0 2px }
+.report .rsub { color: var(--label-2); font-size: 13px; margin: 0 0 16px }
+.report .rh { font-size: 16px; font-weight: 650; margin: 22px 0 8px }
+.report .rnone { color: var(--label-2); font-size: 14px }
+.report .rtab { width: 100%; border-collapse: collapse; font-size: 14px }
+.report .rtab th { text-align: left; font-weight: 500; color: var(--label-2); padding: 5px 0 }
+.report .rtab td { text-align: right; padding: 5px 0; font-variant-numeric: tabular-nums }
+.report .rgrid { font-size: 13px }
+.report .rgrid th, .report .rgrid td { padding-left: 10px; padding-right: 0 }
+.report .rgrid th:first-child, .report .rgrid td:first-child { padding-left: 0 }
+.report .rgrid thead th { text-align: right; border-bottom: 1px solid var(--sep); padding-bottom: 6px }
+.report .rgrid thead th:first-child { text-align: left }
+.report .rgrid td { border-bottom: 1px solid var(--sep) }
+.report .rgrid td:first-child { text-align: left }
+.report .rnotes { margin: 0; padding-left: 18px; color: var(--label-2); font-size: 12.5px; line-height: 1.5 }
+.report .rnotes li { margin-bottom: 6px }
+
+/* A table that outgrows a narrow phone scrolls inside itself rather than pushing the
+   whole page sideways. */
+.report .rgrid { display: block; overflow-x: auto; white-space: nowrap }
+
+@media print {
+  /* Everything that is app rather than document. */
+  .noprint, #tabbar, #toast, #timer, #modal-root { display: none !important }
+  html, body { background: #fff !important; color: #000 !important }
+  #app { padding: 0 !important; max-width: none !important }
+  .report .rsheet { padding: 0 }
+  .report .rsub, .report .rtab th, .report .rnotes { color: #333 !important }
+  .report .rgrid { display: table; overflow: visible; white-space: normal }
+  .report .rgrid thead th, .report .rgrid td { border-bottom: 1px solid #ccc !important }
+  /* A day table split across a page break is unreadable; keep each row whole. */
+  .report tr { break-inside: avoid }
+  .report .rh { break-after: avoid }
+  @page { margin: 16mm }
+}

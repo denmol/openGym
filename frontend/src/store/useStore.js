@@ -25,7 +25,14 @@ export const DEF = {
   // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates
   // ("my breakfast") and myFoods are the user's own entries — the same relationship
   // customEx has with the exercise catalogue.
-  meals: [], myMeals: [], myFoods: []
+  meals: [], myMeals: [], myFoods: [],
+  // Diabetes mode (lib/diabetes.js). null until someone turns it on in Settings — read it
+  // through healthOf, which overlays the defaults, rather than reaching in here.
+  health: null,
+  // Glucose readings, always stored in mmol/L whatever the profile displays, and insulin
+  // doses in units. Both carry src: 'import' when they came out of a file, which is what
+  // makes an import undoable without touching what was typed by hand.
+  glucose: [], doses: []
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 

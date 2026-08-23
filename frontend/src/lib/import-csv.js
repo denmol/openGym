@@ -24,11 +24,14 @@ import { uid } from './format.js'
 /* ----------------------------------------------------------------- CSV ---- */
 
 /**
- * A real CSV reader: quoted fields, embedded commas and newlines, doubled quotes, BOM
+ * A real CSV reader: quoted fields, embedded separators and newlines, doubled quotes, BOM
  * and CRLF. Splitting on commas breaks on the first exercise named "Bench Press, Close
  * Grip" — and a whole history would import shifted by one column without ever erroring.
+ *
+ * The separator is a parameter because a CSV written by a European tool is very often
+ * semicolon-delimited: comma is the decimal point there, so the two cannot both be commas.
  */
-export function parseCSV(text) {
+export function parseCSV(text, delim = ',') {
   const rows = []
   let row = [], field = '', quoted = false
   const s = String(text).replace(/^﻿/, '')
@@ -38,7 +41,7 @@ export function parseCSV(text) {
       if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++ } else quoted = false }
       else field += c
     } else if (c === '"') quoted = true
-    else if (c === ',') { row.push(field); field = '' }
+    else if (c === delim) { row.push(field); field = '' }
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && s[i + 1] === '\n') i++
       row.push(field); field = ''

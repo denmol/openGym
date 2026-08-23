@@ -13,6 +13,8 @@ import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
 import { coachProfileOf, isCoachReady } from '../lib/coach-profile.js'
+import { healthSheet, healthSummary, importGlucoseSheet, undoImport, hasImported } from '../glucose-sheets.jsx'
+import { diabetesOn } from '../lib/diabetes.js'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
@@ -24,6 +26,7 @@ export default function Settings() {
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
   const importRef = useRef(null)
+  const glucoseRef = useRef(null)
   const wakeOK = wakeLockSupported()
 
   const doExport = async () => {
@@ -50,6 +53,18 @@ export default function Settings() {
     }
     rd.readAsText(f)
   }
+  // Glucose and insulin out of a device export. The sheet does the deciding — this only
+  // gets the text off disk — because the confirmation is the whole point of that flow.
+  const doGlucoseImport = ev => {
+    const f = ev.target.files[0]
+    ev.target.value = ''                  // so picking the same file twice still fires
+    if (!f) return
+    const rd = new FileReader()
+    rd.onload = () => importGlucoseSheet(String(rd.result))
+    rd.onerror = () => toast(t('Could not read that file'))
+    rd.readAsText(f)
+  }
+
   const signInHere = async () => {
     try { const u = await passkeyLogin(); setUser(u); await pullState(); toast(t('Welcome back, {0}', u.name)) }
     catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') toast(e.message || t('Sign-in failed')) }
@@ -114,6 +129,33 @@ export default function Settings() {
           confirmText: t('Undo'),
           onConfirm: undoCoachPlan
         })} />}
+    </Section>
+
+    {/* ---------- diabetes ---------- */}
+    <Section title={t('Diabetes')}
+      footer={diabetesOn(S)
+        ? t('A logbook, not a calculator. openGym never works out a dose, and nothing in it is medical advice.')
+        : null}>
+      <Row icon="heart" iconTint="var(--red)" accessory="chevron"
+        title={diabetesOn(S) ? t('Diabetes mode') : t('Turn on diabetes mode')}
+        subtitle={diabetesOn(S) ? healthSummary(S) : t('Glucose log, insulin log and a report for appointments')}
+        onClick={healthSheet} />
+      {diabetesOn(S) && <>
+        <Row icon="upload" iconTint="var(--blue)" title={t('Import from meter or pump')}
+          subtitle={t('A CSV from CareLink, Libre or your meter — you confirm what it found before anything is saved.')}
+          accessory="chevron" onClick={() => glucoseRef.current.click()} />
+        {hasImported(S) && <Row icon="reset" iconTint="var(--orange)" title={t('Undo the last import')}
+          subtitle={t('Removes everything that came from a file. Hand-typed entries stay.')} accessory="chevron"
+          onClick={() => confirmSheet({
+            title: t('Undo the import?'),
+            message: t('Every reading and dose that came from a file is removed. Anything you typed yourself is left alone.'),
+            confirmText: t('Undo'),
+            onConfirm: undoImport
+          })} />}
+        <Row icon="clipboard" iconTint="var(--indigo)" title={t('Report for your care team')}
+          subtitle={t('Time in range, insulin and carbs — printed or saved as a PDF')}
+          accessory="chevron" onClick={() => nav('/report')} />
+      </>}
     </Section>
 
     {/* ---------- general ---------- */}
@@ -201,6 +243,7 @@ export default function Settings() {
       <Row icon="trash" iconTint="var(--red)" title={t('Reset everything')} danger onClick={() => confirmSheet({ title: t('Reset everything?'), message: t('Deletes your plan, workouts and body weight on this device. This cannot be undone.'), confirmText: t('Delete everything'), danger: true, onConfirm: () => { replaceState(JSON.parse(JSON.stringify(DEF)), true); nav('/home'); toast(t('All data reset')) } })} />
     </Section>
     <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doImport} />
+    <input ref={glucoseRef} type="file" data-import="glucose" accept=".csv,text/csv,text/plain" style={{ display: 'none' }} onChange={doGlucoseImport} />
     {/* Reset after reading so picking the same file twice still fires onChange. */}
     <input ref={importRef} type="file" accept=".csv,.xml,text/csv,text/xml" style={{ display: 'none' }}
       onChange={ev => { const f = ev.target.files[0]; if (f) importFromApp(f); ev.target.value = '' }} />
