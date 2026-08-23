@@ -5,6 +5,7 @@ import { useUI } from '../store/useUI.js'
 import { exOr } from '../lib/exercises.js'
 import { effectiveRoutine, lastEntryFor, bestWeightFor, buildSets, setsDoneActive, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, sideReps, repStep, EFFORT, effortOf, stepEffort, capEffort } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
+import { formatKm, formatPace, sumCardio } from '../lib/cardio.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import { api } from '../lib/api.js'
@@ -82,7 +83,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   const col1 = cardio ? { f: 'min', step: 1, dec: false, hd: t('Duration (min)') }
     : timed ? { f: 'sec', step: 5, dec: false, hd: t('Seconds') }
       : (bw && !added) ? repCol : loadCol
-  const col2 = cardio ? { f: 'speed', step: 0.5, dec: true, hd: t('Speed (km/h)') }
+  const col2 = cardio ? { f: 'km', step: 0.5, dec: true, opt: true, hd: t('Distance (km)') }
     : timed ? ((bw && !added) ? null : loadCol)
       : (bw && !added) ? null : repCol
   // Effort (RIR or RPE, whichever the profile logs) only makes sense for weighted rep sets,
@@ -90,9 +91,14 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   // because an unlogged effort is not the same as 0 — RIR 0 says the set went to failure.
   const kind = effortOf(S)
   const eff = EFFORT[kind]
-  const col3 = mode === 'reps' && eff ? { ...eff, eff: kind, dec: true, opt: true, hd: t(eff.hd) } : null
+  // Cardio gets the third column instead, for heart rate. It is optional in the same sense
+  // effort is — an unrecorded pulse is not a pulse of zero — and it is shown rather than
+  // hidden behind a setting because a cardio exercise has a couple of sets, not twenty.
+  const col3 = cardio ? { f: 'hr', step: 5, dec: false, opt: true, hd: t('Heart rate') }
+    : mode === 'reps' && eff ? { ...eff, eff: kind, dec: true, opt: true, hd: t(eff.hd) } : null
   // The effort column walks its own scale — see stepEffort. Weight and reps step up from 0
   // with no ceiling, as they always did.
+  const done = cardio ? sumCardio(entry.sets) : null
   const bump = (s, i, col, dir) => {
     if (col.eff) return onField(i, col.f, stepEffort(col.eff, s[col.f], dir))
     onField(i, col.f, Math.max(0, Math.round(((s[col.f] || 0) + dir * col.step) * 100) / 100))
@@ -142,6 +148,14 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
           onClick={() => onStartTimed(i)}><Icon name="play" /></button>}
         <Check checked={s.done} onChange={() => onToggle(i)} />
       </div>)}
+      {cardio && done.sets > 0 && <div className="small dim" style={{ marginTop: 6 }}>
+        {t('So far')}: {[
+          `${fmtNum(done.minutes)} min`,
+          done.km > 0 && `${done.anyDistanceDerived ? '≈' : ''}${formatKm(done.km)} km`,
+          formatPace(done.pace) && `${formatPace(done.pace)}/km`,
+          done.hr && `${done.hr} bpm`
+        ].filter(Boolean).join(' · ')}
+      </div>}
       <div style={{ height: 8 }} />
       <div className="row">
         <Button size="sm" icon="minus" disabled={entry.sets.length <= 1} onClick={onRemoveSet}>{t('Remove set')}</Button>
@@ -177,7 +191,7 @@ function ActiveWorkout() {
   const addSet = idx => mutEntry(idx, e => {
     const l = e.sets[e.sets.length - 1]
     const m = modeOf({ ...(e.target || {}), id: e.id })
-    if (m === 'cardio') e.sets.push({ min: l ? l.min : (e.target.min || 20), speed: l ? l.speed : (e.target.speed || 8), done: false })
+    if (m === 'cardio') e.sets.push({ min: l ? l.min : (e.target.min || 20), km: l?.km ?? e.target.km ?? null, done: false })
     else if (m === 'time') e.sets.push({ sec: l ? l.sec : (e.target.sec || 45), w: l ? (l.w || 0) : (e.target.weight || 0), done: false })
     else e.sets.push({ w: l ? l.w : 0, r: l ? l.r : e.target.reps, done: false })
   })

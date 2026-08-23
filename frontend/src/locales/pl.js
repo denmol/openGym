@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': '{0} {1} ponad maksimum',
   '{0} {1} to go': 'brakuje {0} {1}',
   'Daily target for {0}. Suggested: {1} {2}': 'Cel dzienny dla {0}. Propozycja: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': 'Dystans (km)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': 'Dystanse oznaczone ≈ obliczono z zapisanej prędkości, a nie zmierzono.',
+  'Heart rate': 'Tętno',
+  'Longest: {0} min': 'Najdłuższa: {0} min',
+  'No cardio in this period.': 'Brak cardio w tym okresie.',
+  'So far': 'Dotychczas',
+  'distance': 'dystans',
+  'over {0} sessions': 'w {0} sesjach',
+  'time and distance': 'czas i dystans',
+  '{0} bpm across {1} min': '{0} bpm przez {1} min',
+  '{0} km': '{0} km',
+  '{0} sessions': '{0} sesji',
 }

@@ -32,6 +32,15 @@ export const fmtVol = (v, unit) => fmtNum(v) + ' ' + unit
 // Plural forms are not automatic when the English string is the key.
 export const exCount = n => t(n === 1 ? '{0} exercise' : '{0} exercises', n)
 
+// The Monday of the week a date falls in, as a timestamp — the x value every weekly chart
+// plots against.
+export function mondayOf(iso) {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  d.setHours(12, 0, 0, 0)
+  return +d
+}
+
 export function weekKey(d) {
   const dt = new Date(d + 'T12:00:00')
   const day = (dt.getDay() + 6) % 7

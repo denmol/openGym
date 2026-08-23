@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': 'üst sınırın {0} {1} üzerinde',
   '{0} {1} to go': '{0} {1} eksik',
   'Daily target for {0}. Suggested: {1} {2}': '{0} için günlük hedef. Öneri: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': 'Mesafe (km)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': '≈ ile işaretli mesafeler ölçülmedi; kaydedilmiş bir hızdan hesaplandı.',
+  'Heart rate': 'Nabız',
+  'Longest: {0} min': 'En uzun: {0} dk',
+  'No cardio in this period.': 'Bu dönemde kardiyo yok.',
+  'So far': 'Şu ana kadar',
+  'distance': 'mesafe',
+  'over {0} sessions': '{0} antrenmanda',
+  'time and distance': 'süre ve mesafe',
+  '{0} bpm across {1} min': '{1} dakikada {0} bpm',
+  '{0} km': '{0} km',
+  '{0} sessions': '{0} antrenman',
 }

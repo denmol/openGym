@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': '{0} {1} сверх максимума',
   '{0} {1} to go': 'не хватает {0} {1}',
   'Daily target for {0}. Suggested: {1} {2}': 'Суточная цель для {0}. Рекомендация: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': 'Дистанция (км)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': 'Дистанции с пометкой ≈ рассчитаны из записанной скорости, а не измерены.',
+  'Heart rate': 'Пульс',
+  'Longest: {0} min': 'Самая длинная: {0} мин',
+  'No cardio in this period.': 'За этот период кардио не было.',
+  'So far': 'Пока что',
+  'distance': 'дистанция',
+  'over {0} sessions': 'за {0} тренировок',
+  'time and distance': 'время и дистанция',
+  '{0} bpm across {1} min': '{0} уд/мин за {1} мин',
+  '{0} km': '{0} км',
+  '{0} sessions': '{0} тренировок',
 }

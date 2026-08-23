@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': 'अधिकतम से {0} {1} अधिक',
   '{0} {1} to go': '{0} {1} और चाहिए',
   'Daily target for {0}. Suggested: {1} {2}': '{0} के लिए दैनिक लक्ष्य। सुझाव: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': 'दूरी (किमी)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': '≈ चिह्नित दूरियाँ मापी नहीं गईं, बल्कि दर्ज गति से निकाली गई हैं।',
+  'Heart rate': 'हृदय गति',
+  'Longest: {0} min': 'सबसे लंबा: {0} मिनट',
+  'No cardio in this period.': 'इस अवधि में कोई कार्डियो नहीं।',
+  'So far': 'अब तक',
+  'distance': 'दूरी',
+  'over {0} sessions': '{0} सत्रों में',
+  'time and distance': 'समय और दूरी',
+  '{0} bpm across {1} min': '{1} मिनट में {0} bpm',
+  '{0} km': '{0} किमी',
+  '{0} sessions': '{0} सत्र',
 }

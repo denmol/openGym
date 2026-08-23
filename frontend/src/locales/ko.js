@@ -636,4 +636,17 @@ export default {
   '{0} {1} over the maximum': '상한을 {0} {1} 초과',
   '{0} {1} to go': '{0} {1} 부족',
   'Daily target for {0}. Suggested: {1} {2}': '{0}의 하루 목표. 제안: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': '거리(km)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': '≈ 표시된 거리는 측정값이 아니라 기록된 속도에서 계산한 값입니다.',
+  'Heart rate': '심박수',
+  'Longest: {0} min': '최장: {0}분',
+  'No cardio in this period.': '이 기간에 유산소 운동이 없습니다.',
+  'So far': '현재까지',
+  'distance': '거리',
+  'over {0} sessions': '{0}회 세션 동안',
+  'time and distance': '시간과 거리',
+  '{0} bpm across {1} min': '{1}분 동안 {0} bpm',
+  '{0} km': '{0} km',
+  '{0} sessions': '{0}회 세션',
 }

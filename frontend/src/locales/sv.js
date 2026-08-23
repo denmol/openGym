@@ -1231,4 +1231,17 @@ export default {
   '{0} {1} over the maximum': '{0} {1} över taket',
   '{0} {1} to go': '{0} {1} kvar att nå',
   'Daily target for {0}. Suggested: {1} {2}': 'Dagligt mål för {0}. Förslag: {1} {2}',
+  // --- cardio ---
+  'Distance (km)': 'Distans (km)',
+  'Distances marked ≈ were calculated from a logged speed rather than measured.': 'Distanser märkta ≈ är beräknade från en loggad hastighet, inte uppmätta.',
+  'Heart rate': 'Puls',
+  'Longest: {0} min': 'Längst: {0} min',
+  'No cardio in this period.': 'Ingen kardio under perioden.',
+  'So far': 'Hittills',
+  'distance': 'distans',
+  'over {0} sessions': 'på {0} pass',
+  'time and distance': 'tid och distans',
+  '{0} bpm across {1} min': '{0} bpm över {1} min',
+  '{0} km': '{0} km',
+  '{0} sessions': '{0} pass',
 }

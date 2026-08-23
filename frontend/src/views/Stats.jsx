@@ -12,6 +12,8 @@ import Icon from '../components/Icon.jsx'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 import { loadOfWorkouts, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
+import { formatKm } from '../lib/cardio.js'
+import { cardioSummary, cardioWeeks, hasCardio, paceLabel } from '../lib/cardio-stats.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -20,6 +22,51 @@ import { Button, Segmented, SelectRow } from '../components/ui.jsx'
 
 // Which muscles the training in a window actually hit — and, the point of the card,
 // which ones it keeps missing. Shading is relative within the window (lib/muscles.js).
+// Cardio, in the units it was measured in. It is absent from the volume figure by design —
+// see cardio-stats.js — so without this card a week of running reads as a week off.
+function CardioCard({ S }) {
+  const [win, setWin] = useState(90)
+  const sum = cardioSummary(S, win)
+  const weeks = cardioWeeks(S, win)
+  const pts = weeks.map(w => ({
+    t: w.t, y: w.minutes,
+    note: [w.km > 0 && `${formatKm(w.km)} km`, paceLabel(w.pace), t('{0} sessions', w.sessions)]
+      .filter(Boolean).join(' · ')
+  }))
+
+  return <div className="card">
+    <h2>{t('Cardio')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('time and distance')}</span></h2>
+    <Segmented className="seg-range" value={win} onChange={setWin}
+      options={[{ value: 30, label: '30d' }, { value: 90, label: '90d' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
+    {sum.sessions === 0 ? <div className="muted small">{t('No cardio in this period.')}</div> : <>
+      <div className="row between" style={{ alignItems: 'flex-end', gap: 12 }}>
+        <div>
+          <div className="stat-v">{fmtNum(sum.minutes)} min</div>
+          <div className="small dim">{t('over {0} sessions', sum.sessions)}</div>
+        </div>
+        {sum.km > 0 && <div style={{ textAlign: 'right' }}>
+          <div className="stat-v">{sum.anyDistanceDerived ? '≈' : ''}{formatKm(sum.km)} km</div>
+          <div className="small dim">{paceLabel(sum.pace) || t('distance')}</div>
+        </div>}
+      </div>
+      <div className="small dim" style={{ marginTop: 8 }}>
+        {[
+          t('Longest: {0} min', fmtNum(sum.longestMinutes)),
+          sum.longestKm > 0 && t('{0} km', formatKm(sum.longestKm)),
+          sum.hr && t('{0} bpm across {1} min', sum.hr, fmtNum(sum.hrMinutes))
+        ].filter(Boolean).join(' · ')}
+      </div>
+      {sum.anyDistanceDerived && <div className="small dim" style={{ marginTop: 4 }}>
+        {t('Distances marked ≈ were calculated from a logged speed rather than measured.')}
+      </div>}
+      {pts.length > 1 && <>
+        <h4 className="sec" style={{ marginTop: 12 }}>{t('Week by week')}</h4>
+        <div className="chart"><LineChart points={pts} h={140} unit="min" color="var(--blue)" /></div>
+      </>}
+    </>}
+  </div>
+}
+
 function MuscleBalance({ S }) {
   const [win, setWin] = useState(7)
   const [hard, setHard] = useState(false)
@@ -138,6 +185,7 @@ export default function Stats() {
   const [exMetric, setExMetric] = useState('top')
   const now = Date.now()
   const anyEffort = hasEffort(S)
+  const anyCardio = hasCardio(S)
   const kind = displayScale(S)
   const hd = scaleName(kind)
 
@@ -214,6 +262,7 @@ export default function Stats() {
 
     {S.workouts.length > 0 && <MuscleBalance S={S} />}
     {anyEffort && <EffortCard S={S} />}
+    {anyCardio && <CardioCard S={S} />}
 
     <div className="cols">
       <div className="card">

@@ -1,6 +1,7 @@
 // Pure helpers over the state object S (ported 1:1 from the vanilla app).
 import { todayISO, isoOf, weekKey, fmtNum } from './format.js'
 import { isCardio, isBodyweightEq } from './exercises.js'
+import { formatCardioSet, sumCardio } from './cardio.js'
 import { t } from './i18n.js'
 
 // How an exercise is logged (issue #16). This used to be derived from the body part alone,
@@ -94,7 +95,7 @@ const effortTail = s => {
 export function setLabel(id, s, cfg) {
   const c = cfg || { id }
   const mode = modeOf(c)
-  if (mode === 'cardio') return `${s.min || 0} min @ ${fmtNum(s.speed || 0)} km/h`
+  if (mode === 'cardio') return formatCardioSet(s)
   if (mode === 'time') return fmtSec(s.sec) + (s.w > 0 ? ` · ${fmtNum(s.w)}` : '')
   // Bodyweight reads as what you did — "12", or "+10 × 12" once there is a belt involved —
   // rather than "0×12", which says a set was performed with no weight and means nothing.
@@ -124,7 +125,7 @@ export function exLine(cfg, unit) {
   const n = cfg.sets || 1
   // Added weight reads as added: "+10 kg" on a dip belt, "60 kg" on a barbell.
   const load = cfg.weight ? ' · ' + (isBw(cfg) ? '+' : '') + fmtNum(cfg.weight) + ' ' + unit : ''
-  if (mode === 'cardio') return `${n} × ${cfg.min || 20} min @ ${fmtNum(cfg.speed || 8)} km/h`
+  if (mode === 'cardio') return `${n} × ${formatCardioSet(cfg, { pace: false, derived: false })}`
   if (mode === 'time') return `${n} × ${fmtSec(cfg.sec || 45)}${load}`
   // This is the line with room for it, so the split is spelled out: "3 × 16 · 8/side".
   const split = isPerSide(cfg) ? ' · ' + t('{0}/side', fmtNum(sideReps(cfg.reps))) : ''
@@ -180,7 +181,13 @@ export function buildSets(S, cfg) {
   if (mode === 'cardio') {
     for (let i = 0; i < n; i++) {
       const prev = prevAt(i)
-      sets.push({ min: prev ? prev.min : (cfg.min || 20), speed: prev ? prev.speed : (cfg.speed || 8), done: false })
+      // Distance carries over only when the last session recorded one; a set built from an
+      // old speed-only entry starts empty rather than seeding a distance nobody measured.
+      sets.push({
+        min: prev?.min ?? cfg.min ?? 20,
+        km: prev?.km ?? cfg.km ?? null,
+        done: false
+      })
     }
     return sets
   }
@@ -203,6 +210,11 @@ export function buildSets(S, cfg) {
   }
   return sets
 }
+// A window in days, counted back from now. 0 = everything, which is also what an empty
+// history means for every caller.
+export const inWindow = (w, days) =>
+  !days || (w.start || new Date(w.d).getTime()) > Date.now() - days * 86400000
+
 export function workoutVolume(w) {
   let v = 0
   // No special case for unilateral work: a per-side set logs its total, so both sides are
@@ -210,6 +222,22 @@ export function workoutVolume(w) {
   w.entries.forEach(e => e.sets.forEach(s => { if (s.done) v += (s.w || 0) * (s.r || 0) }))
   return v
 }
+/**
+ * The cardio in one workout.
+ *
+ * workoutVolume is weight × reps, so a 45-minute run contributes nothing to it and never
+ * will — multiplying a duration into a volume figure would make two incomparable things
+ * look like one. Cardio gets counted in its own units instead.
+ */
+export function workoutCardio(w) {
+  const sets = []
+  for (const e of (w && w.entries) || []) {
+    if (modeOf({ ...(e.target || {}), id: e.id }) !== 'cardio') continue
+    for (const s of e.sets || []) if (s.done) sets.push(s)
+  }
+  return sumCardio(sets)
+}
+
 export function setsDone(w) {
   let n = 0
   w.entries.forEach(e => e.sets.forEach(s => { if (s.done) n++ }))
