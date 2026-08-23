@@ -1,6 +1,6 @@
 # Källmärkta näringsreferenser för vuxna och GLP-1
 
-Status: inväntar användarens granskning. Ingen implementation ingår i denna commit.
+Status: godkänd av användaren 2026-08-23. Ingen implementation ingår i specifikationen.
 
 ## Mål
 
@@ -97,13 +97,15 @@ Aktiv substans, dos, laboratorievärden och diagnosnamn lagras inte eftersom de 
 
 Härledda referenser sparas inte. De räknas fram vid visning från källkatalogen och profilens explicita uppgifter. Befintliga profiler migreras genom normalisering: saknad/ogiltig `incretinUse` och `weightPhase` blir `null`, saknad/ogiltig `fiberReference` blir `'range'`, saknade säkerhetssvar och `safetyReviewedAt` blir `null`, och saknad `targetReviewRequired` blir `false`. Gamla manuella mål lämnas exakt som de är. `null` betyder obesvarat och ska aldrig konverteras med `Number` eller behandlas som ett nekande svar.
 
-Säkerhetssvaren måste bekräftas på nytt när incretinanvändning eller behandlingsfas ändras, när användaren ändrar markeringen för sjukdom/medicinering eller en säkerhetsmarkering, samt senast 90 dagar efter föregående bekräftelse. Nittio dagar är Dagsnavs försiktiga produktregel, inte ett medicinskt riktvärde. Saknade, ogiltiga eller utgångna svar behandlas fail-closed och blockerar numeriska GLP-1-referenser.
+Säkerhetssvaren måste bekräftas på nytt när incretinanvändning eller behandlingsfas ändras, när användaren ändrar markeringen för sjukdom/medicinering eller en säkerhetsmarkering, samt senast 90 dagar efter föregående bekräftelse. Nittio dagar är Dagsnavs försiktiga produktregel, inte ett medicinskt riktvärde. Klient och server använder samma UTC-kalenderdag för denna regel så att AI-vägen aldrig öppnas av två olika datumtolkningar. Saknade, ogiltiga eller utgångna svar behandlas fail-closed och blockerar numeriska GLP-1-referenser.
 
 När en riskmarkering blir `true` sätts `targetReviewRequired` till `true`. Att risken senare ändras till `false` återaktiverar inte måljämförelser automatiskt. Användaren måste först öppna de bevarade målen och bekräfta **Jag har granskat mina egna mål**.
 
+Eftersom `targetReviewRequired` är en enda boolesk flagga pausas alla måljämförelser medan den är `true`. Efter användarens uttryckliga målgranskning fortsätter spärrmatrisen att pausa de enskilda mål som fortfarande berörs av en aktiv risk.
+
 ## Säkerhetsregler
 
-Populationens referensvärden får visas för alla bekräftat vuxna, men Dagsnav ska tydligt markera att de inte är personliga behandlingsmål. Om ålder saknas eller inte är ett giltigt heltal visas i stället en uppmaning att ange ålder; inga vuxenreferenser väljs.
+Populationens referensvärden får visas för alla bekräftat vuxna, men Dagsnav ska tydligt markera att de inte är personliga behandlingsmål. Ålder måste vara ett heltal mellan 18 och 100, samma intervall som den befintliga profilnormaliseringen. Om ålder saknas eller ligger utanför intervallet visas i stället en uppmaning att ange ålder; inga vuxenreferenser väljs.
 
 En riskmarkering döljer berörda referenser och pausar jämförelse mot berörda manuella mål enligt denna matris. Det manuella värdet ligger kvar i lagringen men visas som **Pausat – behöver granskas** utan måluppfyllelse eller färgkodning.
 
@@ -144,6 +146,8 @@ I arket **Näringsmål** läggs följande till:
 
 På kostsidan visas manuellt mål och automatisk referens som två olika rader. Ordvalen ska vara **Eget mål** respektive **Referens**, inte två varianter av ordet mål.
 
+Källornas precision ska bevaras i visningen: salt visas som exakt 5,75 g i svensk miljö och vätskeintervallet som 2,0–2,5 liter. Den befintliga en-decimalsformatteraren får inte avrunda bort dessa skillnader.
+
 Källänkar öppnas i ny flik med `rel="noopener"`. Min/max/intervall får inte kommuniceras enbart med färg, och säkerhetsmeddelanden använder `role="note"` eller `role="alert"` efter allvarlighetsgrad.
 
 ## AI och integritet
@@ -152,11 +156,13 @@ Referensmotorn använder inte AI. Klienten normaliserar och tillämpar fail-clos
 
 Incretinanvändning och säkerhetskategorierna ska behandlas som medicinska markeringar i det befintliga AI-flödet. Modellen får fortfarande bara befintliga, icke-medicinska och tillåtna faktakoder. Alla vårdanteckningar som följer av en medicinsk markering skapas som fast text på servern. Ingen läkemedelsklass, behandlingsindikation, riskkategori, diagnos, vikt eller siffra skickas till modellen. Saknat, okänt, ogiltigt eller utgånget säkerhetstillstånd får inte tolkas som riskfritt av vare sig klient eller server.
 
+AI får därför bara anropas när den sparade serverstaten visar en bekräftat vuxen användare, `incretinUse: 'none'`, samtliga säkerhetsfält exakt `false`, ett giltigt granskningsdatum som är högst 90 dagar gammalt, `targetReviewRequired: false` och inga befintliga diabetes-, sjukdoms- eller medicineringsspärrar. Saknad serverstat eller ett äldre/ogiltigt fält ger ett lokalt `clinician_review`-svar innan AI-kvot reserveras. Klientens motsvarande generella spärr får endast göra beslutet striktare, aldrig öppna AI-vägen.
+
 ## Testkrav
 
 Tester ska verifiera värden och semantik, inte bara att funktionerna körs:
 
-- 17 år ger inga vuxenreferenser; 18 år med `pregnancyOrBreastfeeding: false` gör det; `null` eller `true` ger inga allmänna vuxenreferenser;
+- 17 och 101 år ger inga vuxenreferenser; 18 och 100 år med `pregnancyOrBreastfeeding: false` gör det; `null` eller `true` ger inga allmänna vuxenreferenser;
 - fiberreferens `female` ger minst 25 g, `male` minst 35 g och `range` ger intervallet 25–35 g; kroppstyp påverkar inte valet;
 - salt är exakt 5,75 g och får aldrig behandlas som 2,3 g salt;
 - totalsocker får inget automatiskt mål från gränsen för tillsatt/fritt socker;
