@@ -22,7 +22,7 @@
 // carbohydrate is what the app shows, under the same name. Check one familiar food against
 // the packet after building.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, accessSync, constants } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -154,15 +154,19 @@ async function pool(items, n, fn) {
 
 // Matched case- and accent-insensitively against whatever the source calls its fields, so a
 // rename upstream does not silently produce a database of zeroes.
+// Order matters: the first name that matches at all wins, so the most specific spelling
+// goes first. Livsmedelsverket lists several sugar fields, and "Monosackarider" is not the
+// one carb counting wants — on milk it reads 0 while the lactose sits in "Sockerarter,
+// totalt". Naming it last keeps it as the fallback it should be.
 const WANT = {
   kcal:  ['energi (kcal)', 'energi kcal', 'energikcal', 'kcal', 'energi'],
-  carb:  ['kolhydrater', 'kolhydrat', 'carbohydrates'],
-  sugar: ['socker totalt', 'sockerarter', 'socker', 'monosackarider'],
+  carb:  ['kolhydrater tillgängliga', 'kolhydrater', 'kolhydrat', 'carbohydrates'],
+  sugar: ['sockerarter totalt', 'sockerarter', 'socker totalt', 'socker', 'monosackarider'],
   prot:  ['protein'],
   fat:   ['fett totalt', 'fett'],
-  sat:   ['summa mättade fettsyror', 'mättat fett', 'mattade fettsyror', 'mättade fettsyror'],
+  sat:   ['summa mättade fettsyror', 'mättade fettsyror', 'fettsyror mättade', 'mättat fett'],
   fib:   ['fibrer', 'fiber', 'kostfiber'],
-  salt:  ['salt', 'natriumklorid', 'nacl']
+  salt:  ['salt nacl', 'salt', 'natriumklorid']
 }
 
 // Sources that carry both energy fields list kilojoules too, and "Energi (kJ)" answers to a
@@ -170,8 +174,11 @@ const WANT = {
 // database look 4.2x more energetic than it is, silently, so kcal refuses a kJ field outright.
 const REJECT = { kcal: /\bkj\b|kilojoule/ }
 
+// Commas and brackets are decoration in a field name: "Fett, totalt" and "Fett totalt" are
+// the same field, and so are "Energi (kcal)" and "Energi kcal".
 const norm = s => String(s || '').toLowerCase()
-  .replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/\s+/g, ' ').trim()
+  .replace(/[åä]/g, 'a').replace(/ö/g, 'o')
+  .replace(/[,()]/g, ' ').replace(/\s+/g, ' ').trim()
 
 /** Flatten one source record into { fieldName: value } no matter how it nests. */
 function flatten(row) {
@@ -199,17 +206,17 @@ function flatten(row) {
   return flat
 }
 
+/**
+ * Each name is tried exactly and then as a prefix before moving on to the next one, so
+ * priority in the list beats strictness of the match. The other way round — all names
+ * exactly, then all names as prefixes — lets a low-priority exact name outrank a
+ * high-priority near one, which is how "Monosackarider" beat "Sockerarter, totalt".
+ */
 function pick(flat, names, reject) {
   const keys = Object.keys(flat).filter(k => !(reject && reject.test(norm(k))))
   for (const want of names) {
     const w = norm(want)
-    const hit = keys.find(k => norm(k) === w)
-    if (hit != null) return flat[hit]
-  }
-  // Nothing matched exactly — try a prefix, which catches "Energi (kcal)" style suffixes.
-  for (const want of names) {
-    const w = norm(want)
-    const hit = keys.find(k => norm(k).startsWith(w))
+    const hit = keys.find(k => norm(k) === w) ?? keys.find(k => norm(k).startsWith(w))
     if (hit != null) return flat[hit]
   }
   return null
@@ -225,6 +232,31 @@ const num = v => {
 }
 
 /* ---------------------------------------------------------------- build -- */
+
+/**
+ * Prove the output is writable before spending 2 600 requests on data we cannot save.
+ * A run that fetches everything and then dies on EACCES has wasted the fetching and
+ * Livsmedelsverket's bandwidth both.
+ */
+function assertWritable(file) {
+  mkdirSync(dirname(file), { recursive: true })
+  try {
+    accessSync(file, constants.W_OK)
+    return
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      try { accessSync(dirname(file), constants.W_OK); return } catch { /* reported below */ }
+    }
+  }
+  console.error(`\n✗ Får inte skriva till ${file}`)
+  console.error('\n  Ge dig själv filen och katalogen, en gång:\n')
+  console.error(`    sudo chown -R $USER ${dirname(file)}\n`)
+  console.error('  Kör inte hela skriptet som root — det skriver en rotägd fil som nästa')
+  console.error('  bygge inte kommer åt.\n')
+  process.exit(1)
+}
+
+if (!inspect) assertWritable(OUT)
 
 const list = fromFile
   ? (r => Array.isArray(r) ? r : (r.livsmedel || r.items || r.data || []))(JSON.parse(readFileSync(fromFile, 'utf8')))
