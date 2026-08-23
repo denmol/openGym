@@ -17,3 +17,10 @@ dist/
 # git so a server can rebuild it without every `git pull` hitting a modified tracked file.
 # frontend/src/lib/foods.js treats its absence as an ordinary state.
 frontend/src/lib/foods-data.js
+
+# The server's data directory: users, passkey credentials, the session-signing secret, the
+# VAPID keypair, and one state-<uid>.json per profile holding their workouts, food log and
+# glucose readings. None of it belongs in a repository — the secret in particular signs
+# session cookies, so anyone holding a copy can mint one. Back this directory up out of
+# band; see docs/SELF_HOSTING.md.
+data/

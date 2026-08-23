@@ -37,7 +37,13 @@ services:
       - PORT=3000            # internal port (nginx proxies here) — do not change
       - DATA_DIR=/data
     volumes:
-      - ./data:/data         # users, passkeys, per-user state, session secret — BACK THIS UP
+      # Users, passkeys, per-user state, the session secret — BACK THIS UP.
+      #
+      # Defaults to ./data inside the checkout, which is gitignored and so is safe from a
+      # `git pull`. It is not safe from a `git clean -xdf`, and a checkout is an odd place
+      # to keep the only copy of an account database, so DATA_DIR in .env lets it live
+      # somewhere that has nothing to do with git:  DATA_DIR=/var/lib/opengym
+      - ${DATA_DIR:-./data}:/data
 
   # Builds the React frontend (multi-stage) and serves it, proxying /api → api
   # and the exercise media from the shared volume. Single origin for passkeys.

@@ -109,7 +109,7 @@ Access…) in front still works, and composes with the above.
 
 ## 5. Backups
 
-Everything is in `./data`:
+Everything is in `./data` — or wherever `DATA_DIR` points, if you moved it out of the checkout:
 
 ```bash
 tar czf opengym-backup-$(date +%F).tar.gz data/
@@ -117,6 +117,23 @@ tar czf opengym-backup-$(date +%F).tar.gz data/
 
 That archive contains all profiles, passkeys and workout history. Restore by unpacking it back
 into the project folder. (Individual users can also export their own data as JSON from Settings.)
+
+**`data/` must never be committed.** It is in `.gitignore`, and it should stay there. The
+directory holds three things a repository is the wrong place for:
+
+- `secret` — signs session cookies. Anyone holding a copy can mint a valid session for any
+  account on your server, without a passkey and without touching it. If it has ever been in a
+  repository, in a paste, or in a backup someone else can read, delete the file and restart:
+  the server writes a fresh one, and everyone simply signs in again with their passkeys.
+- `vapid.json` — the keypair your server signs push notifications with. Delete and restart to
+  rotate; existing subscriptions stop working and re-subscribe when each user next opens the app.
+- `db.json` and `state-<uid>.json` — accounts, passkey credentials, and every profile's
+  training, food and glucose history.
+
+If your checkout came from a repository that had `data/` committed in it, your server is running
+on that repository's secret, because the server only generates one when the file is absent. Check
+`db.json` for accounts you do not recognise while you are there — a committed `db.json` brings its
+author's registered passkey along with it, and that credential works against your server.
 
 ## 6. Notifications
 
