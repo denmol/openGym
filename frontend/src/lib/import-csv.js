@@ -24,11 +24,14 @@ import { uid } from './format.js'
 /* ----------------------------------------------------------------- CSV ---- */
 
 /**
- * A real CSV reader: quoted fields, embedded commas and newlines, doubled quotes, BOM
+ * A real CSV reader: quoted fields, embedded separators and newlines, doubled quotes, BOM
  * and CRLF. Splitting on commas breaks on the first exercise named "Bench Press, Close
  * Grip" — and a whole history would import shifted by one column without ever erroring.
+ *
+ * The separator is a parameter because a CSV written by a European tool is very often
+ * semicolon-delimited: comma is the decimal point there, so the two cannot both be commas.
  */
-export function parseCSV(text) {
+export function parseCSV(text, delim = ',') {
   const rows = []
   let row = [], field = '', quoted = false
   const s = String(text).replace(/^﻿/, '')
@@ -38,7 +41,7 @@ export function parseCSV(text) {
       if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++ } else quoted = false }
       else field += c
     } else if (c === '"') quoted = true
-    else if (c === ',') { row.push(field); field = '' }
+    else if (c === delim) { row.push(field); field = '' }
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && s[i + 1] === '\n') i++
       row.push(field); field = ''
@@ -443,7 +446,8 @@ export function parseWorkoutCSV(text, { unit = 'kg' } = {}) {
  */
 export function parseBodyweight(text, { unit = 'kg' } = {}) {
   const s = String(text)
-  const out = new Map()          // iso date -> { w, t }  (one weigh-in per day, the last)
+  const out = new Map()          // iso date -> { w, u, t }  (one weigh-in per day, the last)
+  const units = new Set()
   let fileUnit = ''
 
   if (s.includes('HKQuantityTypeIdentifierBodyMass')) {
@@ -457,8 +461,9 @@ export function parseBodyweight(text, { unit = 'kg' } = {}) {
       if (!val || !dt) continue
       const when = parseWhen(dt[1])
       if (!when) continue
-      if (u) fileUnit = /lb/i.test(u[1]) ? 'lb' : 'kg'
-      out.set(when.d, { w: parseFloat(val[1]), t: new Date(dt[1]).getTime() || null })
+      const rowUnit = u ? (/lb/i.test(u[1]) ? 'lb' : 'kg') : unit
+      units.add(rowUnit)
+      out.set(when.d, { w: parseFloat(val[1]), u: rowUnit, t: new Date(dt[1]).getTime() || null })
     }
   } else {
     const rows = parseCSV(s)
@@ -470,24 +475,26 @@ export function parseBodyweight(text, { unit = 'kg' } = {}) {
     if (wCol === undefined || dCol === undefined) return { error: 'unrecognised' }
     if (map.weightKg !== undefined) fileUnit = 'kg'
     else if (map.weightLb !== undefined) fileUnit = 'lb'
+    const rowUnit = fileUnit || unit
+    units.add(rowUnit)
     for (let i = 1; i < rows.length; i++) {
       const when = parseWhen(String(rows[i][dCol] ?? ''))
       const w = num(rows[i][wCol])
       if (!when || !w) continue
-      out.set(when.d, { w, t: new Date(when.d).getTime() + (when.t ?? 0) })
+      out.set(when.d, { w, u: rowUnit, t: new Date(when.d).getTime() + (when.t ?? 0) })
     }
   }
 
   if (!out.size) return { error: 'unrecognised' }
-  const converted = !!fileUnit && fileUnit !== unit
-  const conv = converted
-    ? (fileUnit === 'lb' ? x => Math.round(x * LB_TO_KG * 10) / 10 : x => Math.round(x / LB_TO_KG * 10) / 10)
-    : x => Math.round(x * 10) / 10
+  const mixedUnits = units.size > 1
+  fileUnit = mixedUnits ? '' : [...units][0]
+  const converted = [...out.values()].some(row => row.u !== unit)
+  const conv = row => Math.round((row.u === unit ? row.w : row.u === 'lb' ? row.w * LB_TO_KG : row.w / LB_TO_KG) * 10) / 10
   const dates = [...out.keys()].sort()
   return {
     kind: 'bodyweight', source: 'Apple Health',
-    bodyweight: dates.map(d => ({ d, w: conv(out.get(d).w), t: out.get(d).t || new Date(d).getTime() })),
-    fileUnit, converted, from: dates[0], to: dates[dates.length - 1],
+    bodyweight: dates.map(d => ({ d, w: conv(out.get(d)), u: unit, t: out.get(d).t || new Date(d).getTime() })),
+    fileUnit, mixedUnits, converted, from: dates[0], to: dates[dates.length - 1],
   }
 }
 

@@ -8,14 +8,37 @@ import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 const KEY = 'gym_state_v1'
 export const DEF = {
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
-  theme: 'dark', accent: 'lime', body: 'male', targetW: null,
+  theme: 'dark', accent: 'lime', body: 'male', targetW: null, targetWU: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
   // keeps the column it had. See effortOf.
-  reminder: { on: false, time: '08:00', tz: null }, effort: null
+  reminder: { on: false, time: '08:00', tz: null }, effort: null,
+  // Who is training, for the AI coach (lib/coach-profile.js). null until the onboarding
+  // wizard runs — read it through coachProfileOf, which overlays the defaults, rather
+  // than reaching in here: a profile written by an older build is missing keys.
+  coachProfile: null,
+  // The plan the coach replaced, kept for a week so an AI-generated week is reversible.
+  coachUndo: null,
+  // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates
+  // ("my breakfast") and myFoods are the user's own entries — the same relationship
+  // customEx has with the exercise catalogue.
+  meals: [], myMeals: [], myFoods: [],
+  // Portions the user weighed once, per food (lib/portions.js): "1 st = 61 g" for their
+  // eggs, their bread. What makes logging possible without a scale on the counter.
+  portions: [],
+  // Personal nutrition objective and optional daily targets. Demographics stay in the
+  // shared coach profile; these values are always typed and confirmed by the user.
+  nutritionGoals: null,
+  // Diabetes mode (lib/diabetes.js). null until someone turns it on in Settings — read it
+  // through healthOf, which overlays the defaults, rather than reaching in here.
+  health: null,
+  // Glucose readings, always stored in mmol/L whatever the profile displays, and insulin
+  // doses in units. Both carry src: 'import' when they came out of a file, which is what
+  // makes an import undoable without touching what was typed by hand.
+  glucose: [], doses: []
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -27,7 +50,11 @@ function loadState() {
   return clone(DEF)
 }
 
-const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length)
+const hasData = st => !!(st && (
+  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses']
+    .some(key => (st[key] || []).length) ||
+  st.coachProfile || st.health || st.nutritionGoals || st.targetW != null || st.active
+))
 
 export const useStore = create((set, get) => {
   let pushTm = null

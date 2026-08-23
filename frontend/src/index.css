@@ -205,6 +205,88 @@ h4.sec{
 }
 .card .big{font-size:30px;font-weight:600;letter-spacing:-.026em;line-height:1.1}
 
+/* ----------------------------------------------------------- nutrition -- */
+/* The trust marker is the visual signature here: a missing source value is named before
+   any goal is shown, so an attractive progress number can never outrank data quality. */
+.nutrient-details{margin-top:12px;border-top:var(--hair) solid var(--sep)}
+.nutrient-details summary{
+  min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  cursor:pointer;color:var(--acc);font-size:14px;list-style:none;
+}
+.nutrient-details summary::-webkit-details-marker{display:none}
+.nutrient-details summary::after{content:'⌄';font-size:17px;color:var(--label-2);transition:transform var(--fast)}
+.nutrient-details[open] summary::after{transform:rotate(180deg)}
+.nutrient-incomplete{
+  margin-left:auto;color:var(--orange);font-size:11px;padding:3px 7px;border-radius:99px;
+  background:color-mix(in srgb,var(--orange) 13%,transparent);
+}
+.nutrient-details dl{margin:0}
+.nutrient-details dl>div{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:9px 0;border-top:var(--hair) solid var(--sep);
+}
+.nutrient-details dt{font-size:14px;color:var(--label-2)}
+.nutrient-details dd{margin:0;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.nutrient-details dd small{display:block;color:var(--label-3);font-size:11px;margin-top:2px;max-width:230px}
+.nutrient-details .incomplete dd>span,.nutrient-details .incomplete dd small{color:var(--orange)}
+
+.ngoal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ngoal{
+  min-height:46px;padding:10px;border-radius:var(--r-sm);background:var(--surface);
+  color:var(--label-2);font-size:15px;text-align:center;
+}
+.ngoal.on{background:var(--acc-soft);color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc-line)}
+.nprofile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nprofile-grid label,.ntargets label{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nprofile-grid label{align-items:stretch;flex-direction:column;color:var(--label-2);font-size:13px}
+.nwith-unit{display:flex;align-items:center;gap:7px}
+.nwith-unit .input{width:100%;min-width:0;text-align:right;font-variant-numeric:tabular-nums}
+.nwith-unit i{font-style:normal;color:var(--label-2);font-size:13px;min-width:28px}
+.nsex{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.nsex button{min-height:44px;border-radius:var(--r-sm);background:var(--surface);color:var(--label-2)}
+.nsex button.on{background:var(--acc-soft);color:var(--acc)}
+.nbmr{display:flex;gap:12px;margin-top:12px;padding:13px;border-radius:var(--r);background:var(--surface)}
+.nbmr-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--acc-soft);color:var(--acc);flex:none}
+.nbmr-value{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:2px 0 4px;font-variant-numeric:tabular-nums}
+.nmedical{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px;border-radius:var(--r);background:color-mix(in srgb,var(--orange) 12%,var(--surface));color:var(--orange);font-size:13px;line-height:1.45}
+.nmedical>.icn{font-size:19px;flex:none;margin-top:1px}
+.ntargets{margin-top:6px;border-radius:var(--r);background:var(--surface);padding:0 12px}
+.ntargets label{min-height:60px;align-items:stretch;flex-direction:column;border-top:var(--hair) solid var(--sep);font-size:14px;padding:8px 0}
+.ntargets label:first-child{border-top:0}
+.ntarget-copy{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.ntarget-name{line-height:1.35}
+.ntargets .nwith-unit{width:100%;flex:none}
+.ntargets .input{min-height:44px;padding:8px 10px}
+.ntarget-reference{display:block;color:var(--label-3);font-size:11px;line-height:1.4}
+.ntarget-reference-value{font-variant-numeric:tabular-nums;color:var(--label-2)}
+.ntarget-calculated .ntarget-reference-value{color:var(--acc);font-weight:600}
+.nreference-note{margin-top:10px;padding:0 4px;color:var(--label-2);font-size:12px;line-height:1.45}
+.nreference{margin-top:12px;border-radius:var(--r);background:var(--surface);padding:0 12px}
+.nreference summary{min-height:44px;display:flex;align-items:center;color:var(--label-2);cursor:pointer;font-size:13px}
+.nreference>div{padding:0 0 12px;line-height:1.5}
+.nai-preview{border-radius:var(--r);background:var(--surface);padding:0 12px}
+.nai-preview>div{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px 0;border-top:var(--hair) solid var(--sep)}
+.nai-preview>div:first-child{border-top:0}
+.nai-preview span{color:var(--label-2);font-size:12px;flex:none}
+.nai-preview strong{font-size:12px;font-weight:500;text-align:right;line-height:1.4;overflow-wrap:anywhere}
+.nai-preview .warn span,.nai-preview .warn strong{color:var(--orange)}
+.nsafety-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-top:var(--hair) solid var(--sep);font-size:13px}
+.nsafety-row:first-child{border-top:0}
+.nsafety-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:0 0 174px}
+.nsafety-buttons button{min-height:44px;padding:6px 8px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--label-2);font-size:12px}
+.nsafety-buttons button.on{background:var(--acc-soft);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc-line)}
+.ntarget-paused{display:block;color:var(--orange);font-size:11px;line-height:1.4}
+.nref-list{display:grid;gap:10px;margin-top:10px}
+.nref-card{padding:12px;border-radius:var(--r);background:var(--surface)}
+.nref-head,.nref-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nref-kind{font-size:11px;color:var(--label-2);border:var(--hair) solid var(--sep);border-radius:99px;padding:3px 7px}
+.nref-value{margin-top:5px;font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
+.nref-meta,.nref-card p{font-size:12px;line-height:1.45;color:var(--label-2)}
+.nref-card p{margin:7px 0}
+.nref-actions a,.nref-actions button{min-height:44px;display:inline-flex;align-items:center;color:var(--acc);font-size:13px}
+.nutrient-details dd small.paused-target{color:var(--orange)}
+@media(max-width:420px){.nsafety-row{align-items:stretch;flex-direction:column}.nsafety-buttons{width:100%;flex-basis:auto}}
+
 /* ------------------------------------------------------ inset group list -- */
 .sect{margin-bottom:22px}
 .sect-t{
@@ -258,6 +340,17 @@ h4.sec{
   letter-spacing:-.012em;background:var(--surface-2);color:var(--label);
   transition:transform var(--fast) var(--ease),background var(--fast),opacity var(--fast);
 }
+/* .btn is full-width by default, which is right for the stacked buttons that fill a sheet
+   and wrong for a control sitting inside a row. Two of them beside a stepper each claimed
+   the whole row, squeezed the stepper to nothing and overlapped each other — and an
+   icon-only ghost button did the same to the text beside it, one word per line, which is
+   what a 44px cross had been doing to the meal form since it was written. flex:none does
+   not help: its basis is auto, which resolves to that width:100%. */
+.btn.inline{width:auto;flex:0 0 auto;padding:11px 13px;font-size:15px;gap:5px}
+.btn.inline .icn{font-size:15px}
+.btn.icon{width:auto;flex:0 0 auto;padding:8px}
+.row > .grow{flex:1;min-width:0}
+.stp.grow{flex:1;min-width:96px}
 .btn .icn{font-size:19px}
 .btn:active{transform:scale(.975)}
 .btn.primary{background:var(--acc);color:var(--on-acc)}
@@ -916,4 +1009,49 @@ h4.sec{
   #timer.rest .head{flex:1;min-width:0}
   .exmedia img{height:380px}
   .hm-wrap{display:flex;flex-direction:column;align-items:center}
+}
+
+/* ============================ the care-team report ============================
+
+   Two audiences on one page. On screen it is another openGym view; on paper it is a
+   document a nurse reads in ten seconds, so printing drops the app entirely — tab bar,
+   the period picker, the print button itself — and switches to black on white. The
+   colours in this app are chosen for a phone at night and turn to mud on a laser
+   printer, so print does not try to keep them.                                       */
+
+.report .rsheet { padding: 2px 0 24px }
+.report .rt { font-size: 20px; font-weight: 700; margin: 0 0 2px }
+.report .rsub { color: var(--label-2); font-size: 13px; margin: 0 0 16px }
+.report .rh { font-size: 16px; font-weight: 650; margin: 22px 0 8px }
+.report .rnone { color: var(--label-2); font-size: 14px }
+.report .rtab { width: 100%; border-collapse: collapse; font-size: 14px }
+.report .rtab th { text-align: left; font-weight: 500; color: var(--label-2); padding: 5px 0 }
+.report .rtab td { text-align: right; padding: 5px 0; font-variant-numeric: tabular-nums }
+.report .rgrid { font-size: 13px }
+.report .rgrid th, .report .rgrid td { padding-left: 10px; padding-right: 0 }
+.report .rgrid th:first-child, .report .rgrid td:first-child { padding-left: 0 }
+.report .rgrid thead th { text-align: right; border-bottom: 1px solid var(--sep); padding-bottom: 6px }
+.report .rgrid thead th:first-child { text-align: left }
+.report .rgrid td { border-bottom: 1px solid var(--sep) }
+.report .rgrid td:first-child { text-align: left }
+.report .rnotes { margin: 0; padding-left: 18px; color: var(--label-2); font-size: 12.5px; line-height: 1.5 }
+.report .rnotes li { margin-bottom: 6px }
+
+/* A table that outgrows a narrow phone scrolls inside itself rather than pushing the
+   whole page sideways. */
+.report .rgrid { display: block; overflow-x: auto; white-space: nowrap }
+
+@media print {
+  /* Everything that is app rather than document. */
+  .noprint, #tabbar, #toast, #timer, #modal-root { display: none !important }
+  html, body { background: #fff !important; color: #000 !important }
+  #app { padding: 0 !important; max-width: none !important }
+  .report .rsheet { padding: 0 }
+  .report .rsub, .report .rtab th, .report .rnotes { color: #333 !important }
+  .report .rgrid { display: table; overflow: visible; white-space: normal }
+  .report .rgrid thead th, .report .rgrid td { border-bottom: 1px solid #ccc !important }
+  /* A day table split across a page break is unreadable; keep each row whole. */
+  .report tr { break-inside: avoid }
+  .report .rh { break-after: avoid }
+  @page { margin: 16mm }
 }

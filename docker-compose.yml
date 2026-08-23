@@ -22,9 +22,14 @@ services:
     restart: "no"
 
   # Passkey auth + per-user data (Node, no framework).
-  # image: prebuilt (docker compose pull). build: from source (docker compose up --build).
+  #
+  # Built from this checkout, always. The image name is deliberately local rather than
+  # upstream's ghcr.io/duartesantos8/... : this fork carries the Swedish translation, the AI
+  # coach and a food database that upstream's published image does not, so a `docker compose
+  # pull` against that name would quietly replace the running app with a different one under
+  # an identical tag. A name that nothing can pull cannot be pulled over.
   api:
-    image: ghcr.io/duartesantos8/opengym-api:latest
+    image: opengym-api:local
     build: ./api
     restart: unless-stopped
     env_file: .env
@@ -32,15 +37,21 @@ services:
       - PORT=3000            # internal port (nginx proxies here) — do not change
       - DATA_DIR=/data
     volumes:
-      - ./data:/data         # users, passkeys, per-user state, session secret — BACK THIS UP
+      # Users, passkeys, per-user state, the session secret — BACK THIS UP.
+      #
+      # Defaults to ./data inside the checkout, which is gitignored and so is safe from a
+      # `git pull`. It is not safe from a `git clean -xdf`, and a checkout is an odd place
+      # to keep the only copy of an account database, so DATA_DIR in .env lets it live
+      # somewhere that has nothing to do with git:  DATA_DIR=/var/lib/opengym
+      - ${DATA_DIR:-./data}:/data
 
   # Builds the React frontend (multi-stage) and serves it, proxying /api → api
   # and the exercise media from the shared volume. Single origin for passkeys.
   web:
-    image: ghcr.io/duartesantos8/opengym-web:latest
+    image: opengym-web:local
     build:
       context: .
-      dockerfile: web/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       media:

@@ -222,6 +222,14 @@ export function setsDoneActive(A) {
 }
 export const lastBW = S => (S.bodyweight.length ? S.bodyweight[S.bodyweight.length - 1] : null)
 
+/** Convert a body-weight measurement only when its stored unit is known. */
+export function weightIn(entry, unit) {
+  const weight = Number(entry?.w)
+  if (!Number.isFinite(weight) || weight <= 0 || !['kg', 'lb'].includes(entry?.u) || !['kg', 'lb'].includes(unit)) return null
+  const converted = entry.u === unit ? weight : entry.u === 'lb' ? weight * 0.45359237 : weight / 0.45359237
+  return Math.round(converted * 10) / 10
+}
+
 // Group consecutive items sharing a superset id (sg) into "units" of indices.
 // items may be routine exercises ({sg}) or active-workout entries ({sg}).
 export function supersetUnits(items) {

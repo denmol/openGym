@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
+import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive, weightIn } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor } from '../sheets.jsx'
@@ -9,6 +9,10 @@ import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
+import { coachWizardSheet } from '../coach-sheets.jsx'
+import { foodMap } from '../lib/foods.js'
+import { dayTotals, hasMeals, nutrientTotal } from '../lib/nutrition.js'
+import { quickLogSheet, mealSheet } from '../food-sheets.jsx'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -22,7 +26,9 @@ export default function Home() {
   const todayOvr = S.dayPlan[todayISO()] !== undefined
   const bw = lastBW(S)
   const prevBW = S.bodyweight.length > 1 ? S.bodyweight[S.bodyweight.length - 2] : null
-  const delta = bw && prevBW ? bw.w - prevBW.w : null
+  const bwValue = bw ? weightIn(bw, S.unit) ?? bw.w : null
+  const prevValue = prevBW ? weightIn(prevBW, S.unit) ?? prevBW.w : null
+  const delta = bwValue != null && prevValue != null ? bwValue - prevValue : null
 
   const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7)
   const doneDays = new Set(S.workouts.map(w => w.d))
@@ -40,14 +46,14 @@ export default function Home() {
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
   const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
-  const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
+  const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: weightIn(b, S.unit) ?? b.w, d: b.d }))
 
   // today's session shown right under the week strip
   const onToday = () => { if (S.active) nav('/workout'); else if (routine) startFlow(routine.id); else dayOverrideSheet(todayISO()) }
 
   return <div className="narrow">
     <div className="hdr">
-      <div><h1>{user ? t('Hi {0}', user.name) : 'openGym'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
+      <div><h1>{user ? t('Hi {0}', user.name) : 'Dagsnav'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
       <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
     </div>
 
@@ -74,14 +80,42 @@ export default function Home() {
       </div>
     </div>
 
+    {/* Food, two taps from the home screen. Anything further away does not get logged. */}
+    <div className="card">
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <h2 style={{ margin: 0 }}>{t('Food')}</h2>
+        <div className="row" style={{ gap: 8 }}>
+          <Button size="sm" icon="star" onClick={quickLogSheet}>{t('My meals')}</Button>
+          <Button size="sm" icon="plus" onClick={() => mealSheet()}>{t('Log')}</Button>
+        </div>
+      </div>
+      {(() => {
+        const foods = foodMap(S)
+        const tot = dayTotals(S, todayISO(), foods)
+        if (!hasMeals(S, todayISO())) {
+          return <div className="muted small">{t('Nothing logged today.')}</div>
+        }
+        return <button className="row between" style={{ width: '100%', background: 'none', border: 0, padding: 0, textAlign: 'left' }}
+          onClick={() => nav('/food')}>
+          <span>
+            <span className="big" style={{ fontSize: 28 }}>{nutrientTotal(tot, 'carb') == null ? '—' : fmtNum(tot.carb)}</span>
+            <span className="dim" style={{ fontSize: 14, marginLeft: 4 }}>g {t('Carbs')}</span>
+            <span className="dim small" style={{ marginLeft: 10 }}>{nutrientTotal(tot, 'kcal') == null ? '—' : fmtNum(tot.kcal)} kcal</span>
+          </span>
+          <Icon name="chevronRight" className="dim" />
+        </button>
+      })()}
+    </div>
+
     {!S.routines.length && !S.active && (
       <div className="card">
         <div className="row" style={{ gap: 10, marginBottom: 6 }}>
           <span className="lrow-i"><Icon name="sparkles" /></span>
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
-        <div className="muted small" style={{ marginBottom: 12 }}>{t('Set up your weekly routine to get going — or load a ready-made Push / Pull / Legs plan.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={loadStarterPlan}>{t('Load starter plan (PPL)')}</Button>
+        <div className="muted small" style={{ marginBottom: 12 }}>{t('Answer a few questions and let AI write your week — or start from a ready-made Push / Pull / Legs plan.')}</div>
+        <Button variant="primary" icon="sparkles" onClick={coachWizardSheet}>{t('Let AI build my program')}</Button>
+        <div style={{ height: 8 }} /><Button icon="clipboard" onClick={loadStarterPlan}>{t('Load starter plan (PPL)')}</Button>
         <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}
@@ -96,10 +130,10 @@ export default function Home() {
       </div>
       {bw ? <>
         <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
-          <div className="big">{fmtNum(bw.w)} <span className="muted" style={{ fontSize: '1rem' }}>{S.unit}</span></div>
+          <div className="big">{fmtNum(bwValue)} <span className="muted" style={{ fontSize: '1rem' }}>{S.unit}</span></div>
           {/* only when it actually moved — an unchanged weight used to read as "− 0" */}
           {!!delta && (
-            <span className="small row" style={{ gap: 2, fontWeight: 500, color: bwDeltaColor(delta, bw.w) }}>
+            <span className="small row" style={{ gap: 2, fontWeight: 500, color: bwDeltaColor(delta, bwValue) }}>
               <Icon name={delta > 0 ? 'arrowUp' : 'arrowDown'} style={{ fontSize: 12 }} />
               {fmtNum(Math.abs(delta))}
             </span>
@@ -109,7 +143,7 @@ export default function Home() {
         {S.targetW && (
           <div className="small row" style={{ color: 'var(--yellow)', marginTop: 4, gap: 5 }}>
             <Icon name="target" style={{ fontSize: 13 }} />
-            <span>{t('Goal')} {fmtNum(S.targetW)} {S.unit} · {Math.abs(S.targetW - bw.w) < 0.05 ? t('reached!') : t(S.targetW > bw.w ? '{0} to gain' : '{0} to lose', fmtNum(Math.abs(S.targetW - bw.w)) + ' ' + S.unit)}</span>
+            <span>{t('Goal')} {fmtNum(S.targetW)} {S.unit} · {Math.abs(S.targetW - bwValue) < 0.05 ? t('reached!') : t(S.targetW > bwValue ? '{0} to gain' : '{0} to lose', fmtNum(Math.abs(S.targetW - bwValue)) + ' ' + S.unit)}</span>
           </div>
         )}
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>

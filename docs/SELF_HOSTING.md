@@ -97,8 +97,9 @@ ADMIN_UIDS=youruserid      # comma-separated; these users get the admin dashboar
 INVITE_ONLY=1              # new profiles need an invite code
 ```
 
-Register your own passkey profile first, then find your id in `./data/db.json` under `users[].id`
-and put it in `ADMIN_UIDS`. You'll get an **Admin dashboard** link in Settings: who's training
+Register your own passkey profile first, then tap the account row at the top of **Settings** to
+copy your profile id, and put it in `ADMIN_UIDS`. (It is also in `db.json` under `users[].id`, if
+you would rather read it off the server.) You'll get an **Admin dashboard** link in Settings: who's training
 right now, each user's workout history and body weight, the ability to disable an account (signed
 out and locked out everywhere until you re-enable it), and — with `INVITE_ONLY=1` — generating and
 revoking invite codes. Existing accounts keep working when you switch invite-only on. Admin access
@@ -109,7 +110,7 @@ Access…) in front still works, and composes with the above.
 
 ## 5. Backups
 
-Everything is in `./data`:
+Everything is in `./data` — or wherever `DATA_DIR` points, if you moved it out of the checkout:
 
 ```bash
 tar czf opengym-backup-$(date +%F).tar.gz data/
@@ -117,6 +118,47 @@ tar czf opengym-backup-$(date +%F).tar.gz data/
 
 That archive contains all profiles, passkeys and workout history. Restore by unpacking it back
 into the project folder. (Individual users can also export their own data as JSON from Settings.)
+
+**`data/` must never be committed.** It is in `.gitignore`, and it should stay there. The
+directory holds three things a repository is the wrong place for:
+
+- `secret` — signs session cookies. Anyone holding a copy can mint a valid session for any
+  account on your server, without a passkey and without touching it. If it has ever been in a
+  repository, in a paste, or in a backup someone else can read, delete the file and restart:
+  the server writes a fresh one, and everyone simply signs in again with their passkeys.
+- `vapid.json` — the keypair your server signs push notifications with. Delete and restart to
+  rotate; existing subscriptions stop working and re-subscribe when each user next opens the app.
+- `db.json` and `state-<uid>.json` — accounts, passkey credentials, and every profile's
+  training, food and glucose history.
+
+If your checkout came from a repository that had `data/` committed in it, your server is running
+on that repository's secret, because the server only generates one when the file is absent. Check
+`db.json` for accounts you do not recognise while you are there — a committed `db.json` brings its
+author's registered passkey along with it, and that credential works against your server.
+
+`scripts/secure-data.sh` does the whole migration for an instance in that position: backs up,
+moves `data/` out of the checkout, rotates the two secrets if they are still the committed ones,
+removes the imported account, and grants the remaining profile the admin panel. Run it with
+`--dry-run` first; it changes nothing and prints what it would do. It is a one-off and can be
+deleted once it has run.
+
+## 5b. Barcode scanning
+
+Scanning a packet looks its barcode up in Open Food Facts and offers the values for
+confirmation against the packet before saving them. The lookup goes through your own API
+container, not from the browser: your phones never tell a third party what they are eating,
+the User-Agent Open Food Facts asks for is set in one place, and answers are cached under
+`DATA_DIR/off` so the same packet is only ever fetched once. `OFF_ENABLED=0` turns the whole
+thing off; the rest of the settings are in `.env.example`.
+
+The decoding happens in WebAssembly rather than through the browser's own barcode API,
+because Safari does not implement that one and on iOS every browser is Safari underneath.
+The decoder is ~1 MB and loads the first time someone taps Scan, not at startup.
+
+**Settings → Can this phone scan?** reports what a given phone actually supports — HTTPS,
+camera, WebAssembly, whether the decoder loads and whether the camera opens — and offers a
+real scan. Worth running once per phone. Where the live camera cannot be used there are two
+fallbacks that need less of the browser: photographing the barcode, and typing the digits.
 
 ## 6. Notifications
 

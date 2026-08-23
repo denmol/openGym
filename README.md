@@ -1,3 +1,8 @@
+# Dagsnav
+
+Dagsnav is the family-test product name for this modified openGym fork. It remains licensed
+under the GNU AGPL v3.0; the original openGym documentation and attribution follow below.
+
 <div align="center">
 
 <img src="assets/banner.png" alt="openGym" width="720">
@@ -151,7 +156,7 @@ All via `.env` (see `.env.example`):
 | `RP_ID`       | Hostname passkeys are bound to                       | `localhost`             |
 | `ORIGIN`      | Full URL the app is served from                      | `http://localhost:8080` |
 | `WEB_PORT`    | Host port for the web UI                             | `8080`                  |
-| `RP_NAME`     | Name shown in the passkey prompt                     | `openGym`               |
+| `RP_NAME`     | Name shown in the passkey prompt                     | `Dagsnav`               |
 | `ADMIN_UIDS`  | User ids that get the admin dashboard (comma-separated) | *(none)*             |
 | `INVITE_ONLY` | Require an invite code to create a profile           | *(off)*                 |
 

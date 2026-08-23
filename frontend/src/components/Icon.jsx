@@ -16,8 +16,15 @@ const P = {
   /* ---- navigation ---- */
   house: <path d="M3.5 10.7 12 3.8l8.5 6.9M5.9 9.4V19a1.4 1.4 0 0 0 1.4 1.4h9.4A1.4 1.4 0 0 0 18.1 19V9.4" />,
   calendar: <><rect x="3.4" y="5.2" width="17.2" height="15.4" rx="3.2" /><path d="M8.2 3.4v3.4M15.8 3.4v3.4M3.4 10.2h17.2" /></>,
+  forkKnife: <><path d="M6 3.6v6.2M3.8 3.6v4.1A2.2 2.2 0 0 0 6 9.9a2.2 2.2 0 0 0 2.2-2.2V3.6M6 9.9v10.5" /><path d="M15.8 20.4V3.6c2.8 1.6 4.4 4.2 4.4 7.2h-4.4" /></>,
   chart: <path d="M4.5 20.2V13M9.5 20.2V6.4M14.5 20.2v-5.1M19.5 20.2V9.6" />,
   magnifier: <><circle cx="11" cy="11" r="7" /><path d="m20.5 20.5-4.4-4.4" /></>,
+  // Body, lens and the little bump over the shutter. Drawn rather than borrowed so it
+  // carries the same 1.7 stroke and 3px padding as everything beside it.
+  camera: <><path d="M3.4 9.1a2.6 2.6 0 0 1 2.6-2.6h1.7l1.2-2h6.2l1.2 2H18a2.6 2.6 0 0 1 2.6 2.6v8.3A2.6 2.6 0 0 1 18 20H6a2.6 2.6 0 0 1-2.6-2.6Z" /><circle cx="12" cy="13.2" r="3.6" /></>,
+  // A barcode: four bars of the weights a real one uses, so it reads as a barcode at 19px
+  // rather than as an equals sign turned sideways.
+  barcode: <path d="M4 5.5v13M7.2 5.5v13M10.4 5.5v13M13.2 5.5v13M16.8 5.5v13M20 5.5v13" />,
   // A real cog outline (8 teeth, generated on a circle) — an earlier version drew
   // radial rays and was indistinguishable from `sun` at tab-bar size.
   gear: <><path d="M20.48 10.59 20.48 13.41 18.58 13.72 17.87 15.43 19 17 17 19 15.43 17.87 13.72 18.58 13.41 20.48 10.59 20.48 10.28 18.58 8.57 17.87 7 19 5 17 6.13 15.43 5.42 13.72 3.52 13.41 3.52 10.59 5.42 10.28 6.13 8.57 5 7 7 5 8.57 6.13 10.28 5.42 10.59 3.52 13.41 3.52 13.72 5.42 15.43 6.13 17 5 19 7 17.87 8.57 18.58 10.28Z" /><circle cx="12" cy="12" r="3.1" /></>,

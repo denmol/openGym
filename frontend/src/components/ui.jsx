@@ -76,7 +76,7 @@ export function SearchField({ value, onChange, onClear, ...rest }) {
 
 /* ============================ switch ============================ */
 
-export function Switch({ checked, onChange, disabled }) {
+export function Switch({ checked, onChange, disabled, ...props }) {
   return (
     <button
       role="switch"
@@ -84,6 +84,7 @@ export function Switch({ checked, onChange, disabled }) {
       disabled={disabled}
       className={'sw' + (checked ? ' on' : '')}
       onClick={() => onChange(!checked)}
+      {...props}
     >
       <span className="knob" />
     </button>

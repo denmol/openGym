@@ -9,12 +9,15 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse
 } from '@simplewebauthn/server';
 import webpush from 'web-push';
+import {
+  decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
+} from './nutrition-context.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
-const RP_NAME = process.env.RP_NAME || 'openGym';
+const RP_NAME = process.env.RP_NAME || 'Dagsnav';
 // Admin dashboard (issue): admins are matched by uid; INVITE_ONLY gates new signups behind a
 // code the admin generates. Both default off so a fresh self-hosted instance stays open.
 const ADMIN_UIDS = (process.env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -25,6 +28,40 @@ const INVITE_ONLY = /^(1|true|yes|on)$/i.test(process.env.INVITE_ONLY || '');
 // baked into each cookie when it's issued, so lowering this never cuts an existing session short.
 const SESSION_DAYS = Math.max(1, +(process.env.SESSION_DAYS || 90) || 90);
 const MAX_BODY = 5 * 1024 * 1024;
+/* ---------- AI coach (optional) ----------
+   Off unless OPENAI_API_KEY is set: the key lives here, in the server's environment, and
+   never reaches a browser. The client sends the prompt it built from the exercise catalogue
+   — which it has and the server does not — and this endpoint adds the key, pins the model,
+   forces the reply into the plan schema and counts the calls.
+
+   What this is NOT: an airtight guard against a signed-in user on this instance burning
+   credit. The daily cap is the whole defence, and it is deliberately per user per day. For a
+   personal or family instance that is the right size of lock; an instance open to strangers
+   should keep the key unset and let people paste into a chat themselves. */
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+const COACH_MODEL = process.env.COACH_MODEL || 'gpt-5.6-luna';
+// Overridable for an OpenAI-compatible endpoint (Azure, a local gateway) — and it is what
+// makes this path testable without spending anything.
+const OPENAI_BASE = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+const COACH_REASONING = process.env.COACH_REASONING || 'low';
+const COACH_DAILY_LIMIT = Math.max(1, +(process.env.COACH_DAILY_LIMIT || 20) || 20);
+const COACH_MAX_PROMPT = 40000;           // characters; a real prompt is ~9,500
+
+/* ---------- Open Food Facts (barcode lookup) ----------
+   Proxied through here rather than called from the browser, for three reasons. The family's
+   phones do not tell a third party what is in their fridge; the User-Agent Open Food Facts
+   asks callers to set lives in one place; and the answers are cached on disk, so the second
+   scan of the same packet needs no network at all and their rate limit is left alone. */
+const OFF_ENABLED = (process.env.OFF_ENABLED ?? '1') !== '0';
+const OFF_BASE = (process.env.OFF_BASE_URL || 'https://world.openfoodfacts.org').replace(/\/$/, '');
+const OFF_UA = process.env.OFF_USER_AGENT || 'Dagsnav/1.0 (self-hosted; based on https://github.com/DuarteSantos8/openGym)';
+const OFF_TTL_MS = Math.max(1, +(process.env.OFF_TTL_DAYS || 30) || 30) * 86400000;
+// A product that is not in the database is a fact worth remembering too, but a shorter one:
+// somebody may add it next month, and a nightly re-ask for a barcode nobody stocks is waste.
+const OFF_MISS_TTL_MS = 7 * 86400000;
+const OFF_DAILY_LIMIT = Math.max(1, +(process.env.OFF_DAILY_LIMIT || 300) || 300);
+const OFF_TIMEOUT_MS = 12000;
+const COACH_TIMEOUT_MS = 120000;          // reasoning models can take a while
 // Secure cookies require HTTPS; over plain http://localhost the flag would drop the cookie
 const SECURE = /^https:/i.test(ORIGIN) ? ' Secure;' : '';
 
@@ -251,9 +288,333 @@ function livePresence(uid) {
 }
 setInterval(() => { for (const [k, v] of presence) if (Date.now() - v.updatedAt > PRESENCE_TTL) presence.delete(k); }, 30000).unref();
 
+/* ---------- AI coach ---------- */
+
+// Structured Outputs need every property listed in `required`, so anything optional is typed
+// as nullable instead. This mirrors the bundle plan-share.js already imports.
+const PLAN_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'week', 'routines'],
+  properties: {
+    name: { type: 'string' },
+    week: {
+      type: 'array',
+      description: 'One entry per training day.',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['day', 'routine'],
+        properties: {
+          day: { type: 'integer', description: '0=Sunday … 6=Saturday' },
+          routine: { type: 'string', description: 'id of a routine below' }
+        }
+      }
+    },
+    routines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'name', 'emoji', 'ex'],
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+          emoji: { type: 'string' },
+          ex: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'sets', 'reps', 'prog', 'inc', 'repsMin', 'repsMax'],
+              properties: {
+                id: { type: 'string', description: 'exercise id from the supplied list' },
+                sets: { type: 'integer' },
+                reps: { type: 'integer' },
+                prog: { type: 'string', enum: ['linear', 'greyskull', 'double', 'off'] },
+                inc: { type: ['number', 'null'] },
+                repsMin: { type: ['integer', 'null'] },
+                repsMax: { type: ['integer', 'null'] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+// The model may only select server-verified fact codes. It has no free-text field.
+const nutritionSchema = facts => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['highlights'],
+  properties: {
+    highlights: { type: 'array', minItems: 1, maxItems: 5, items: { type: 'string', enum: facts } }
+  }
+});
+
+// `week` travels as a list because Structured Outputs cannot express an object with unknown
+// keys. Back to the {day: routineId} map the app reads.
+function weekToMap(week) {
+  const out = {};
+  for (const w of Array.isArray(week) ? week : []) {
+    if (w && Number.isInteger(w.day) && w.day >= 0 && w.day <= 6 && w.routine) out[w.day] = w.routine;
+  }
+  return out;
+}
+
+// Calls per user per UTC day. In memory on purpose: a restart forgiving the count is a far
+// smaller problem than another file to keep in ./data, and the cap exists to stop a runaway
+// loop rather than a determined person.
+const aiCalls = new Map();                // uid -> { day, n }, shared by coach and nutrition
+function aiQuota(uid) {
+  const day = new Date().toISOString().slice(0, 10);
+  const rec = aiCalls.get(uid);
+  if (!rec || rec.day !== day) { aiCalls.set(uid, { day, n: 0 }); return { used: 0, left: COACH_DAILY_LIMIT }; }
+  return { used: rec.n, left: Math.max(0, COACH_DAILY_LIMIT - rec.n) };
+}
+function aiReserve(uid) {
+  if (aiQuota(uid).left <= 0) return false;
+  aiCalls.get(uid).n++;
+  return true;
+}
+
+/* ---------- Open Food Facts ---------- */
+
+const offDir = path.join(DATA, 'off');
+
+/** EAN-8/UPC-A/EAN-13/GTIN-14, check digit included. Same rule as the client, on purpose:
+    a code that cannot be real is not worth a round trip to anybody's API. */
+function validBarcode(code) {
+  const s = String(code || '').trim();
+  if (!/^\d+$/.test(s) || ![8, 12, 13, 14].includes(s.length)) return null;
+  const d = s.split('').map(Number);
+  const check = d.pop();
+  let sum = 0;
+  for (let i = d.length - 1, w = 3; i >= 0; i--, w = w === 3 ? 1 : 3) sum += d[i] * w;
+  if ((10 - (sum % 10)) % 10 !== check) return null;
+  return s.length === 12 ? '0' + s : s;      // UPC-A is EAN-13 with a leading zero
+}
+
+// Only the fields the app reads. Everything else in an Open Food Facts product — images,
+// ingredient tags, packaging, a hundred translations — is bulk this never looks at, and
+// caching it would put megabytes on disk per scan.
+const OFF_NUTRIENTS = ['energy-kcal_100g', 'energy-kj_100g', 'energy_100g', 'carbohydrates_100g',
+  'sugars_100g', 'proteins_100g', 'fat_100g', 'saturated-fat_100g', 'fiber_100g', 'salt_100g'];
+const OFF_FIELDS = ['code', 'product_name', 'product_name_sv', 'brands', 'quantity',
+  'serving_size', 'serving_quantity', 'serving_quantity_unit', 'last_modified_t', 'nutriments'];
+
+function trimProduct(p) {
+  if (!p || typeof p !== 'object') return null;
+  const out = {};
+  for (const f of OFF_FIELDS) if (p[f] !== undefined && f !== 'nutriments') out[f] = p[f];
+  const nut = p.nutriments || {};
+  out.nutriments = {};
+  for (const k of OFF_NUTRIENTS) if (nut[k] !== undefined) out.nutriments[k] = nut[k];
+  return out;
+}
+
+const offCachePath = code => path.join(offDir, code + '.json');
+
+function offCached(code) {
+  try {
+    const c = JSON.parse(fs.readFileSync(offCachePath(code), 'utf8'));
+    const ttl = c.product ? OFF_TTL_MS : OFF_MISS_TTL_MS;
+    if (Date.now() - (c.at || 0) < ttl) return c;
+  } catch { /* no cache, or unreadable — fetch it */ }
+  return null;
+}
+
+function offStore(code, product) {
+  try {
+    fs.mkdirSync(offDir, { recursive: true });
+    fs.writeFileSync(offCachePath(code), JSON.stringify({ at: Date.now(), code, product }));
+  } catch (e) { console.error('off cache write', e.message); }
+}
+
+async function offFetch(code) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), OFF_TIMEOUT_MS);
+  try {
+    const url = `${OFF_BASE}/api/v2/product/${code}.json?fields=${OFF_FIELDS.join(',')}`;
+    const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': OFF_UA, Accept: 'application/json' } });
+    if (r.status === 404) return { product: null };
+    if (!r.ok) { const e = new Error('upstream ' + r.status); e.status = r.status; throw e; }
+    const body = await r.json();
+    // status 0 is how Open Food Facts says "no such product" with a 200.
+    return { product: body && body.status === 1 ? trimProduct(body.product) : null };
+  } finally { clearTimeout(timer); }
+}
+
+// Per user per UTC day, like the coach. Not about cost — about not becoming the reason
+// Open Food Facts rate-limits this server.
+const offCounts = new Map();
+function offQuota(uid) {
+  const day = new Date().toISOString().slice(0, 10);
+  const k = uid + '|' + day;
+  const n = (offCounts.get(k) || 0) + 1;
+  if (offCounts.size > 500) for (const key of offCounts.keys()) if (!key.endsWith(day)) offCounts.delete(key);
+  offCounts.set(k, n);
+  return { n, left: OFF_DAILY_LIMIT - n, ok: n <= OFF_DAILY_LIMIT };
+}
+
+async function askOpenAI(messages, name, schema, maxCompletionTokens = null) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), COACH_TIMEOUT_MS);
+  try {
+    const request = {
+      model: COACH_MODEL,
+      reasoning_effort: COACH_REASONING,
+      messages,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name, strict: true, schema }
+      }
+    };
+    if (maxCompletionTokens) request.max_completion_tokens = maxCompletionTokens;
+    const r = await fetch(OPENAI_BASE + '/chat/completions', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + OPENAI_KEY },
+      body: JSON.stringify(request)
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      // Surface the provider's own words: "insufficient_quota" is a different problem from a
+      // bad key, and a generic failure message would send you looking in the wrong place.
+      const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
+      const err = new Error(msg);
+      err.status = r.status === 401 || r.status === 429 ? r.status : 502;
+      throw err;
+    }
+    return data;
+  } finally { clearTimeout(timer); }
+}
+
 /* ---------- routes ---------- */
 const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
+
+  // Does this instance have a key, and how many calls has the caller got left today?
+  'GET /api/coach/status': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const q = aiQuota(user.id);
+    json(res, 200, { enabled: !!OPENAI_KEY, model: OPENAI_KEY ? COACH_MODEL : null, limit: COACH_DAILY_LIMIT, ...q });
+  },
+
+  'GET /api/food/barcode': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!OFF_ENABLED) return json(res, 501, { error: 'barcode lookup is switched off' });
+    const code = validBarcode(new URL(req.url, 'http://x').searchParams.get('code'));
+    if (!code) return json(res, 400, { error: 'not a barcode' });
+
+    const hit = offCached(code);
+    if (hit) return json(res, hit.product ? 200 : 404,
+      hit.product ? { code, product: hit.product, cached: true } : { error: 'not found', cached: true });
+
+    const q = offQuota(user.id);
+    if (!q.ok) return json(res, 429, { error: 'daily lookup limit reached', limit: OFF_DAILY_LIMIT });
+
+    try {
+      const { product } = await offFetch(code);
+      offStore(code, product);
+      if (!product) return json(res, 404, { error: 'not found' });
+      return json(res, 200, { code, product });
+    } catch (e) {
+      // Upstream trouble is not cached: a timeout today says nothing about tomorrow, and
+      // storing it would keep a real product hidden for a week.
+      console.error('off', code, e.message);
+      return json(res, 502, { error: 'lookup failed', detail: e.message });
+    }
+  },
+
+  'GET /api/food/barcode/status': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    json(res, 200, { enabled: OFF_ENABLED, limit: OFF_DAILY_LIMIT, source: 'Open Food Facts' });
+  },
+
+  'POST /api/coach': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+    const body = await readBody(req);
+    const prompt = String(body.prompt || '');
+    const repair = String(body.repair || '');
+    if (!prompt || prompt.length > COACH_MAX_PROMPT) return json(res, 400, { error: 'bad prompt' });
+    if (repair.length > 4000) return json(res, 400, { error: 'bad repair' });
+
+    // The system message is set here, not by the caller — it is the one instruction the
+    // client cannot talk the model out of.
+    const messages = [
+      { role: 'system', content: 'You write weekly strength training plans as JSON for the Dagsnav app. Use only exercise ids from the list you are given. Never set a weight. Reply with the JSON object only.' },
+      { role: 'user', content: prompt }
+    ];
+    // A repair round carries the first answer and the validator's complaints, so the model
+    // fixes what was wrong instead of starting over.
+    if (repair && body.previous) {
+      messages.push({ role: 'assistant', content: String(body.previous).slice(0, 40000) });
+      messages.push({ role: 'user', content: repair });
+    }
+
+    try {
+      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      const data = await askOpenAI(messages, 'opengym_plan', PLAN_SCHEMA);
+      const text = data?.choices?.[0]?.message?.content || '';
+      let plan;
+      try { plan = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      json(res, 200, {
+        plan: { opengym_plan: 1, name: plan.name, week: weekToMap(plan.week), routines: plan.routines },
+        raw: text,
+        usage: data.usage || null,
+        ...aiQuota(user.id)
+      });
+    } catch (e) {
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
+
+  'POST /api/nutrition/assist': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+
+    const body = await readBody(req);
+    const today = new Date().toISOString().slice(0, 10);
+    const decision = decideNutritionAssist(body.context, readState(user.id), today);
+    if (decision.mode === 'invalid') return json(res, 400, { error: 'bad nutrition context' });
+    const context = decision.context;
+    if (decision.mode === 'local') return json(res, 200, {
+      answer: nutritionReviewAnswer(context), local: true, usage: null, ...aiQuota(user.id)
+    });
+
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+
+    const payload = nutritionAiPayload(context);
+    const facts = payload.facts;
+    const messages = [
+      {
+        role: 'system',
+        content: 'Select one to five supplied fact codes that are most useful to highlight. Prefer the selected goal, missing data and user-entered targets. You can only return codes from the supplied list. Return the required JSON object only.'
+      },
+      { role: 'user', content: JSON.stringify(payload) }
+    ];
+
+    try {
+      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      const data = await askOpenAI(messages, 'dagsnav_nutrition_highlights', nutritionSchema(facts), 200);
+      const text = data?.choices?.[0]?.message?.content || '';
+      let selected;
+      try { selected = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      const answer = nutritionAnswer(selected?.highlights, context);
+      if (!answer) return json(res, 502, { error: 'model returned an invalid explanation' });
+      json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
+    } catch (e) {
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
 
   // Public config the login screen needs before anyone is signed in.
   'GET /api/config': async (req, res) => json(res, 200, { invite_only: INVITE_ONLY }),
@@ -417,7 +778,7 @@ const routes = {
   'POST /api/push/test': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    await sendPush(user.id, { title: 'openGym', body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
+    await sendPush(user.id, { title: 'Dagsnav', body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
     json(res, 200, { ok: true });
   },
 
