@@ -4,6 +4,7 @@ import {
   policyFor, defaultIncrement, POLICIES_FOR, DELOAD_AFTER, MAX_BW_SETS
 } from './progression.js'
 import { EXDB } from './exercises.js'
+import { setLang, t } from './i18n.js'
 
 const LIFT = EXDB.find(e => e.bp !== 'cardio' && !['upper legs', 'lower legs', 'back', 'hips', 'glutes'].includes(e.bp)).id
 const HEAVY = EXDB.find(e => e.bp === 'upper legs').id
@@ -116,6 +117,13 @@ describe('linear progression', () => {
     const p = nextPrescription(hist(LIFT, [[60, 5, 5, 5]]), cfg)
     expect(p.kind).toBe('up')
     expect(p.weight).toBe(62.5)
+  })
+
+  it('formats a decimal increment for the UI language', async () => {
+    await setLang('sv')
+    const p = nextPrescription(hist(LIFT, [[60, 5, 5, 5]]), cfg)
+    expect(t(...p.why)).toBe('Varje rep förra gången — 2,5 kg mer.')
+    await setLang('en')
   })
 
   it('repeats the weight after a miss instead of advancing', () => {
