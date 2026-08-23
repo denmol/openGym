@@ -81,6 +81,16 @@ test('server state is authoritative and fails closed', () => {
   assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, nutritionGoals: { ...SAFE_STATE.nutritionGoals, targetReviewRequired: true } }, '2026-08-23').mode, 'local');
 });
 
+test('only explicit stored diabetes-off shapes allow AI', () => {
+  assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, health: null }, '2026-08-23').mode, 'ai');
+  assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, health: { on: false } }, '2026-08-23').mode, 'ai');
+  const { health: _health, ...missingHealth } = SAFE_STATE;
+  assert.equal(decideNutritionAssist(RAW_CONTEXT, missingHealth, '2026-08-23').mode, 'local');
+  for (const health of [undefined, false, 'false', [], {}, { on: 'false' }, { on: null }, { on: true }]) {
+    assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, health }, '2026-08-23').mode, 'local');
+  }
+});
+
 test('every incretin use except explicit none stays local', () => {
   for (const incretinUse of ['weight', 'diabetes', 'both', 'other', null, undefined]) {
     const state = { ...SAFE_STATE, nutritionGoals: { ...SAFE_STATE.nutritionGoals, incretinUse } };

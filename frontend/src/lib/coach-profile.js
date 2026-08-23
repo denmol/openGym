@@ -66,7 +66,7 @@ const clampNum = (v, [lo, hi]) => {
  */
 export function cleanCoachProfile(p) {
   const out = { ...DEF_COACH, ...(p || {}) }
-  out.age = clampNum(out.age, [12, 100])
+  out.age = typeof out.age === 'number' && Number.isInteger(out.age) && out.age >= 12 && out.age <= 100 ? out.age : null
   out.heightCm = clampNum(out.heightCm, [120, 230])
   out.days = clampNum(out.days, DAYS_RANGE) ?? DEF_COACH.days
   out.minutes = clampNum(out.minutes, MINUTES_RANGE) ?? DEF_COACH.minutes

@@ -81,7 +81,9 @@ export function cleanNutritionContext(raw) {
 function storedNutritionNeedsLocal(state, today) {
   const goals = state?.nutritionGoals;
   if (!goals || typeof goals !== 'object' || !adult(state?.coachProfile?.age)) return true;
-  return state?.health?.on !== false || goals.condition !== false || goals.medication !== false ||
+  const healthOff = Object.hasOwn(state, 'health') && (state.health === null ||
+    (state.health && typeof state.health === 'object' && !Array.isArray(state.health) && state.health.on === false));
+  return !healthOff || goals.condition !== false || goals.medication !== false ||
     goals.incretinUse !== 'none' || goals.weightPhase !== null ||
     !STORED_SAFETY_KEYS.every(key => goals.safety?.[key] === false) ||
     !currentReview(goals.safetyReviewedAt, today) || goals.targetReviewRequired !== false;

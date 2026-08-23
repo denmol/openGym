@@ -323,9 +323,11 @@ describe('nutrition reference engine', () => {
     ['otherClinicalNutrition', ['glp-protein-example', 'glp-protein-reference-weight', 'glp-protein-floor', 'glp-fiber', 'glp-fluid', 'glp-energy-1500', 'glp-energy-1200', 'glp-energy-800']],
     ['hypoglycemiaRiskMedication', ['nnr-carb', 'glp-energy-1500', 'glp-energy-1200', 'glp-energy-800']]
   ])('hides the exact references for %s', (key, hidden) => {
+    const baseIds = nutritionReferenceState(CURRENT_GLP, { age: 40, today: '2026-08-23' })
+      .references.map(item => item.id)
     const ids = nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, [key]: true } }, { age: 40, today: '2026-08-23' })
       .references.map(item => item.id)
-    for (const id of hidden) expect(ids).not.toContain(id)
+    expect(ids).toEqual(baseIds.filter(id => !hidden.includes(id)))
   })
 
   it('locks reference kind, operator, placement and source family for every catalogue row', () => {
