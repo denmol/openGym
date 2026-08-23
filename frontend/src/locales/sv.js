@@ -841,7 +841,7 @@ export default {
   'Answer and confirm every safety question before GLP-1 references are shown.': 'Besvara och bekräfta alla säkerhetsfrågor innan GLP-1-referenser visas.',
   'Confirm the safety answers again; the previous review is older than 90 days.': 'Bekräfta säkerhetssvaren igen; den förra granskningen är äldre än 90 dagar.',
   'The GLP-1 reference layer is hidden because a professional review is needed.': 'GLP-1-referenserna döljs eftersom professionell granskning behövs.',
-  'General adult references are shown. GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.': 'Allmänna vuxenreferenser visas. GLP-1-referenser för obesitas kräver Viktbehandling eller Vikt- och diabetesbehandling.',
+  'GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.': 'GLP-1-referenser för obesitas kräver Viktbehandling eller Vikt- och diabetesbehandling.',
   'Explain with AI': 'Förklara med AI',
   'Explain this day with AI': 'Förklara dagen med AI',
   'AI explanation': 'AI-förklaring',

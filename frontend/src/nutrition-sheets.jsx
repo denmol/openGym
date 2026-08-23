@@ -52,7 +52,7 @@ const STATUS_TEXT = {
   safety_incomplete: 'Answer and confirm every safety question before GLP-1 references are shown.',
   safety_expired: 'Confirm the safety answers again; the previous review is older than 90 days.',
   blocked: 'The GLP-1 reference layer is hidden because a professional review is needed.',
-  not_applicable: 'General adult references are shown. GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.'
+  not_applicable: 'GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.'
 }
 const GOAL_NOTE = {
   maintain: 'Weight and logged intake over time are more useful than a one-off formula.',
