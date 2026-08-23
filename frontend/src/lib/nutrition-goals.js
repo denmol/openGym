@@ -43,10 +43,10 @@ const EASO = {
 }
 
 export const NUTRITION_REFERENCE_CATALOG = [
-  { id: 'nnr-carb', layer: 'adult', nutrient: 'carb', kind: 'range', value: { min: 45, max: 60 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; Dagsnav does not convert E% to grams.' },
-  { id: 'nnr-protein', layer: 'adult', nutrient: 'prot', kind: 'range', value: { min: 10, max: 20 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; Dagsnav does not convert E% to grams.' },
-  { id: 'nnr-fat', layer: 'adult', nutrient: 'fat', kind: 'range', value: { min: 25, max: 40 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; Dagsnav does not convert E% to grams.' },
-  { id: 'nnr-saturated', layer: 'adult', nutrient: 'sat', kind: 'max', value: 10, operator: '<', unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population maximum, not a personal treatment target; Dagsnav does not convert E% to grams.' },
+  { id: 'nnr-carb', layer: 'adult', nutrient: 'carb', kind: 'range', value: { min: 45, max: 60 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; a separate approximate gram range is shown when an energy basis is available.' },
+  { id: 'nnr-protein', layer: 'adult', nutrient: 'prot', kind: 'range', value: { min: 10, max: 20 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; a separate approximate gram range is shown when an energy basis is available.' },
+  { id: 'nnr-fat', layer: 'adult', nutrient: 'fat', kind: 'range', value: { min: 25, max: 40 }, unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population range, not a personal treatment target; a separate approximate gram range is shown when an energy basis is available.' },
+  { id: 'nnr-saturated', layer: 'adult', nutrient: 'sat', kind: 'max', value: 10, operator: '<', unit: 'E%', digits: 0, daily: true, ...NNR, limitation: 'Population maximum, not a personal treatment target; a separate approximate gram maximum is shown when an energy basis is available.' },
   { id: 'nnr-fiber-range', layer: 'adult', nutrient: 'fib', kind: 'range', value: { min: 25, max: 35 }, unit: 'g/day', digits: 0, daily: true, targetField: 'fib', ...NNR, limitation: 'Population interval shown when no sex-specific NNR reference is selected.' },
   { id: 'nnr-fiber-female', layer: 'adult', nutrient: 'fib', kind: 'min', value: 25, operator: '≥', unit: 'g/day', digits: 0, daily: true, targetField: 'fib', ...NNR, limitation: 'NNR population minimum for women, selected explicitly by the user.' },
   { id: 'nnr-fiber-male', layer: 'adult', nutrient: 'fib', kind: 'min', value: 35, operator: '≥', unit: 'g/day', digits: 0, daily: true, targetField: 'fib', ...NNR, limitation: 'NNR population minimum for men, selected explicitly by the user.' },
@@ -229,12 +229,32 @@ export function formatNutritionReference(reference, locale = 'en-GB', unit = ref
   return `${value} ${unit}`
 }
 
-/** Resting-energy estimate only; it is never copied into an intake target. */
+/** Resting-energy estimate already used by the profile and AI context. */
 export function bmrEstimate({ sex, age, heightCm, weightKg } = {}) {
   const values = [age, heightCm, weightKg].map(numberOf)
   const [adultAge, height, weight] = values
   if ((sex !== 'male' && sex !== 'female') || !values.every(Number.isFinite) || adultAge < 18 || height <= 0 || weight <= 0) return null
   return bmr({ sex, age: adultAge, heightCm: height, weightKg: weight })
+}
+
+export const nnrRestingEnergyEstimate = ({ sex, age, heightCm, weightKg }) => {
+  const adultAge = ageOf(age)
+  const [height, weight] = [heightCm, weightKg].map(numberOf)
+  if ((sex !== 'male' && sex !== 'female') || adultAge == null ||
+    ![height, weight].every(Number.isFinite) || height <= 0 || weight <= 0) return null
+  const metres = height / 100
+  const mj = sex === 'female'
+    ? adultAge < 25
+      ? 0.0433 * weight + 2.57 * metres - 1.180
+      : adultAge < 51
+        ? 0.0342 * weight + 2.10 * metres - 0.0486
+        : 0.0356 * weight + 1.76 * metres + 0.0448
+    : adultAge < 25
+      ? 0.0600 * weight + 1.31 * metres + 0.473
+      : adultAge < 51
+        ? 0.0476 * weight + 2.26 * metres - 0.574
+        : 0.0478 * weight + 2.26 * metres - 1.070
+  return mj > 0 ? Math.round(mj * 239) : null
 }
 
 const ACTIVITY_PAL = {
@@ -246,30 +266,40 @@ const ACTIVITY_PAL = {
 const round10 = value => Math.round(value / 10) * 10
 const roundGram = value => Math.round(value * 10) / 10
 const energyRange = (min, max) => ({ min: round10(min), max: round10(max) })
-const macroGrams = ({ min, max }) => {
+const macroGrams = ({ min, max }, { age, weightKg }) => {
   const carbohydrate = (energy, percent) =>
     (energy * percent / 100 - 3 * (energy / 239) * 2) / 4
+  const proteinMin = age > 70 ? weightKg * 1.2 : Math.max(min * 0.10 / 4, weightKg * 0.83)
+  const proteinMax = age > 70 ? weightKg * 1.5 : Math.max(max * 0.20 / 4, proteinMin)
+  const protein = {
+    min: roundGram(proteinMin), max: roundGram(proteinMax),
+    ...(age <= 70 && proteinMin >= max * 0.20 / 4 ? { operator: '≥' } : {})
+  }
   return {
     carb: { min: roundGram(carbohydrate(min, 45)), max: roundGram(carbohydrate(max, 60)) },
-    prot: { min: roundGram(min * 0.10 / 4), max: roundGram(max * 0.20 / 4) },
+    prot: protein,
     fat: { min: roundGram(min * 0.25 / 9), max: roundGram(max * 0.40 / 9) },
-    sat: { max: roundGram(max * 0.10 / 9), operator: '<' },
+    sat: { min: roundGram(min * 0.10 / 9), max: roundGram(max * 0.10 / 9), operator: '<' },
     sugar: null
   }
 }
 
 /** Approximate energy and NNR macro ranges; manual targets remain authoritative and untouched. */
-export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weightKg } = {}) {
+export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weightKg, today = nutritionSafetyToday() } = {}) {
   const profile = cleanNutritionProfile(rawProfile)
-  if (!profile.goal || ageOf(age) == null) return null
-  const basal = bmrEstimate({ sex, age, heightCm, weightKg })
+  const adultAge = ageOf(age)
+  if (!profile.goal || adultAge == null || !allSafetyAnswered(profile) ||
+    !safetyReviewCurrent(profile.safetyReviewedAt, today)) return null
+  const referenceState = nutritionReferenceState(profile, { age: adultAge, today })
+  if (referenceState.adultStatus !== 'available' || referenceState.pausedTargets.includes('kcal')) return null
+  const basal = nnrRestingEnergyEstimate({ sex, age, heightCm, weightKg })
   const height = numberOf(heightCm), weight = numberOf(weightKg)
   if (!(basal > 0) || !Number.isFinite(height) || height <= 0 || !Number.isFinite(weight) || weight <= 0) return null
 
   const pal = ACTIVITY_PAL[profile.activityLevel]
   const maintenanceKcal = energyRange(basal * pal.min, basal * pal.max)
   const bmi = weight / ((height / 100) ** 2)
-  let goalKcal = { ...maintenanceKcal }, goalBasis = 'maintenance', goalStatus = 'maintenance_estimate'
+  let goalKcal = null, goalBasis = 'maintenance', goalStatus = 'maintenance_estimate'
   if (profile.goal === 'lose' && bmi >= 25) {
     goalKcal = energyRange(maintenanceKcal.min - 750, maintenanceKcal.max - 500)
     goalBasis = 'loss_deficit'
@@ -287,10 +317,13 @@ export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weight
     goalStatus = 'planning_example'
   }
 
-  const ownEnergy = profile.targets.kcal > 0 ? profile.targets.kcal : null
+  const ownEnergy = profile.targets.kcal >= 1200 ? profile.targets.kcal : null
+  const estimatedEnergy = goalKcal || (goalStatus === 'low_energy_review' ? null : maintenanceKcal)
   const macroBasisKcal = ownEnergy != null
     ? { min: ownEnergy, max: ownEnergy, source: 'own_target' }
-    : goalKcal && { ...goalKcal, source: 'estimated_goal' }
+    : estimatedEnergy && { ...estimatedEnergy, source: goalKcal ? 'estimated_goal' : 'estimated_maintenance' }
+  const grams = macroBasisKcal ? macroGrams(macroBasisKcal, { age: adultAge, weightKg: weight }) : null
+  for (const target of referenceState.pausedTargets) if (grams && target in grams) grams[target] = null
   const planningExample = goalBasis === 'loss_deficit' || goalBasis === 'muscle_surplus'
   return {
     approximate: true,
@@ -301,18 +334,37 @@ export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weight
     goalBasis,
     goalStatus,
     macroBasisKcal,
-    grams: macroBasisKcal ? macroGrams(macroBasisKcal) : null,
+    macroStatus: profile.targets.kcal > 0 && profile.targets.kcal < 1200 ? 'low_energy_review' : 'available',
+    grams,
     basis: {
-      maintenance: { kind: 'estimate', sources: ['mifflin_st_jeor', 'nnr_2023_pal'] },
+      maintenance: { kind: 'estimate', sources: ['nnr_2023_henry', 'nnr_2023_pal'] },
       goal: planningExample
-        ? { kind: goalStatus === 'low_energy_review' ? 'review' : 'planning_example', source: 'nnr_2023', rule: goalBasis }
-        : { kind: 'estimate', sources: ['mifflin_st_jeor', 'nnr_2023_pal'] },
+        ? {
+            kind: goalStatus === 'low_energy_review' ? 'review' : 'planning_example',
+            source: goalBasis === 'loss_deficit' ? 'aha_acc_2026' : 'resistance_training_surplus_2023',
+            rule: goalBasis
+          }
+        : { kind: 'estimate', sources: ['nnr_2023_henry', 'nnr_2023_pal'] },
       macros: {
         kind: 'population_reference_conversion', source: 'nnr_2023',
-        carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj'
+        carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj',
+        proteinRule: adultAge > 70 ? 'older_adult_1_2_1_5_g_per_kg' : 'adult_ri_0_83_g_per_kg_floor'
       }
     }
   }
+}
+
+export function formatNutritionPlanningValue(value, locale = 'en-GB', unit = 'g/day') {
+  if (!value || typeof value !== 'object') return ''
+  const min = numberOf(value.min ?? value.max), max = numberOf(value.max ?? value.min)
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) return ''
+  const digits = unit.startsWith('kcal') ? 0 : 1
+  const fmt = number => number.toLocaleString(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  })
+  const amount = min === max ? fmt(min) : `${fmt(min)}–${fmt(max)}`
+  return `${value.operator || ''}≈${amount} ${unit}`
 }
 
 /** Convert only a weight whose unit was stored with the measurement. */

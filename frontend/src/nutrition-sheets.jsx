@@ -1,9 +1,8 @@
 // Personal nutrition goals.
 //
-// Numbers here have two sources only: measurements already in the profile and values the
-// person types. A resting-energy estimate is shown as an estimate and never copied into a
-// daily intake target. Illness and medication tighten that boundary rather than changing a
-// formula behind the person's back.
+// Numbers here come from measurements already in the profile, explicit choices and sourced
+// equations. Every calculated value is marked as approximate and stays separate from the
+// editable target fields.
 
 import { useState } from 'react'
 import { useStore } from './store/useStore.js'
@@ -15,8 +14,9 @@ import { coachProfileOf, cleanCoachProfile } from './lib/coach-profile.js'
 import { diabetesOn } from './lib/diabetes.js'
 import { NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import {
-  NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS, bmrEstimate, cleanNutritionProfile,
-  dailyNutritionReferences, finalizeNutritionProfile, formatNutritionReference, needsClinicianTargets,
+  NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS, cleanNutritionProfile,
+  dailyNutritionReferences, finalizeNutritionProfile, formatNutritionPlanningValue,
+  formatNutritionReference, needsClinicianTargets, nnrRestingEnergyEstimate, nutritionPlanningValues,
   nutritionReferenceState, nutritionSafetyToday, safetyReviewCurrent, weightKgOf
 } from './lib/nutrition-goals.js'
 import { askNutrition, nutritionAssistContext } from './lib/nutrition-assist.js'
@@ -32,6 +32,12 @@ const INCRETIN_NAME = {
 }
 const PHASE_NAME = { active_loss: 'Active weight loss', maintenance: 'Weight-stable phase' }
 const FIBER_NAME = { range: 'Population interval', female: "Women's NNR reference", male: "Men's NNR reference" }
+const ACTIVITY_NAME = {
+  range: 'Not sure — show PAL 1.4–1.8',
+  low: 'Mostly sedentary · PAL 1.4',
+  moderate: 'Sedentary work and active leisure · PAL 1.6',
+  active: 'Active lifestyle · PAL 1.8'
+}
 const SAFETY_QUESTION = {
   kidneyOrProteinRestriction: 'Kidney disease, dialysis, transplant or prescribed protein restriction?',
   fluidOrSodiumRestriction: 'Heart failure or prescribed fluid or sodium restriction?',
@@ -55,10 +61,10 @@ const STATUS_TEXT = {
   not_applicable: 'GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.'
 }
 const GOAL_NOTE = {
-  maintain: 'Weight and logged intake over time are more useful than a one-off formula.',
-  lose: 'Source references are shown, but Dagsnav does not invent a calorie deficit or personal target.',
-  muscle: 'Source references are shown, but Dagsnav does not invent a calorie surplus, protein surplus or personal target.',
-  health: 'Use the Nordic reference ranges as context, then set only the targets that help you.'
+  maintain: 'The estimate shows maintenance energy; you decide whether to enter it as your own target.',
+  lose: 'A sourced weight-loss planning interval is shown when the inputs support it; you decide your own target.',
+  muscle: 'A sourced muscle-gain planning interval is shown as an example; you decide your own target.',
+  health: 'The estimate shows maintenance energy together with Nordic nutrient ranges in grams.'
 }
 const ASSIST_ERROR = {
   'no api key configured': 'Nutrition explanation is not configured on this server.',
@@ -111,12 +117,15 @@ function GoalsSheet({ close }) {
 
   const bw = lastBW(S)
   const weightKg = weightKgOf(bw)
-  const basal = bmrEstimate({ sex, age, heightCm, weightKg })
+  const basal = nnrRestingEnergyEstimate({ sex, age, heightCm, weightKg })
   const profile = cleanNutritionProfile(draft)
-  const today = todayISO()
   const safetyToday = nutritionSafetyToday()
+  const planning = nutritionPlanningValues(profile, { sex, age, heightCm, weightKg, today: safetyToday })
+  const today = todayISO()
   const referenceState = nutritionReferenceState(profile, { age, today: safetyToday })
   const safetyComplete = NUTRITION_SAFETY_KEYS.every(key => typeof profile.safety[key] === 'boolean')
+  const planningSafetyReady = safetyComplete && safetyReviewCurrent(profile.safetyReviewedAt, safetyToday)
+  const visiblePlanning = planning
   const clinician = needsClinicianTargets(profile, { diabetes: diabetesOn(S) }) ||
     ((typeof age === 'number' || (typeof age === 'string' && age.trim())) && Number(age) > 0 && Number(age) < 18)
 
@@ -169,7 +178,7 @@ function GoalsSheet({ close }) {
       <label><span>{t('Height')}</span><span className="nwith-unit"><NumberField className="input" value={heightCm} nullable decimal={false}
         aria-label={t('Height in cm')} onChange={setHeight} /><i>cm</i></span></label>
     </div>
-    <div className="nsex" role="group" aria-label={t('Sex used by the BMR formula')}>
+    <div className="nsex" role="group" aria-label={t('Sex used by the resting-energy equation')}>
       {['female', 'male'].map(value => <button key={value} className={sex === value ? 'on' : ''}
         aria-pressed={sex === value} onClick={() => setSex(value)}>{t(value === 'female' ? 'Female' : 'Male')}</button>)}
     </div>
@@ -177,18 +186,72 @@ function GoalsSheet({ close }) {
     <div className="nbmr">
       <span className="nbmr-icon"><Icon name="flame" /></span>
       <div className="grow">
-        <div className="small dim">{t('Estimated BMR')}</div>
+        <div className="small dim">{t('Estimated resting energy · NNR 2023 Henry')}</div>
         <div className="nbmr-value">{basal == null ? '—' : t('≈ {0} kcal/day', fmtNum(basal))}</div>
         <div className="dim small">{basal == null
           ? t(bw && !bw.u
             ? 'Log a new weight so its unit is known before BMR is estimated.'
             : 'Add adult age, sex, height and a logged weight to show the estimate.')
-          : t('BMR is an estimate of energy at rest, not a daily calorie target.')}</div>
+          : t('Resting energy is an equation-based estimate, not a daily calorie target.')}</div>
         {bw?.u && <div className="dim small" style={{ marginTop: 4 }}>
           {t('Latest weight: {0} {1} on {2}', fmtNum(bw.w), bw.u, bw.d)}
         </div>}
       </div>
     </div>
+
+    <h4 className="sec">{t('Activity used for the energy estimate')}</h4>
+    <ChoiceGrid label="Activity used for the energy estimate" names={ACTIVITY_NAME}
+      value={profile.activityLevel} onChange={activityLevel => change({ activityLevel })} />
+    <div className="nreference-note">
+      {t('PAL is not inferred from workouts. Choose a level, or keep the full PAL 1.4–1.8 range when unsure.')}{' '}
+      <a href="https://pub.norden.org/nord2023-003/appendix.html" target="_blank" rel="noopener">
+        {t('Source: Nordic Nutrition Recommendations 2023')}
+      </a>
+    </div>
+
+    {profile.goal && !planningSafetyReady && <div className="nmedical" role="note">
+      <Icon name="shield" /><div>{t('Answer and confirm every safety question below before calculated kcal and gram ranges are shown.')}</div>
+    </div>}
+
+    {visiblePlanning && <div className="nbmr">
+      <span className="nbmr-icon"><Icon name="target" /></span>
+      <div className="grow">
+        <div className="small dim">{t('Estimated maintenance energy')}</div>
+        <div className="nbmr-value">{formatNutritionPlanningValue(
+          visiblePlanning.maintenanceKcal, dateLocale(), t('kcal/day'))}</div>
+        {visiblePlanning.goalKcal && <>
+          <div className="small dim" style={{ marginTop: 8 }}>{t(visiblePlanning.goalBasis === 'loss_deficit'
+            ? 'Sourced weight-loss planning interval'
+            : visiblePlanning.goalBasis === 'muscle_surplus'
+              ? 'Sourced muscle-gain planning interval'
+              : 'Calculated daily energy')}</div>
+          <div className="nbmr-value">{formatNutritionPlanningValue(
+            visiblePlanning.goalKcal, dateLocale(), t('kcal/day'))}</div>
+        </>}
+        {visiblePlanning.goalBasis === 'loss_deficit' && <div className="dim small">
+          {t('The 500–750 kcal deficit comes from clinician-led multicomponent programmes for adults with overweight or obesity and is shown only as a planning example.')}
+        </div>}
+        {visiblePlanning.goalBasis === 'muscle_surplus' && <div className="dim small">
+          {t('The 5–20% surplus is a research-based example for resistance-trained adults; larger surpluses mainly increased skinfolds.')}
+        </div>}
+        <div className="dim small" style={{ marginTop: 6 }}>
+          <a href="https://pub.norden.org/nord2023-003/appendix.html" target="_blank" rel="noopener">NNR 2023 · Henry + PAL</a>
+          {visiblePlanning.goalBasis === 'loss_deficit' && <>
+            {' · '}<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC13399222/" target="_blank" rel="noopener">AHA/ACC 2026</a>
+          </>}
+          {visiblePlanning.goalBasis === 'muscle_surplus' && <>
+            {' · '}<a href="https://pubmed.ncbi.nlm.nih.gov/37914977/" target="_blank" rel="noopener">Helms et al. 2023</a>
+          </>}
+        </div>
+        <div className="dim small">{t('These are equation-based estimates, not measured expenditure, and nothing is copied into your own targets.')}</div>
+      </div>
+    </div>}
+    {visiblePlanning?.goalStatus === 'low_energy_review' && <div className="nmedical" role="note">
+      <Icon name="info" /><div>{t('No weight-loss interval is shown because the calculation would go below 1,200 kcal/day. Use an individually reviewed energy target instead.')}</div>
+    </div>}
+    {visiblePlanning?.goalStatus === 'loss_not_applied_bmi_below_25' && <div className="nreference-note">
+      {t('No automatic calorie deficit is applied below BMI 25; estimated maintenance energy is shown instead.')}
+    </div>}
 
     <h4 className="sec">{t('Health boundary')}</h4>
     <div className="sect-b">
@@ -226,7 +289,7 @@ function GoalsSheet({ close }) {
       </div>)}
     </div>
     <details className="nreference"
-      open={(profile.incretinUse != null && profile.incretinUse !== 'none') || profile.condition || profile.medication}>
+      open={!planningSafetyReady || (profile.incretinUse != null && profile.incretinUse !== 'none') || profile.condition || profile.medication}>
       <summary>{t('Safety questions')}</summary>
       <div>
         {NUTRITION_SAFETY_KEYS.filter(key => key !== 'pregnancyOrBreastfeeding').map(key => <div className="nsafety-row" key={key}>
@@ -253,18 +316,40 @@ function GoalsSheet({ close }) {
 
     <h4 className="sec">{t('Recommendations and own targets')}</h4>
     <div className="nreference-note">
-      {t('The values are shown before each field as general population references, not personal recommendations. Nothing is copied into your own target.')}{' '}
+      {t('Calculated values are marked with ≈ and shown in kcal or grams before each editable field. Nothing is copied into your own target.')}{' '}
       <a href="https://pub.norden.org/nord2023-003/recommendations.html" target="_blank" rel="noopener">
         {t('Source: Nordic Nutrition Recommendations 2023')}
       </a>
+      <br />{t('Carbohydrate grams exclude fibre, matching EU food labels. The conversion reserves fibre energy using the NNR minimum of 3 g/MJ.')}
+      <br />{t('Protein grams use at least the NNR RI of 0.83 g/kg; for adults over 70, the NNR range 1.2–1.5 g/kg is used.')}
     </div>
+    {visiblePlanning?.macroStatus === 'low_energy_review' && <div className="nmedical" role="note">
+      <Icon name="info" /><div>{t('Your energy target below 1,200 kcal/day is not used to calculate gram ranges; the sourced planning estimate is used instead when available.')}</div>
+    </div>}
     <div className="ntargets">
       {NUTRIENT_TARGETS.map(key => {
         const paused = referenceState.pausedTargets.includes(key)
         const references = dailyNutritionReferences(referenceState, key)
+        const calculated = !paused && visiblePlanning && (key === 'kcal'
+          ? visiblePlanning.goalKcal || visiblePlanning.maintenanceKcal
+          : visiblePlanning.grams?.[key])
         return <label key={key} className={paused ? 'paused' : ''}>
           <span className="ntarget-copy">
             <span className="ntarget-name">{t(NUTRIENT_NAME[key])}</span>
+            {calculated && <small className="ntarget-reference ntarget-calculated">
+              <span className="ntarget-reference-value">{t(key === 'kcal'
+                ? visiblePlanning.goalKcal && visiblePlanning.goalBasis === 'loss_deficit'
+                  ? 'Weight-loss planning interval: {0}'
+                  : visiblePlanning.goalKcal && visiblePlanning.goalBasis === 'muscle_surplus'
+                    ? 'Muscle-gain planning interval: {0}'
+                    : 'Estimated maintenance energy: {0}'
+                : visiblePlanning.macroBasisKcal.source === 'own_target'
+                  ? 'Converted from your own energy target: {0}'
+                  : visiblePlanning.macroBasisKcal.source === 'estimated_maintenance'
+                    ? 'Calculated from estimated maintenance energy: {0}'
+                  : 'Calculated range: {0}',
+              formatNutritionPlanningValue(calculated, dateLocale(), t(key === 'kcal' ? 'kcal/day' : 'g/day')))}</span>
+            </small>}
             {references.map(reference => <small className="ntarget-reference" key={reference.id}>
               <span className="ntarget-reference-value">{t(reference.layer === 'adult'
                 ? 'General adult reference: {0}'
@@ -272,8 +357,11 @@ function GoalsSheet({ close }) {
               formatNutritionReference(reference, dateLocale(), t(reference.unit)))}</span>
               <span> · {t(reference.source)}</span>
             </small>)}
-            {!paused && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
-              {t('No automatic calorie target — energy expenditure has not been measured.')}
+            {!paused && !calculated && !planningSafetyReady && key === 'kcal' && <small className="ntarget-reference">
+              {t('Confirm the safety answers to show the calculated interval.')}
+            </small>}
+            {!paused && !calculated && planningSafetyReady && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
+              {t('Add a goal, adult age, sex, height and a logged weight to calculate an energy interval.')}
             </small>}
             {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
               {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}

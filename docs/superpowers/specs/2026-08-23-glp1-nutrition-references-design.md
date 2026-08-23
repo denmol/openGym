@@ -1,6 +1,10 @@
 # Källmärkta näringsreferenser för vuxna och GLP-1
 
-Status: godkänd av användaren 2026-08-23. Ingen implementation ingår i specifikationen.
+Status: ursprungligen godkänd 2026-08-23. Avgränsningen om att aldrig räkna om E% eller
+visa energiuppskattning ersattes senare samma dag på användarens uttryckliga begäran.
+Appen visar nu `≈`-märkta kcal- och gramintervall från NNR 2023:s Henry-ekvationer,
+ett uttryckligt NNR-PAL-val och källmärkta planeringsexempel. Värdena visas först efter
+en aktuell säkerhetsbekräftelse och kopieras aldrig till användarens egna mål.
 
 ## Mål
 
@@ -22,8 +26,7 @@ Första versionen omfattar de åtta näringsvärden som redan kan loggas: energi
 
 Följande ingår inte:
 
-- ett automatiskt dagligt kalorimål från BMR;
-- ett fast energiunderskott eller energiöverskott;
+- ett automatiskt ifyllt dagligt kalorimål;
 - sjukdoms- eller läkemedelsdosering;
 - automatiska vitamin-, mineral- eller kosttillskottsdoser;
 - AI-genererade näringsvärden;

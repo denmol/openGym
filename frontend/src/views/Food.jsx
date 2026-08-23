@@ -11,9 +11,11 @@ import { todayISO, isoOf, fmtNum } from '../lib/format.js'
 import { foodMap, hasFoodDb, FOODS_SOURCE, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from '../lib/foods.js'
 import { mealsOn, dayTotals, mealTotals, nutrientTotal, MEAL_NAME } from '../lib/nutrition.js'
 import { coachProfileOf } from '../lib/coach-profile.js'
+import { lastBW } from '../lib/history.js'
 import {
-  cleanNutritionProfile, dailyNutritionReferences, formatNutritionReference, nutritionAiGate,
-  nutritionReferenceState, nutritionSafetyToday
+  NUTRITION_SAFETY_KEYS, cleanNutritionProfile, dailyNutritionReferences, formatNutritionPlanningValue,
+  formatNutritionReference, nutritionAiGate, nutritionPlanningValues, nutritionReferenceState,
+  nutritionSafetyToday, safetyReviewCurrent, weightKgOf
 } from '../lib/nutrition-goals.js'
 import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
 import { mealSheet, quickLogSheet, mealDetailSheet, ownFoodSheet, deleteMyMeal, Macros } from '../food-sheets.jsx'
@@ -33,7 +35,7 @@ const foodValue = (food, key) => {
   return value == null || String(value).trim() === '' ? '—' : fmtNum(value)
 }
 
-function NutrientDetails({ totals, goals, referenceState }) {
+function NutrientDetails({ totals, goals, referenceState, planning }) {
   const incomplete = NUTRIENTS.some(key => nutrientTotal(totals, key) == null)
   return <details className="nutrient-details">
     <summary>
@@ -46,6 +48,9 @@ function NutrientDetails({ totals, goals, referenceState }) {
         const target = goals.targets[key]
         const paused = referenceState.pausedTargets.includes(key)
         const references = dailyNutritionReferences(referenceState, key)
+        const calculated = !paused && planning && (key === 'kcal'
+          ? planning.goalKcal || planning.maintenanceKcal
+          : planning.grams?.[key])
         return <div key={key} className={value == null ? 'incomplete' : ''}>
           <dt>{t(NUTRIENT_NAME[key])}</dt>
           <dd>
@@ -55,6 +60,18 @@ function NutrientDetails({ totals, goals, referenceState }) {
               {paused
                 ? t('Own target: Paused — needs review')
                 : t('Own target: {0} {1}', fmtNum(target), NUTRIENT_UNIT[key])}
+            </small>}
+            {calculated && <small>
+              {t(key === 'kcal'
+                ? planning.goalKcal && planning.goalBasis === 'loss_deficit'
+                  ? 'Weight-loss planning interval · NNR 2023 Henry + PAL · AHA/ACC 2026: {0}'
+                  : planning.goalKcal && planning.goalBasis === 'muscle_surplus'
+                    ? 'Muscle-gain planning interval · NNR 2023 Henry + PAL · Helms et al. 2023: {0}'
+                    : 'Estimated maintenance energy · NNR 2023 Henry + PAL: {0}'
+                : planning.macroBasisKcal.source === 'own_target'
+                  ? 'NNR range from your own energy target: {0}'
+                  : 'Calculated NNR range: {0}',
+              formatNutritionPlanningValue(calculated, dateLocale(), t(key === 'kcal' ? 'kcal/day' : 'g/day')))}
             </small>}
             {references.map(reference => <small key={reference.id}>
               {t(reference.kind === 'example' ? 'Source example: {0}' : 'Reference: {0}',
@@ -78,7 +95,14 @@ export default function Food() {
   const goals = cleanNutritionProfile(S.nutritionGoals)
   const person = coachProfileOf(S)
   const safetyToday = nutritionSafetyToday()
+  const planning = nutritionPlanningValues(goals, {
+    sex: person.sex, age: person.age, heightCm: person.heightCm,
+    weightKg: weightKgOf(lastBW(S)), today: safetyToday
+  })
   const referenceState = nutritionReferenceState(goals, { age: person.age, today: safetyToday })
+  const visiblePlanning = planning
+  const planningSafetyReady = NUTRITION_SAFETY_KEYS.every(key => typeof goals.safety[key] === 'boolean') &&
+    safetyReviewCurrent(goals.safetyReviewedAt, safetyToday)
   const localNotes = nutritionAiGate(goals, {
     age: person.age, today: safetyToday, diabetes: dia
   })
@@ -109,12 +133,28 @@ export default function Food() {
         </button>
       </div>
       <Macros totals={totals} big />
+      {goals.goal && !planningSafetyReady && <div className="nmedical" role="note">
+        <Icon name="shield" /><div>
+          {t('Confirm the safety answers in Nutrition goals to show calculated kcal and gram ranges.')}
+          <div style={{ marginTop: 8 }}><Button size="sm" variant="tinted" onClick={nutritionGoalsSheet}>
+            {t('Open nutrition goals')}
+          </Button></div>
+        </div>
+      </div>}
+      {goals.goal && planningSafetyReady && !planning && referenceState.pausedTargets.length === 0 &&
+        <div className="nmedical" role="note"><Icon name="info" /><div>
+          {t('Complete age, sex, height and a unit-tagged weight in Nutrition goals to show calculated kcal and gram ranges.')}
+          <div style={{ marginTop: 8 }}><Button size="sm" variant="tinted" onClick={nutritionGoalsSheet}>
+            {t('Open nutrition goals')}
+          </Button></div>
+        </div></div>}
       {referenceState.notices.map(notice => <div key={notice.code} className="nmedical"
         role={notice.severity === 'alert' ? 'alert' : 'note'}>
         <Icon name={notice.severity === 'alert' ? 'info' : 'shield'} />
         <div>{t(notice.message)}</div>
       </div>)}
-      {meals.length > 0 && <NutrientDetails totals={totals} goals={goals} referenceState={referenceState} />}
+      {meals.length > 0 && <NutrientDetails totals={totals} goals={goals}
+        referenceState={referenceState} planning={visiblePlanning} />}
       {meals.length > 0 && goals.goal && <div style={{ marginTop: 10 }}>
         <Button size="sm" variant="tinted" icon={localNotes ? 'shield' : 'sparkles'} onClick={() => nutritionAssistSheet(day, totals)}>
           {t(localNotes ? 'Care-team notes' : 'Explain with AI')}

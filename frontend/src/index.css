@@ -259,6 +259,7 @@ h4.sec{
 .ntargets .input{min-height:44px;padding:8px 10px}
 .ntarget-reference{display:block;color:var(--label-3);font-size:11px;line-height:1.4}
 .ntarget-reference-value{font-variant-numeric:tabular-nums;color:var(--label-2)}
+.ntarget-calculated .ntarget-reference-value{color:var(--acc);font-weight:600}
 .nreference-note{margin-top:10px;padding:0 4px;color:var(--label-2);font-size:12px;line-height:1.45}
 .nreference{margin-top:12px;border-radius:var(--r);background:var(--surface);padding:0 12px}
 .nreference summary{min-height:44px;display:flex;align-items:center;color:var(--label-2);cursor:pointer;font-size:13px}
