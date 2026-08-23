@@ -53,6 +53,13 @@ export default function Settings() {
     }
     rd.readAsText(f)
   }
+  // Copying the id is the whole point of showing it: it goes into ADMIN_UIDS in .env, and
+  // nobody retypes 16 characters of base64 correctly on a phone.
+  const copyId = async (id, say) => {
+    try { await navigator.clipboard.writeText(id); say(t('Profile id copied')) }
+    catch (e) { say(t('Could not copy — the id is {0}', id)) }
+  }
+
   // Glucose and insulin out of a device export. The sheet does the deciding — this only
   // gets the text off disk — because the confirmation is the whole point of that flow.
   const doGlucoseImport = ev => {
@@ -102,7 +109,12 @@ export default function Settings() {
         <Row icon="rocket" iconTint="var(--indigo)" title={t('Self-host openGym')} subtitle={t('Passkey sign-in, sync across your devices, your own data.')} accessory="chevron"
           onClick={() => window.open(REPO, '_blank', 'noopener')} />
       </> : user ? <>
-        <Row icon="personCircle" iconTint="var(--grey)" title={user.name} subtitle={t('Signed in with passkey — data syncs to this profile.')} />
+        {/* The user id is here because two places tell you to come and get it — .env.example
+            for ADMIN_UIDS, and the self-hosting guide — and until now the row showed only a
+            name, sending people to read db.json over SSH for a string the app already knew. */}
+        <Row icon="personCircle" iconTint="var(--grey)" title={user.name}
+          subtitle={t('Signed in with passkey. Profile id: {0}', user.id)}
+          accessory="chevron" onClick={() => copyId(user.id, toast)} />
         {user.admin && <Row icon="wrench" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
         <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={() => confirmSheet({ title: t('Sign out?'), message: t('Your data is synced to your profile first, then cleared from this device.'), confirmText: t('Sign out'), danger: true, onConfirm: () => { signOut(); nav('/home') } })} />
         <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />

@@ -97,8 +97,9 @@ ADMIN_UIDS=youruserid      # comma-separated; these users get the admin dashboar
 INVITE_ONLY=1              # new profiles need an invite code
 ```
 
-Register your own passkey profile first, then find your id in `./data/db.json` under `users[].id`
-and put it in `ADMIN_UIDS`. You'll get an **Admin dashboard** link in Settings: who's training
+Register your own passkey profile first, then tap the account row at the top of **Settings** to
+copy your profile id, and put it in `ADMIN_UIDS`. (It is also in `db.json` under `users[].id`, if
+you would rather read it off the server.) You'll get an **Admin dashboard** link in Settings: who's training
 right now, each user's workout history and body weight, the ability to disable an account (signed
 out and locked out everywhere until you re-enable it), and — with `INVITE_ONLY=1` — generating and
 revoking invite codes. Existing accounts keep working when you switch invite-only on. Admin access

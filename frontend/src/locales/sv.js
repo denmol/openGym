@@ -840,6 +840,11 @@ export default {
   'There is no estimated HbA1c here. It is defined over a continuous sensor trace, and calculating one from spot readings would look like a lab result without being one.': 'Det finns inget uppskattat HbA1c här. Det är definierat över en kontinuerlig sensorkurva, och att räkna fram ett från stickprov hade sett ut som ett provsvar utan att vara det.',
   'openGym is a logbook. It does not calculate doses and nothing in it is medical advice.': 'openGym är en loggbok. Den räknar inte ut doser och ingenting i den är medicinsk rådgivning.',
 
+  // --- account ---
+  'Signed in with passkey. Profile id: {0}': 'Inloggad med nyckel. Profil-id: {0}',
+  'Profile id copied': 'Profil-id kopierat',
+  'Could not copy — the id is {0}': 'Kunde inte kopiera — id:t är {0}',
+
   // --- demo build ---
   'Demo': 'Demo',
   'You’re in the demo': 'Du är i demoläget',
