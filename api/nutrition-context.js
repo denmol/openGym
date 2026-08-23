@@ -23,9 +23,7 @@ const currentReview = (reviewedAt, today) => {
 };
 
 const adult = value => {
-  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return false;
-  const age = Number(value);
-  return Number.isInteger(age) && age >= 18 && age <= 100;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 18 && value <= 100;
 };
 
 const cleanNumber = (value, max) => {

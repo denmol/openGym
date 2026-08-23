@@ -110,7 +110,7 @@ test('stored adult age uses the same 18 through 100 boundary as the profile', ()
   for (const age of [18, 100]) {
     assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, coachProfile: { age } }, '2026-08-23').mode, 'ai');
   }
-  for (const age of [17, 101, 18.5, null, '', true]) {
+  for (const age of [17, 101, 18.5, '40', null, '', true]) {
     assert.equal(decideNutritionAssist(RAW_CONTEXT, { ...SAFE_STATE, coachProfile: { age } }, '2026-08-23').mode, 'local');
   }
 });
