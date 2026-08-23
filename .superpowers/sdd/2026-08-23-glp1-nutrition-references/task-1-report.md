@@ -30,3 +30,15 @@ Result: PASS — 23 test files, 461 tests passed.
 ## Self-review and concerns
 
 Reviewed the focused diff for scope, fail-closed normalization, exact boolean handling, real ISO-day validation, UTC date derivation, sticky transitions, and preservation of manual targets. No `.env` or `data/` files were touched, and no dependencies were added. Concern: callers must pass an explicit `safetyConfirmedAt` and all safety answers to establish a review date; this is intentional fail-closed behavior.
+
+## Fix round 1
+
+Changed `finalizeNutritionProfile` so the normalized draft can no longer supply or overwrite `safetyReviewedAt`. An unchanged context retains only the prior normalized review date; a changed context clears it; a new date is established only by a valid `safetyConfirmedAt` with every tri-state safety answer explicit. Added `does not accept a hand-written unconfirmed safety date` in `frontend/src/lib/nutrition-goals.test.js`. Reverted the unrelated BMR upper-age cutoff in `frontend/src/lib/nutrition-goals.js`, preserving the prior behavior.
+
+Focused test: `npm --prefix frontend test -- src/lib/nutrition-goals.test.js`
+
+Output: PASS — 1 test file, 19 tests passed.
+
+Full suite: `npm --prefix frontend test`
+
+Output: PASS — 23 test files, 462 tests passed.

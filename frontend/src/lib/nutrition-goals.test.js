@@ -136,6 +136,12 @@ describe('cleanNutritionProfile', () => {
     expect(finalizeNutritionProfile(null, incomplete, { safetyConfirmedAt: '2026-08-23' }).safetyReviewedAt).toBeNull()
     expect(finalizeNutritionProfile(null, { ...incomplete, safety: SAFE }, { safetyConfirmedAt: '2026-08-23' }).safetyReviewedAt).toBe('2026-08-23')
   })
+
+  it('does not accept a hand-written unconfirmed safety date', () => {
+    expect(finalizeNutritionProfile(null, {
+      goal: 'health', safety: {}, safetyReviewedAt: '2026-08-23'
+    }).safetyReviewedAt).toBeNull()
+  })
 })
 
 describe('bmrEstimate', () => {

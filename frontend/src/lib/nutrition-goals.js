@@ -77,7 +77,7 @@ export function finalizeNutritionProfile(previous, draft, { safetyConfirmedAt = 
   const contextChanged = safetyChanged || before.incretinUse !== next.incretinUse ||
     before.weightPhase !== next.weightPhase || before.condition !== next.condition ||
     before.medication !== next.medication
-  if (contextChanged) next.safetyReviewedAt = null
+  next.safetyReviewedAt = contextChanged ? null : before.safetyReviewedAt
   if (cleanIsoDay(safetyConfirmedAt) && allSafetyAnswered(next)) next.safetyReviewedAt = safetyConfirmedAt
 
   const riskChanged = NUTRITION_SAFETY_KEYS.some(key =>
@@ -91,7 +91,7 @@ export function finalizeNutritionProfile(previous, draft, { safetyConfirmedAt = 
 export function bmrEstimate({ sex, age, heightCm, weightKg } = {}) {
   const values = [age, heightCm, weightKg].map(numberOf)
   const [adultAge, height, weight] = values
-  if ((sex !== 'male' && sex !== 'female') || !values.every(Number.isFinite) || adultAge < 18 || adultAge > 100 || height <= 0 || weight <= 0) return null
+  if ((sex !== 'male' && sex !== 'female') || !values.every(Number.isFinite) || adultAge < 18 || height <= 0 || weight <= 0) return null
   return bmr({ sex, age: adultAge, heightCm: height, weightKg: weight })
 }
 
