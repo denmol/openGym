@@ -1,7 +1,7 @@
 {
-  "name": "openGym",
-  "short_name": "openGym",
-  "description": "Personal gym & body weight tracker",
+  "name": "Dagsnav",
+  "short_name": "Dagsnav",
+  "description": "Family training, food and diabetes log",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

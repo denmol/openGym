@@ -70,7 +70,7 @@ function WeighForm({ food, name, close, onSaved }) {
   return <>
     <h3>{t('Weigh it once')}</h3>
     <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.45 }}>
-      {t('Put one on the scale and type what it says. From then on openGym counts yours, not an average — and you never weigh it again.')}
+      {t('Put one on the scale and type what it says. From then on Dagsnav counts yours, not an average — and you never weigh it again.')}
     </div>
     <div className="dim small" style={{ marginBottom: 10 }}>{food.n}</div>
     <div className="row" style={{ gap: 10 }}>

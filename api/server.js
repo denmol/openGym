@@ -14,7 +14,7 @@ const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
-const RP_NAME = process.env.RP_NAME || 'openGym';
+const RP_NAME = process.env.RP_NAME || 'Dagsnav';
 // Admin dashboard (issue): admins are matched by uid; INVITE_ONLY gates new signups behind a
 // code the admin generates. Both default off so a fresh self-hosted instance stays open.
 const ADMIN_UIDS = (process.env.ADMIN_UIDS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -51,7 +51,7 @@ const COACH_MAX_PROMPT = 40000;           // characters; a real prompt is ~9,500
    scan of the same packet needs no network at all and their rate limit is left alone. */
 const OFF_ENABLED = (process.env.OFF_ENABLED ?? '1') !== '0';
 const OFF_BASE = (process.env.OFF_BASE_URL || 'https://world.openfoodfacts.org').replace(/\/$/, '');
-const OFF_UA = process.env.OFF_USER_AGENT || 'openGym/1.0 (self-hosted; https://github.com/DuarteSantos8/openGym)';
+const OFF_UA = process.env.OFF_USER_AGENT || 'Dagsnav/1.0 (self-hosted; based on https://github.com/DuarteSantos8/openGym)';
 const OFF_TTL_MS = Math.max(1, +(process.env.OFF_TTL_DAYS || 30) || 30) * 86400000;
 // A product that is not in the database is a fact worth remembering too, but a shorter one:
 // somebody may add it next month, and a nightly re-ask for a barcode nobody stocks is waste.
@@ -539,7 +539,7 @@ const routes = {
     // The system message is set here, not by the caller — it is the one instruction the
     // client cannot talk the model out of.
     const messages = [
-      { role: 'system', content: 'You write weekly strength training plans as JSON for the openGym app. Use only exercise ids from the list you are given. Never set a weight. Reply with the JSON object only.' },
+      { role: 'system', content: 'You write weekly strength training plans as JSON for the Dagsnav app. Use only exercise ids from the list you are given. Never set a weight. Reply with the JSON object only.' },
       { role: 'user', content: prompt }
     ];
     // A repair round carries the first answer and the validator's complaints, so the model
@@ -728,7 +728,7 @@ const routes = {
   'POST /api/push/test': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    await sendPush(user.id, { title: 'openGym', body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
+    await sendPush(user.id, { title: 'Dagsnav', body: 'Test notification ✅ — this is what alerts look like.', tag: 'test' });
     json(res, 200, { ok: true });
   },
 

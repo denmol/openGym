@@ -68,7 +68,7 @@ export default function Report() {
 
     {/* Everything below prints. */}
     <div className="rsheet">
-      <h2 className="rt">openGym · {t('Glucose and insulin')}</h2>
+      <h2 className="rt">Dagsnav · {t('Glucose and insulin')}</h2>
       <p className="rsub">
         {when(from)} – {when(to)} · {t('printed {0}', when(todayISO()))}
         {h.type ? ' · ' + t(TYPE_NAME[h.type]) : ''}
@@ -133,7 +133,7 @@ export default function Report() {
         <li>{t('Insulin is what was logged in this app. Basal delivered by a pump is not included — a pump reports basal as a rate rather than an amount, and adding rates up would invent a figure.')}</li>
         <li>{t('Carbohydrate comes from the food log in this app and covers only meals that were logged.')}</li>
         <li>{t('There is no estimated HbA1c here. It is defined over a continuous sensor trace, and calculating one from spot readings would look like a lab result without being one.')}</li>
-        <li>{t('openGym is a logbook. It does not calculate doses and nothing in it is medical advice.')}</li>
+        <li>{t('Dagsnav is a logbook. It does not calculate doses and nothing in it is medical advice.')}</li>
       </ul>
     </div>
   </div>

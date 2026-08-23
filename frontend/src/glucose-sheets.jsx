@@ -135,7 +135,7 @@ function DoseForm({ existing, close }) {
     <h3>{existing ? t('Edit dose') : t('Log a dose')}</h3>
     {/* Said once, on the form where someone might expect the app to do the sum for them. */}
     <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.45 }}>
-      {t('Write down the dose that was given. openGym does not work out doses — that stays between you and your care team.')}
+      {t('Write down the dose that was given. Dagsnav does not work out doses — that stays between you and your care team.')}
     </div>
 
     <div className="row" style={{ gap: 10, alignItems: 'center', marginBottom: 12 }}>
@@ -339,7 +339,7 @@ function HealthForm({ close }) {
   return <>
     <h3>{t('Diabetes')}</h3>
     <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.5 }}>
-      {t('Turns on a glucose log, an insulin log and a report you can take to an appointment. openGym never calculates a dose — it records what you tell it and adds it up.')}
+      {t('Turns on a glucose log, an insulin log and a report you can take to an appointment. Dagsnav never calculates a dose — it records what you tell it and adds it up.')}
     </div>
 
     <div className="row between" style={{ padding: '4px 0 14px' }}>

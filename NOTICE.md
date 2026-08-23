@@ -1,5 +1,8 @@
 # Third-party notices
 
+Dagsnav is a modified version of openGym. The product name was changed on 23 August 2026;
+the original copyright, licence and third-party notices are retained below.
+
 openGym — Copyright (C) 2026 Duarte Santos.
 openGym's own code is licensed under the **GNU AGPL v3.0** (see [LICENSE](LICENSE)).
 

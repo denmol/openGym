@@ -250,7 +250,7 @@ function CoachBridge({ profile, close }) {
   if (flagged) return <>
     <h3>{t('Better to ask a person for this one')}</h3>
     <div className="muted small" style={{ marginBottom: 16, lineHeight: 1.5 }}>
-      {t('What you wrote under limitations is something a physiotherapist or doctor should program around, not an app. Build the plan with them — openGym will happily track it.')}
+      {t('What you wrote under limitations is something a physiotherapist or doctor should program around, not an app. Build the plan with them — Dagsnav will happily track it.')}
     </div>
     <Button variant="primary" onClick={() => { close(); coachWizardSheet() }}>{t('Edit my answers')}</Button>
     <div style={{ height: 8 }} />
