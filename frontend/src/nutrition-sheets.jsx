@@ -8,15 +8,16 @@
 import { useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
-import { t } from './lib/i18n.js'
+import { dateLocale, t } from './lib/i18n.js'
 import { fmtNum, todayISO } from './lib/format.js'
 import { lastBW } from './lib/history.js'
 import { coachProfileOf, cleanCoachProfile } from './lib/coach-profile.js'
 import { diabetesOn } from './lib/diabetes.js'
 import { NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import {
-  NNR_REFERENCE, NUTRIENT_TARGETS, bmrEstimate,
-  cleanNutritionProfile, needsClinicianTargets, weightKgOf
+  NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS, bmrEstimate, cleanNutritionProfile,
+  finalizeNutritionProfile, formatNutritionReference, needsClinicianTargets,
+  nutritionReferenceState, nutritionSafetyToday, safetyReviewCurrent, weightKgOf
 } from './lib/nutrition-goals.js'
 import { askNutrition, nutritionAssistContext } from './lib/nutrition-assist.js'
 import { Button, NumberField, Switch } from './components/ui.jsx'
@@ -24,6 +25,34 @@ import Icon from './components/Icon.jsx'
 
 const GOAL_NAME = {
   maintain: 'Maintain weight', lose: 'Lose weight', muscle: 'Build muscle', health: 'General health'
+}
+const INCRETIN_NAME = {
+  none: 'No incretin treatment', weight: 'Weight treatment', diabetes: 'Diabetes treatment',
+  both: 'Weight and diabetes treatment', other: 'Other or unclear use'
+}
+const PHASE_NAME = { active_loss: 'Active weight loss', maintenance: 'Weight-stable phase' }
+const FIBER_NAME = { range: 'Population interval', female: "Women's NNR reference", male: "Men's NNR reference" }
+const SAFETY_QUESTION = {
+  kidneyOrProteinRestriction: 'Kidney disease, dialysis, transplant or prescribed protein restriction?',
+  fluidOrSodiumRestriction: 'Heart failure or prescribed fluid or sodium restriction?',
+  pregnancyOrBreastfeeding: 'Pregnant, planning pregnancy or breastfeeding?',
+  eatingDisorder: 'Current or previous eating disorder, self-induced vomiting or severe restriction?',
+  severeGI: 'Severe or persistent stomach symptoms, dehydration or inability to eat and drink enough?',
+  malnutritionRisk: 'Unintentional rapid weight loss, much lower intake, new weakness or diagnosed malnutrition or muscle loss?',
+  otherClinicalNutrition: 'Liver disease, previous obesity surgery or another prescribed nutrition plan?',
+  hypoglycemiaRiskMedication: 'Insulin or another medicine that your care team says can cause hypoglycaemia?'
+}
+const KIND_NAME = { range: 'Range', min: 'Minimum', max: 'Maximum', example: 'Source example', warning: 'Warning threshold' }
+const REFERENCE_NAME = { ...NUTRIENT_NAME, fluid: 'Fluid' }
+const STATUS_TEXT = {
+  age_required: 'Enter an adult age to show nutrition references.',
+  pregnancy_required: 'Answer the pregnancy and breastfeeding question before adult references are shown.',
+  professional_review: 'These general adult references are hidden because professional adaptation is needed.',
+  phase_required: 'Choose active weight loss or weight-stable phase before GLP-1 references are shown.',
+  safety_incomplete: 'Answer and confirm every safety question before GLP-1 references are shown.',
+  safety_expired: 'Confirm the safety answers again; the previous review is older than 90 days.',
+  blocked: 'The GLP-1 reference layer is hidden because a professional review is needed.',
+  not_applicable: 'Weight-treatment references are not shown for this incretin use.'
 }
 const GOAL_NOTE = {
   maintain: 'Weight and logged intake over time are more useful than a one-off formula.',
@@ -43,32 +72,78 @@ const ASSIST_ERROR = {
 const update = (...args) => useStore.getState().update(...args)
 const toast = message => useUI.getState().toast(message)
 
+function ChoiceGrid({ label, names, value, onChange }) {
+  return <div className="ngoal-grid" role="group" aria-label={t(label)}>
+    {Object.entries(names).map(([id, text]) => <button key={id}
+      className={'ngoal' + (value === id ? ' on' : '')}
+      aria-pressed={value === id} onClick={() => onChange(id)}>{t(text)}</button>)}
+  </div>
+}
+
+function ReferenceCard({ reference, paused }) {
+  const targetKey = NUTRIENT_TARGETS.includes(reference.targetField) ? reference.targetField : null
+  return <article className="nref-card">
+    <div className="nref-head">
+      <strong>{t(REFERENCE_NAME[reference.nutrient])}</strong>
+      <span className="nref-kind">{t(KIND_NAME[reference.kind])}</span>
+    </div>
+    <div className="nref-value">{formatNutritionReference(reference, dateLocale(), t(reference.unit))}</div>
+    <div className="nref-meta">{t(reference.source)} · {reference.year} · {t(reference.audience)}</div>
+    <p>{t(reference.limitation)}</p>
+    <div className="nref-actions">
+      <a href={reference.sourceUrl} target="_blank" rel="noopener">{t('Open source')}</a>
+      {targetKey && !paused.includes(targetKey) && <button onClick={() =>
+        document.getElementById(`nutrition-target-${targetKey}`)?.focus()}>{t('Set my own target')}</button>}
+    </div>
+  </article>
+}
+
 function GoalsSheet({ close }) {
   const S = useStore(s => s.S)
   const stored = cleanNutritionProfile(S.nutritionGoals)
   const person = coachProfileOf(S)
-  const [goal, setGoal] = useState(stored.goal)
+  const [draft, setDraft] = useState(stored)
+  const [safetyConfirmedAt, setSafetyConfirmedAt] = useState(null)
+  const [targetsReviewed, setTargetsReviewed] = useState(false)
   const [age, setAge] = useState(person.age)
   const [heightCm, setHeight] = useState(person.heightCm)
   const [sex, setSex] = useState(person.sex)
-  const [condition, setCondition] = useState(stored.condition)
-  const [medication, setMedication] = useState(stored.medication)
-  const [targets, setTargets] = useState(stored.targets)
 
   const bw = lastBW(S)
   const weightKg = weightKgOf(bw)
   const basal = bmrEstimate({ sex, age, heightCm, weightKg })
-  const profile = cleanNutritionProfile({ goal, targets, condition, medication })
-  const clinician = needsClinicianTargets(profile, { diabetes: diabetesOn(S) }) || (Number(age) > 0 && Number(age) < 18)
+  const profile = cleanNutritionProfile(draft)
+  const today = todayISO()
+  const safetyToday = nutritionSafetyToday()
+  const referenceState = nutritionReferenceState(profile, { age, today: safetyToday })
+  const safetyComplete = NUTRITION_SAFETY_KEYS.every(key => typeof profile.safety[key] === 'boolean')
+  const clinician = needsClinicianTargets(profile, { diabetes: diabetesOn(S) }) ||
+    ((typeof age === 'number' || (typeof age === 'string' && age.trim())) && Number(age) > 0 && Number(age) < 18)
 
-  const setTarget = (key, value) => setTargets(old => ({ ...old, [key]: value }))
+  const change = patch => setDraft(old => ({ ...old, ...patch }))
+  const changeMedical = updater => {
+    setDraft(old => ({ ...updater(old), safetyReviewedAt: null }))
+    setSafetyConfirmedAt(null)
+  }
+  const setTarget = (key, value) => setDraft(old => ({
+    ...old, targets: { ...old.targets, [key]: value }
+  }))
+  const setSafety = (key, value) => changeMedical(old => ({
+    ...old, safety: { ...old.safety, [key]: value }
+  }))
+  const confirmSafety = () => {
+    if (!safetyComplete) return toast(t('Answer every safety question first.'))
+    setDraft(old => ({ ...old, safetyReviewedAt: safetyToday }))
+    setSafetyConfirmedAt(safetyToday)
+  }
   const save = () => {
-    if (!goal) { toast(t('Choose a nutrition goal.')); return }
+    if (!profile.goal) { toast(t('Choose a nutrition goal.')); return }
+    const saved = finalizeNutritionProfile(stored, profile, { safetyConfirmedAt, targetsReviewed })
     update(state => {
       state.coachProfile = cleanCoachProfile({
-        ...coachProfileOf(state), age, heightCm, sex, updated: todayISO()
+        ...coachProfileOf(state), age, heightCm, sex, updated: today
       })
-      state.nutritionGoals = { ...profile, updated: todayISO() }
+      state.nutritionGoals = { ...saved, updated: today }
     })
     close()
     toast(t('Nutrition goals saved'))
@@ -80,12 +155,12 @@ function GoalsSheet({ close }) {
     <h4 className="sec">{t('What do you want to work toward?')}</h4>
     <div className="ngoal-grid">
       {Object.entries(GOAL_NAME).map(([id, label]) => <button key={id}
-        className={'ngoal' + (goal === id ? ' on' : '')}
-        aria-pressed={goal === id} onClick={() => setGoal(id)}>
+        className={'ngoal' + (profile.goal === id ? ' on' : '')}
+        aria-pressed={profile.goal === id} onClick={() => change({ goal: id })}>
         {t(label)}
       </button>)}
     </div>
-    {goal && <div className="dim small" style={{ marginTop: 9, lineHeight: 1.45 }}>{t(GOAL_NOTE[goal])}</div>}
+    {profile.goal && <div className="dim small" style={{ marginTop: 9, lineHeight: 1.45 }}>{t(GOAL_NOTE[profile.goal])}</div>}
 
     <h4 className="sec">{t('Individual information')}</h4>
     <div className="nprofile-grid">
@@ -118,10 +193,55 @@ function GoalsSheet({ close }) {
     <h4 className="sec">{t('Health boundary')}</h4>
     <div className="sect-b">
       <div className="lrow"><span className="lrow-m"><span className="lrow-t">{t('Illness affects my diet')}</span></span>
-        <Switch checked={condition} aria-label={t('Illness affects my diet')} onChange={setCondition} /></div>
+        <Switch checked={profile.condition} aria-label={t('Illness affects my diet')}
+          onChange={condition => changeMedical(old => ({ ...old, condition }))} /></div>
       <div className="lrow"><span className="lrow-m"><span className="lrow-t">{t('Medication affects my diet')}</span></span>
-        <Switch checked={medication} aria-label={t('Medication affects my diet')} onChange={setMedication} /></div>
+        <Switch checked={profile.medication} aria-label={t('Medication affects my diet')}
+          onChange={medication => changeMedical(old => ({ ...old, medication }))} /></div>
     </div>
+    <h4 className="sec">{t('Incretin treatment')}</h4>
+    <ChoiceGrid label="Incretin treatment" names={INCRETIN_NAME} value={profile.incretinUse}
+      onChange={incretinUse => changeMedical(old => ({
+        ...old, incretinUse, weightPhase: incretinUse === 'none' ? null : old.weightPhase
+      }))} />
+    {['weight', 'both'].includes(profile.incretinUse) && <>
+      <h4 className="sec">{t('Weight-treatment phase')}</h4>
+      <ChoiceGrid label="Weight-treatment phase" names={PHASE_NAME} value={profile.weightPhase}
+        onChange={weightPhase => changeMedical(old => ({ ...old, weightPhase }))} />
+    </>}
+    <h4 className="sec">{t('Fibre reference')}</h4>
+    <ChoiceGrid label="Fibre reference" names={FIBER_NAME} value={profile.fiberReference}
+      onChange={fiberReference => change({ fiberReference })} />
+
+    <h4 className="sec">{t('Safety questions')}</h4>
+    <div className="sect-b">
+      {['pregnancyOrBreastfeeding'].map(key => <div className="nsafety-row" key={key}>
+        <span>{t(SAFETY_QUESTION[key])}</span>
+        <span className="nsafety-buttons" role="group" aria-label={t(SAFETY_QUESTION[key])}>
+          <button aria-pressed={profile.safety[key] === true} className={profile.safety[key] === true ? 'on' : ''}
+            onClick={() => setSafety(key, true)}>{t('Yes')}</button>
+          <button aria-pressed={profile.safety[key] === false} className={profile.safety[key] === false ? 'on' : ''}
+            onClick={() => setSafety(key, false)}>{t('No / not applicable')}</button>
+        </span>
+      </div>)}
+    </div>
+    <details className="nreference"
+      open={(profile.incretinUse != null && profile.incretinUse !== 'none') || profile.condition || profile.medication}>
+      <summary>{t('Safety questions')}</summary>
+      <div>
+        {NUTRITION_SAFETY_KEYS.filter(key => key !== 'pregnancyOrBreastfeeding').map(key => <div className="nsafety-row" key={key}>
+          <span>{t(SAFETY_QUESTION[key])}</span>
+          <span className="nsafety-buttons" role="group" aria-label={t(SAFETY_QUESTION[key])}>
+            <button aria-pressed={profile.safety[key] === true} className={profile.safety[key] === true ? 'on' : ''}
+              onClick={() => setSafety(key, true)}>{t('Yes')}</button>
+            <button aria-pressed={profile.safety[key] === false} className={profile.safety[key] === false ? 'on' : ''}
+              onClick={() => setSafety(key, false)}>{t('No / not applicable')}</button>
+          </span>
+        </div>)}
+      </div>
+    </details>
+    {safetyComplete && !safetyReviewCurrent(profile.safetyReviewedAt, safetyToday) &&
+      <Button variant="tinted" icon="shield" onClick={confirmSafety}>{t('Confirm safety answers')}</Button>}
     {clinician && <div className="nmedical" role="note">
       <Icon name="shield" />
       <div><strong>{t('Targets need review')}</strong><br />
@@ -131,25 +251,37 @@ function GoalsSheet({ close }) {
     <h4 className="sec">{t('Daily targets')}</h4>
     <div className="dim small" style={{ marginBottom: 6 }}>{t('Leave blank to track without a target.')}</div>
     <div className="ntargets">
-      {NUTRIENT_TARGETS.map(key => <label key={key}>
-        <span>{t(NUTRIENT_NAME[key])}</span>
-        <span className="nwith-unit"><NumberField className="input" value={targets[key]} nullable
-          aria-label={t('Daily target for {0}', t(NUTRIENT_NAME[key]))}
-          onChange={value => setTarget(key, value)} /><i>{NUTRIENT_UNIT[key]}</i></span>
-      </label>)}
+      {NUTRIENT_TARGETS.map(key => {
+        const paused = referenceState.pausedTargets.includes(key)
+        return <label key={key} className={paused ? 'paused' : ''}>
+          <span>{t(NUTRIENT_NAME[key])}</span>
+          <span className="nwith-unit">
+            <NumberField id={`nutrition-target-${key}`} className="input" value={profile.targets[key]} nullable
+              aria-label={t('Daily target for {0}', t(NUTRIENT_NAME[key]))}
+              onChange={value => setTarget(key, value)} />
+            <i>{NUTRIENT_UNIT[key]}</i>
+          </span>
+          {paused && <small>{t('Paused — needs review')}</small>}
+        </label>
+      })}
     </div>
+    {stored.targetReviewRequired && !targetsReviewed &&
+      <Button variant="tinted" onClick={() => setTargetsReviewed(true)}>{t('I have reviewed my own targets')}</Button>}
 
-    <details className="nreference">
-      <summary>{t('Reference for healthy adults')}</summary>
-      <div className="dim small">
-        {t('Carbohydrate {0} E%, protein {1} E%, fat {2} E%, fibre at least {3}. These are population ranges, not personal treatment targets.',
-          `${NNR_REFERENCE.ranges.carb.min}–${NNR_REFERENCE.ranges.carb.max}`,
-          `${NNR_REFERENCE.ranges.prot.min}–${NNR_REFERENCE.ranges.prot.max}`,
-          `${NNR_REFERENCE.ranges.fat.min}–${NNR_REFERENCE.ranges.fat.max}`,
-          `${NNR_REFERENCE.ranges.fib.min} ${NNR_REFERENCE.ranges.fib.unit}`)}
-        {' '}<a href="https://pub.norden.org/nord2023-003/recommendations.html" target="_blank" rel="noopener">NNR 2023</a>
-      </div>
-    </details>
+    <h4 className="sec">{t('Scientific references')}</h4>
+    {referenceState.adultStatus !== 'available' && <div className="nmedical" role="note">
+      <Icon name="shield" /><div>{t(STATUS_TEXT[referenceState.adultStatus])}</div>
+    </div>}
+    {profile.incretinUse && profile.incretinUse !== 'none' && referenceState.glpStatus !== 'available' &&
+      <div className="nmedical" role="note"><Icon name="shield" /><div>{t(STATUS_TEXT[referenceState.glpStatus])}</div></div>}
+    {referenceState.notices.map(notice => <div key={notice.code} className="nmedical"
+      role={notice.severity === 'alert' ? 'alert' : 'note'}>
+      <Icon name={notice.severity === 'alert' ? 'info' : 'shield'} /><div>{t(notice.message)}</div>
+    </div>)}
+    <div className="nref-list">
+      {referenceState.references.map(reference => <ReferenceCard key={reference.id}
+        reference={reference} paused={referenceState.pausedTargets} />)}
+    </div>
 
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{t('Save nutrition goals')}</Button>
@@ -172,6 +304,7 @@ function AssistSheet({ date, totals, close }) {
   const send = async () => {
     setBusy(true); setError('')
     try {
+      await useStore.getState().pushState()
       const result = await askNutrition(context)
       setAnswer(result.answer); setLocal(result.local === true)
     }
@@ -207,7 +340,8 @@ function AssistSheet({ date, totals, close }) {
     context.medical.diabetes && t('Diabetes mode is on'),
     context.medical.condition && t('Illness affects my diet'),
     context.medical.medication && t('Medication affects my diet'),
-    context.medical.under18 && t('Under 18')
+    context.medical.under18 && t('Under 18'),
+    context.medical.nutritionSafety && t('Nutrition safety review required')
   ].filter(Boolean)
 
   return <>
