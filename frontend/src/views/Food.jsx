@@ -12,7 +12,7 @@ import { foodMap, hasFoodDb, FOODS_SOURCE, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UN
 import { mealsOn, dayTotals, mealTotals, nutrientTotal, MEAL_NAME } from '../lib/nutrition.js'
 import { coachProfileOf } from '../lib/coach-profile.js'
 import {
-  cleanNutritionProfile, formatNutritionReference, nutritionAiGate,
+  cleanNutritionProfile, dailyNutritionReferences, formatNutritionReference, nutritionAiGate,
   nutritionReferenceState, nutritionSafetyToday
 } from '../lib/nutrition-goals.js'
 import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
@@ -45,7 +45,7 @@ function NutrientDetails({ totals, goals, referenceState }) {
         const value = nutrientTotal(totals, key)
         const target = goals.targets[key]
         const paused = referenceState.pausedTargets.includes(key)
-        const references = referenceState.references.filter(reference => reference.nutrient === key && reference.daily)
+        const references = dailyNutritionReferences(referenceState, key)
         return <div key={key} className={value == null ? 'incomplete' : ''}>
           <dt>{t(NUTRIENT_NAME[key])}</dt>
           <dd>

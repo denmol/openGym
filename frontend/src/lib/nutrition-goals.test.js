@@ -7,6 +7,7 @@ import {
   NUTRITION_GOALS,
   bmrEstimate,
   cleanNutritionProfile,
+  dailyNutritionReferences,
   finalizeNutritionProfile,
   nutritionAiGate,
   needsClinicianTargets,
@@ -216,6 +217,71 @@ describe('NNR reference', () => {
 })
 
 describe('nutrition reference engine', () => {
+  describe('dailyNutritionReferences', () => {
+    const ids = (state, nutrient) => dailyNutritionReferences(state, nutrient).map(item => item.id)
+
+    it('returns the exact comparable adult references without inventing calorie or sugar targets', () => {
+      const state = nutritionReferenceState({ ...AI_SAFE, medication: true }, { age: 40, today: '2026-08-23' })
+      expect(Object.fromEntries(NUTRIENT_TARGETS.map(key => [key, ids(state, key)]))).toEqual({
+        kcal: [], carb: ['nnr-carb'], sugar: [], prot: ['nnr-protein'],
+        fat: ['nnr-fat'], sat: ['nnr-saturated'], fib: ['nnr-fiber-range'], salt: ['nnr-salt']
+      })
+      expect(dailyNutritionReferences(state, 'carb')[0].value).toEqual({ min: 45, max: 60 })
+      expect(dailyNutritionReferences(state, 'prot')[0].value).toEqual({ min: 10, max: 20 })
+      expect(dailyNutritionReferences(state, 'fat')[0].value).toEqual({ min: 25, max: 40 })
+      expect(dailyNutritionReferences(state, 'sat')[0]).toMatchObject({ value: 10, operator: '<' })
+      expect(dailyNutritionReferences(state, 'fib')[0].value).toEqual({ min: 25, max: 35 })
+      expect(dailyNutritionReferences(state, 'salt')[0].value).toBe(5.75)
+    })
+
+    it('adds only the exact daily GLP-1 references for active obesity treatment', () => {
+      const state = nutritionReferenceState(CURRENT_GLP, { age: 40, today: '2026-08-23' })
+      expect(ids(state, 'prot')).toEqual(['nnr-protein', 'glp-protein-example'])
+      expect(dailyNutritionReferences(state, 'prot').map(item => item.value)).toEqual([
+        { min: 10, max: 20 }, { min: 80, max: 120 }
+      ])
+      expect(ids(state, 'fib')).toEqual(['nnr-fiber-range', 'glp-fiber'])
+      expect(dailyNutritionReferences(state, 'fib').map(item => item.value)).toEqual([
+        { min: 25, max: 35 }, 25
+      ])
+
+      const both = nutritionReferenceState({ ...CURRENT_GLP, incretinUse: 'both' }, { age: 40, today: '2026-08-23' })
+      expect(ids(both, 'prot')).toEqual(['nnr-protein', 'glp-protein-example'])
+      expect(ids(both, 'fib')).toEqual(['nnr-fiber-range', 'glp-fiber'])
+    })
+
+    it('keeps adult references but adds no obesity-treatment layer for diabetes treatment only', () => {
+      const state = nutritionReferenceState({ ...CURRENT_GLP, incretinUse: 'diabetes' }, { age: 40, today: '2026-08-23' })
+      expect(ids(state, 'prot')).toEqual(['nnr-protein'])
+      expect(ids(state, 'fib')).toEqual(['nnr-fiber-range'])
+      expect(state.references.some(item => item.layer === 'glp1')).toBe(false)
+    })
+
+    it.each([
+      ['kidneyOrProteinRestriction', ['nnr-carb', 'nnr-fat', 'nnr-saturated', 'nnr-fiber-range', 'glp-fiber']],
+      ['fluidOrSodiumRestriction', ['nnr-carb', 'nnr-protein', 'glp-protein-example', 'nnr-fat', 'nnr-saturated', 'nnr-fiber-range', 'glp-fiber']],
+      ['pregnancyOrBreastfeeding', []],
+      ['eatingDisorder', []],
+      ['severeGI', ['nnr-carb', 'nnr-protein', 'nnr-fat', 'nnr-saturated', 'nnr-salt']],
+      ['malnutritionRisk', []],
+      ['otherClinicalNutrition', ['nnr-carb', 'nnr-protein', 'nnr-fat', 'nnr-saturated', 'nnr-fiber-range', 'nnr-salt']],
+      ['hypoglycemiaRiskMedication', ['nnr-protein', 'glp-protein-example', 'nnr-fat', 'nnr-saturated', 'nnr-fiber-range', 'glp-fiber', 'nnr-salt']]
+    ])('removes only the daily source references affected by %s', (key, expected) => {
+      const state = nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, [key]: true } }, { age: 40, today: '2026-08-23' })
+      expect(NUTRIENT_TARGETS.flatMap(nutrient => ids(state, nutrient))).toEqual(expected)
+    })
+
+    it('does not write source values into manual targets', () => {
+      const raw = { ...AI_SAFE, targets: { prot: null, fib: 30 } }
+      const state = nutritionReferenceState(raw, { age: 40, today: '2026-08-23' })
+      expect(ids(state, 'prot')).toEqual(['nnr-protein'])
+      expect(raw.targets).toEqual({ prot: null, fib: 30 })
+      expect(cleanNutritionProfile(raw).targets).toEqual({
+        kcal: null, carb: null, sugar: null, prot: null, fat: null, sat: null, fib: 30, salt: null
+      })
+    })
+  })
+
   it('returns exact adult values and never turns free sugar into a log target', () => {
     const state = nutritionReferenceState(CURRENT_GLP, { age: 18, today: '2026-08-23' })
     expect(reference(state, 'nnr-carb').value).toEqual({ min: 45, max: 60 })

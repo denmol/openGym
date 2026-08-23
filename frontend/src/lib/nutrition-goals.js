@@ -213,6 +213,9 @@ export function nutritionReferenceState(rawProfile, { age, today } = {}) {
   }
 }
 
+export const dailyNutritionReferences = (state, nutrient) =>
+  (state?.references || []).filter(reference => reference.daily === true && reference.nutrient === nutrient)
+
 export function formatNutritionReference(reference, locale = 'en-GB', unit = reference.unit) {
   const fmt = value => Number(value).toLocaleString(locale, {
     minimumFractionDigits: reference.digits,

@@ -16,7 +16,7 @@ import { diabetesOn } from './lib/diabetes.js'
 import { NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import {
   NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS, bmrEstimate, cleanNutritionProfile,
-  finalizeNutritionProfile, formatNutritionReference, needsClinicianTargets,
+  dailyNutritionReferences, finalizeNutritionProfile, formatNutritionReference, needsClinicianTargets,
   nutritionReferenceState, nutritionSafetyToday, safetyReviewCurrent, weightKgOf
 } from './lib/nutrition-goals.js'
 import { askNutrition, nutritionAssistContext } from './lib/nutrition-assist.js'
@@ -27,7 +27,7 @@ const GOAL_NAME = {
   maintain: 'Maintain weight', lose: 'Lose weight', muscle: 'Build muscle', health: 'General health'
 }
 const INCRETIN_NAME = {
-  none: 'No incretin treatment', weight: 'Weight treatment', diabetes: 'Diabetes treatment',
+  none: 'No incretin treatment', weight: 'Weight treatment', diabetes: 'Diabetes treatment only',
   both: 'Weight and diabetes treatment', other: 'Other or unclear use'
 }
 const PHASE_NAME = { active_loss: 'Active weight loss', maintenance: 'Weight-stable phase' }
@@ -52,12 +52,12 @@ const STATUS_TEXT = {
   safety_incomplete: 'Answer and confirm every safety question before GLP-1 references are shown.',
   safety_expired: 'Confirm the safety answers again; the previous review is older than 90 days.',
   blocked: 'The GLP-1 reference layer is hidden because a professional review is needed.',
-  not_applicable: 'Weight-treatment references are not shown for this incretin use.'
+  not_applicable: 'General adult references are shown. GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.'
 }
 const GOAL_NOTE = {
   maintain: 'Weight and logged intake over time are more useful than a one-off formula.',
-  lose: 'No automatic calorie deficit is created. Set a target yourself or with your care team.',
-  muscle: 'No automatic calorie surplus or protein target is created. Set values you can verify and change.',
+  lose: 'Source references are shown, but Dagsnav does not invent a calorie deficit or personal target.',
+  muscle: 'Source references are shown, but Dagsnav does not invent a calorie surplus, protein surplus or personal target.',
   health: 'Use the Nordic reference ranges as context, then set only the targets that help you.'
 }
 const ASSIST_ERROR = {
@@ -244,24 +244,40 @@ function GoalsSheet({ close }) {
       <Button variant="tinted" icon="shield" onClick={confirmSafety}>{t('Confirm safety answers')}</Button>}
     {clinician && <div className="nmedical" role="note">
       <Icon name="shield" />
-      <div><strong>{t('Targets need review')}</strong><br />
-        <span>{t('Dagsnav will not calculate nutrition targets for anyone under 18 or from diabetes, illness or medication. Enter values agreed with your care team.')}</span></div>
+      <div><strong>{t('Own targets need review')}</strong><br />
+        <span>{t('The fields are your own targets. Scientific references appear automatically when applicable, but are not copied into targets. For diabetes, illness or medication, review own targets with your care team.')}</span></div>
     </div>}
+    <div className="nreference-note" role="note">
+      {t('References are general source values, not personal treatment targets or medical advice. Your care plan and advice from your care team take priority.')}
+    </div>
 
-    <h4 className="sec">{t('Daily targets')}</h4>
-    <div className="dim small" style={{ marginBottom: 6 }}>{t('Leave blank to track without a target.')}</div>
+    <h4 className="sec">{t('Own targets and automatic references')}</h4>
+    <div className="dim small" style={{ marginBottom: 6 }}>{t('Empty fields mean that you have not entered an own target. Applicable scientific references appear automatically below each nutrient.')}</div>
     <div className="ntargets">
       {NUTRIENT_TARGETS.map(key => {
         const paused = referenceState.pausedTargets.includes(key)
+        const references = dailyNutritionReferences(referenceState, key)
         return <label key={key} className={paused ? 'paused' : ''}>
           <span>{t(NUTRIENT_NAME[key])}</span>
           <span className="nwith-unit">
             <NumberField id={`nutrition-target-${key}`} className="input" value={profile.targets[key]} nullable
+              placeholder={t('Own target')}
               aria-label={t('Daily target for {0}', t(NUTRIENT_NAME[key]))}
               onChange={value => setTarget(key, value)} />
             <i>{NUTRIENT_UNIT[key]}</i>
           </span>
-          {paused && <small>{t('Paused — needs review')}</small>}
+          {references.map(reference => <small className="ntarget-reference" key={reference.id}>
+            <span className="ntarget-reference-value">{t(reference.kind === 'example' ? 'Source example: {0}' : 'Reference: {0}',
+              formatNutritionReference(reference, dateLocale(), t(reference.unit)))}</span>
+            <span> · <a href={reference.sourceUrl} target="_blank" rel="noopener">{t(reference.source)}</a></span>
+          </small>)}
+          {!paused && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
+            {t('No automatic calorie target — energy expenditure has not been measured.')}
+          </small>}
+          {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
+            {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}
+          </small>}
+          {paused && <small className="ntarget-paused">{t('Paused — needs review')}</small>}
         </label>
       })}
     </div>
