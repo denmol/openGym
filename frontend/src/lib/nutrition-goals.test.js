@@ -10,10 +10,11 @@ import {
   cleanNutritionProfile,
   dailyNutritionReferences,
   finalizeNutritionProfile,
-  formatNutritionPlanningValue,
   nutritionAiGate,
   needsClinicianTargets,
-  nutritionPlanningValues,
+  CORE_SAFETY_KEYS,
+  EXTENDED_SAFETY_KEYS,
+  safetyPausedTargets,
   nutritionReferenceState,
   nutritionSafetyToday,
   safetyReviewCurrent,
@@ -155,10 +156,15 @@ describe('cleanNutritionProfile', () => {
     expect(finalizeNutritionProfile(base, change(base)).safetyReviewedAt).toBeNull()
   })
 
-  it('accepts a new confirmation only after every tri-state answer is explicit', () => {
-    const incomplete = { goal: 'health', incretinUse: 'none', safety: { ...SAFE, severeGI: null } }
+  it.each(CORE_SAFETY_KEYS)('accepts no confirmation while the core question %s is unanswered', key => {
+    const incomplete = { goal: 'health', incretinUse: 'none', safety: { ...SAFE, [key]: null } }
     expect(finalizeNutritionProfile(null, incomplete, { safetyConfirmedAt: '2026-08-23' }).safetyReviewedAt).toBeNull()
     expect(finalizeNutritionProfile(null, { ...incomplete, safety: SAFE }, { safetyConfirmedAt: '2026-08-23' }).safetyReviewedAt).toBe('2026-08-23')
+  })
+
+  it.each(EXTENDED_SAFETY_KEYS)('accepts a confirmation while the extended question %s is unanswered', key => {
+    const partial = { goal: 'health', incretinUse: 'none', safety: { ...SAFE, [key]: null } }
+    expect(finalizeNutritionProfile(null, partial, { safetyConfirmedAt: '2026-08-23' }).safetyReviewedAt).toBe('2026-08-23')
   })
 
   it('does not accept a hand-written unconfirmed safety date', () => {
@@ -183,172 +189,6 @@ describe('bmrEstimate', () => {
   })
 })
 
-describe('nutritionPlanningValues', () => {
-  const person = { sex: 'male', age: 30, heightCm: 175, weightKg: 70, today: '2026-08-23' }
-  const ready = profile => ({ safety: SAFE, safetyReviewedAt: '2026-08-23', ...profile })
-
-  it('maps explicit NNR PAL choices and keeps legacy profiles at an honest range', () => {
-    expect(NUTRITION_ACTIVITY_LEVELS).toEqual(['range', 'low', 'moderate', 'active'])
-    expect(nutritionPlanningValues(ready({ goal: 'health' }), person)).toMatchObject({
-      activityLevel: 'range', pal: { min: 1.4, max: 1.8 },
-      maintenanceKcal: { min: 2250, max: 2890 }, goalKcal: null,
-      macroBasisKcal: { min: 2250, max: 2890, source: 'estimated_maintenance' },
-      basis: { maintenance: { sources: ['nnr_2023_henry', 'nnr_2023_pal'] } }
-    })
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'low' }), person).maintenanceKcal)
-      .toEqual({ min: 2250, max: 2250 })
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'moderate' }), person).maintenanceKcal)
-      .toEqual({ min: 2570, max: 2570 })
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'active' }), person).maintenanceKcal)
-      .toEqual({ min: 2890, max: 2890 })
-    expect(nutritionPlanningValues(ready({ goal: 'maintain', activityLevel: 'moderate' }), person).goalKcal)
-      .toBeNull()
-    expect(cleanNutritionProfile({ activityLevel: 'unknown' }).activityLevel).toBe('range')
-  })
-
-  it('uses NNR adult Henry bands at both supported age boundaries', () => {
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'low' }),
-      { ...person, age: 18 }).maintenanceKcal).toEqual({ min: 2330, max: 2330 })
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'low' }),
-      { ...person, age: 100 }).maintenanceKcal).toEqual({ min: 2080, max: 2080 })
-  })
-
-  it('keeps maintenance below BMI 25, applies the deficit at BMI 25, and uses the muscle surplus range', () => {
-    expect(nutritionPlanningValues(ready({ goal: 'lose', activityLevel: 'moderate' }), person)).toMatchObject({
-      goalKcal: null, goalBasis: 'loss_not_applied_bmi_below_25',
-      goalStatus: 'loss_not_applied_bmi_below_25'
-    })
-    expect(nutritionPlanningValues(ready({ goal: 'lose', activityLevel: 'moderate' }),
-      { ...person, weightKg: 76.5625 })).toMatchObject({
-      maintenanceKcal: { min: 2690, max: 2690 },
-      goalKcal: { min: 1940, max: 2190 }, goalBasis: 'loss_deficit', goalStatus: 'planning_example',
-      basis: { goal: { kind: 'planning_example', source: 'aha_acc_2026', rule: 'loss_deficit' } }
-    })
-    expect(nutritionPlanningValues(ready({ goal: 'muscle', activityLevel: 'moderate' }), person)).toMatchObject({
-      goalKcal: { min: 2700, max: 3080 }, goalBasis: 'muscle_surplus', goalStatus: 'planning_example',
-      basis: { goal: { kind: 'planning_example', source: 'resistance_training_surplus_2023', rule: 'muscle_surplus' } }
-    })
-  })
-
-  it('returns maintenance and a review status instead of a sub-1,200 kcal loss range', () => {
-    expect(nutritionPlanningValues(ready({ goal: 'lose', activityLevel: 'low' }),
-      { sex: 'female', age: 70, heightCm: 160, weightKg: 80, today: '2026-08-23' })).toMatchObject({
-      maintenanceKcal: { min: 1910, max: 1910 },
-      goalKcal: null,
-      goalBasis: 'loss_deficit',
-      goalStatus: 'low_energy_review',
-      macroBasisKcal: null,
-      grams: null,
-      basis: { goal: { kind: 'review', source: 'aha_acc_2026', rule: 'loss_deficit' } }
-    })
-  })
-
-  it.each([['plain', {}], ['condition', { condition: true }], ['medication', { medication: true }]])(
-    'uses an exact 2,000 kcal own target for EU-comparable macro grams with %s profile', (_name, medical) => {
-      const profile = ready({ goal: 'health', activityLevel: 'moderate', targets: { kcal: 2000 }, ...medical })
-      const before = structuredClone(profile)
-      expect(nutritionPlanningValues(profile, person)).toMatchObject({
-        goalKcal: null,
-        macroBasisKcal: { min: 2000, max: 2000, source: 'own_target' },
-        grams: {
-          carb: { min: 212.4, max: 287.4 },
-          prot: { min: 58.1, max: 100 },
-          fat: { min: 55.6, max: 88.9 },
-          sat: { min: 22.2, max: 22.2, operator: '<' },
-          sugar: null
-        },
-        basis: { macros: {
-          kind: 'population_reference_conversion', source: 'nnr_2023',
-          carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj'
-        } }
-      })
-      expect(profile).toEqual(before)
-    })
-
-  it('shows concrete goal and gram intervals after review despite illness, medication and GLP-1 use', () => {
-    expect(nutritionPlanningValues(ready({
-      goal: 'lose', activityLevel: 'moderate', condition: true, medication: true,
-      incretinUse: 'weight', weightPhase: 'active_loss'
-    }), { sex: 'male', age: 45, heightCm: 183, weightKg: 102, today: '2026-08-23' })).toMatchObject({
-      maintenanceKcal: { min: 3220, max: 3220 },
-      goalKcal: { min: 2470, max: 2720 },
-      grams: {
-        carb: { min: 262.4, max: 390.9 },
-        prot: { min: 84.7, max: 136 },
-        fat: { min: 68.6, max: 120.9 },
-        sat: { min: 27.4, max: 30.2, operator: '<' }
-      }
-    })
-  })
-
-  it.each([null, false, 0, -1, Infinity])('does not turn %s into an own energy basis', kcal => {
-    expect(nutritionPlanningValues(ready({ goal: 'health', activityLevel: 'moderate', targets: { kcal } }), person)
-      .macroBasisKcal).toEqual({ min: 2570, max: 2570, source: 'estimated_maintenance' })
-  })
-
-  it('never uses an own target below 1,200 kcal as the gram-conversion basis', () => {
-    expect(nutritionPlanningValues(ready({
-      goal: 'health', activityLevel: 'moderate', targets: { kcal: 800 }
-    }), person)).toMatchObject({
-      macroStatus: 'low_energy_review',
-      macroBasisKcal: { min: 2570, max: 2570, source: 'estimated_maintenance' }
-    })
-  })
-
-  it('keeps adult protein at the NNR RI floor and uses the separate over-70 range', () => {
-    expect(nutritionPlanningValues(ready({
-      goal: 'health', targets: { kcal: 1200 }
-    }), { ...person, weightKg: 100 }).grams.prot).toEqual({ min: 83, max: 83, operator: '≥' })
-    expect(nutritionPlanningValues(ready({
-      goal: 'health', targets: { kcal: 2000 }
-    }), { ...person, age: 71 }).grams.prot).toEqual({ min: 84, max: 105 })
-  })
-
-  it.each(NUTRITION_SAFETY_KEYS)('fails closed while %s is unanswered', key => {
-    expect(nutritionPlanningValues({
-      goal: 'lose', safety: { ...SAFE, [key]: null }, safetyReviewedAt: '2026-08-23'
-    }, person)).toBeNull()
-  })
-
-  it('fails closed when the safety review is stale', () => {
-    expect(nutritionPlanningValues({
-      goal: 'lose', safety: SAFE, safetyReviewedAt: '2026-05-24'
-    }, person)).toBeNull()
-  })
-
-  it.each([
-    'pregnancyOrBreastfeeding', 'eatingDisorder', 'severeGI',
-    'malnutritionRisk', 'otherClinicalNutrition', 'hypoglycemiaRiskMedication'
-  ])('fails closed when %s pauses energy planning', key => {
-    expect(nutritionPlanningValues({
-      goal: 'lose', safety: { ...SAFE, [key]: true }, safetyReviewedAt: '2026-08-23'
-    }, person)).toBeNull()
-  })
-
-  it('keeps energy planning but masks protein when kidney safety pauses protein only', () => {
-    expect(nutritionPlanningValues({
-      goal: 'health', safety: { ...SAFE, kidneyOrProteinRestriction: true }, safetyReviewedAt: '2026-08-23'
-    }, person)).toMatchObject({ grams: { prot: null } })
-  })
-
-  it.each([
-    [ready({ goal: 'health' }), { ...person, age: null }],
-    [ready({ goal: 'health' }), { ...person, age: true }],
-    [ready({ goal: 'health' }), { ...person, heightCm: null }],
-    [ready({ goal: 'health' }), { ...person, weightKg: false }],
-    [ready({ goal: null }), person]
-  ])('fails closed for incomplete or wrong-typed planning inputs', (profile, details) => {
-    expect(nutritionPlanningValues(profile, details)).toBeNull()
-  })
-
-  it('formats every derived value as an approximation with its unit', () => {
-    expect(formatNutritionPlanningValue({ min: 212.4, max: 287.4 }, 'sv-SE', 'g/dag')).toBe('≈212,4–287,4 g/dag')
-    expect(formatNutritionPlanningValue({ max: 22.2, operator: '<' }, 'sv-SE', 'g/dag')).toBe('<≈22,2 g/dag')
-    expect(formatNutritionPlanningValue({ min: 83, max: 83, operator: '≥' }, 'sv-SE', 'g/dag')).toBe('≥≈83,0 g/dag')
-    expect(formatNutritionPlanningValue({ min: 1890, max: 2140 }, 'sv-SE', 'kcal/dag')).toBe('≈1\u00a0890–2\u00a0140 kcal/dag')
-    expect(formatNutritionPlanningValue({ min: 10, max: 9 }, 'sv-SE', 'g/dag')).toBe('')
-  })
-})
 
 describe('weightKgOf', () => {
   it('uses the unit stored with the measurement and rejects ambiguous legacy weights', () => {

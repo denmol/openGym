@@ -77,6 +77,44 @@ Off unless you turn it on, and deliberately smaller than it could be.
   pre-approved highlights. Where a health flag is set, no model is called at all: the server
   writes fixed care-team notes instead. Nothing from an explanation is ever saved as a target.
 
+### Daily nutrition values you can actually follow
+
+The nutrition references landed as intervals — 1,850–2,850 kcal, 197–410 g of carbohydrate —
+because that is the shape a population reference has. Nobody can eat an interval. Everything
+below is about turning what the sources say into one number per nutrient per day, and then
+subtracting what has been logged from it.
+
+- 🎯 **One number per nutrient, per day.** Energy is a point on the PAL scale rather than its
+  full width, and carbohydrate is whatever energy is left after protein, fat and fibre — which
+  is how a day is actually put together, and what stops two percentage ranges from multiplying
+  into a span nobody can act on. A 40-year-old man of 180 cm and 90 kg aiming to lose weight now
+  gets 2,350 kcal · 263 g carbohydrate · 135 g protein · 78 g fat · 29 g fibre.
+- 📊 **The day counted down, on the Food screen.** Eaten, goal, what remains, and a bar — for
+  energy and the three macros up front, the rest under *All nutrients*. Carbohydrate leads the
+  list when diabetes mode is on. A total built from foods missing that nutrient reads as "≥ 112 g"
+  rather than pretending to be complete, because the amount left would otherwise be invented.
+- ✅ **Use these as my targets.** One tap copies the calculated day into the editable target
+  fields. Editing a field afterwards makes that field your own again. Before this the numbers
+  could only be read and retyped by hand.
+- **Three questions instead of eleven.** Only pregnancy/breastfeeding and hypoglycaemia-risk
+  medication now gate the general adult estimate; the other six narrow the references and are
+  asked where they become relevant. The GLP-1 layer still requires every one of them.
+- **Weight can be entered where it is needed.** It was the one field the nutrition sheet asked
+  for but could not accept, so supplying it meant leaving for another screen and coming back.
+- **A blocked estimate says which field is missing** — age, sex, height, weight, a weight logged
+  before units were stored — with the button that fixes it, instead of a paragraph listing
+  everything it could possibly need.
+- ⓘ **Sourcing moved behind an info button** per nutrient, showing the whole arithmetic: resting
+  energy, PAL, maintenance, the deficit applied, the daily plan. It no longer sits between the
+  reader and the figure.
+- Protein above BMI 25 counts only 40% of the excess weight, matching the adjusted-reference-weight
+  convention the EASO source already assumes.
+- **Fixed: the person this feature is for got nothing.** A woman of 160 cm and 68 kg aiming to
+  lose weight was shown maintenance energy and no macro grams at all, because the interval's low
+  end fell under the 1,200 kcal floor and the whole estimate was dropped. The floor is now applied
+  to the number rather than used to cancel it.
+- Translated into all 13 UI languages.
+
 ### Swedish
 
 - 🇸🇪 **Swedish (Svenska)** joins the UI languages, bringing the count to 13. Pick it under

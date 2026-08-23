@@ -230,6 +230,32 @@ h4.sec{
 .nutrient-details dd small{display:block;color:var(--label-3);font-size:11px;margin-top:2px;max-width:230px}
 .nutrient-details .incomplete dd>span,.nutrient-details .incomplete dd small{color:var(--orange)}
 
+/* --- the day against its goals (components/DayGoals.jsx) --- */
+.dgoals{display:grid;gap:13px}
+.dgoal-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.dgoal-name{font-size:14px;color:var(--label-2)}
+.dgoal-nums{font-size:14px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
+.dgoal-nums strong{font-size:20px;font-weight:650;letter-spacing:-.02em}
+.dgoal-bar{height:6px;margin-top:7px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.dgoal-bar i{display:block;height:100%;border-radius:99px;background:var(--acc);transition:width var(--med)}
+.dgoal.over .dgoal-bar i{background:var(--orange)}
+.dgoal-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:5px}
+.dgoal-left{font-size:12px;color:var(--label-2);line-height:1.4}
+.dgoal.over .dgoal-left{color:var(--orange)}
+.dgoal-partial{color:var(--label-3)}
+.dgoal-paused{font-size:12px;color:var(--orange)}
+.dgoal-src{display:flex;align-items:center;gap:4px;flex:none;padding:0;min-height:22px;background:none;font-size:11px;color:var(--label-3)}
+.dgoal-src .icn{font-size:14px}
+.dgoal.compact .dgoal-nums strong{font-size:15px;font-weight:600}
+.dgoal.compact .dgoal-bar{height:4px;margin-top:6px}
+.dgoal.compact .dgoal-name{font-size:13px}
+.nplan{margin-top:6px;border-radius:var(--r);background:var(--surface);padding:0 13px}
+.nplan-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-height:42px;padding:6px 0;border-top:var(--hair) solid var(--sep);font-size:14px;color:var(--label-2)}
+.nplan-row:first-child{border-top:0}
+.nplan-row strong{font-size:16px;font-weight:650;color:var(--label);font-variant-numeric:tabular-nums}
+.dblocked{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:12px;border-radius:var(--r);background:var(--surface);font-size:13px;line-height:1.45;color:var(--label-2)}
+.dblocked>.icn{font-size:19px;flex:none;margin-top:1px;color:var(--acc)}
+.dnote{margin-top:9px;font-size:12px;line-height:1.45;color:var(--label-3)}
 .ngoal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ngoal{
   min-height:46px;padding:10px;border-radius:var(--r-sm);background:var(--surface);

@@ -13,6 +13,12 @@ export const NUTRITION_SAFETY_KEYS = [
   'pregnancyOrBreastfeeding', 'eatingDisorder', 'severeGI',
   'malnutritionRisk', 'otherClinicalNutrition', 'hypoglycemiaRiskMedication'
 ]
+// The two questions a general adult estimate cannot be shown without: one changes which
+// references apply at all, the other is the only answer where a wrong energy or
+// carbohydrate figure can do harm within a day. The rest narrow the reference layer and
+// are asked where they become relevant, rather than as a wall in front of the first number.
+export const CORE_SAFETY_KEYS = ['pregnancyOrBreastfeeding', 'hypoglycemiaRiskMedication']
+export const EXTENDED_SAFETY_KEYS = NUTRITION_SAFETY_KEYS.filter(key => !CORE_SAFETY_KEYS.includes(key))
 
 // Population references for healthy adults, not personalised intake targets.
 export const NNR_REFERENCE = {
@@ -80,6 +86,11 @@ const isoDayNumber = value => {
 }
 const cleanIsoDay = value => isoDayNumber(value) == null ? null : value
 const allSafetyAnswered = profile => NUTRITION_SAFETY_KEYS.every(key => typeof profile.safety[key] === 'boolean')
+/** Enough answered for the general adult estimate; the GLP-1 layer still needs all of them. */
+export const coreSafetyAnswered = rawProfile => {
+  const profile = cleanNutritionProfile(rawProfile)
+  return CORE_SAFETY_KEYS.every(key => typeof profile.safety[key] === 'boolean')
+}
 export const nutritionSafetyToday = (now = new Date()) => now.toISOString().slice(0, 10)
 
 /** Normalise user-entered daily targets without inventing any. */
@@ -116,7 +127,7 @@ export function finalizeNutritionProfile(previous, draft, { safetyConfirmedAt = 
     before.weightPhase !== next.weightPhase || before.condition !== next.condition ||
     before.medication !== next.medication
   next.safetyReviewedAt = contextChanged ? null : before.safetyReviewedAt
-  if (cleanIsoDay(safetyConfirmedAt) && allSafetyAnswered(next)) next.safetyReviewedAt = safetyConfirmedAt
+  if (cleanIsoDay(safetyConfirmedAt) && coreSafetyAnswered(next)) next.safetyReviewedAt = safetyConfirmedAt
 
   const riskChanged = NUTRITION_SAFETY_KEYS.some(key =>
     before.safety[key] !== next.safety[key] && (before.safety[key] === true || next.safety[key] === true))
@@ -143,6 +154,20 @@ const SAFETY_RULES = {
   hypoglycemiaRiskMedication: { hide: ['nnr-carb', ...GLP_ENERGY_IDS], pause: ['kcal', 'carb'], severity: 'alert', message: 'Do not change energy or carbohydrate targets without your diabetes care plan. Follow your prescribed emergency plan and seek urgent help for acute severe hypoglycaemia; repeated episodes need contact with your diabetes team.' }
 }
 
+/**
+ * Targets a health answer pauses, ignoring the separate own-target review flag.
+ *
+ * The day plan needs the health half of this on its own: an own target awaiting review is
+ * a reason to stop showing that target, not a reason to stop estimating.
+ */
+export function safetyPausedTargets(rawProfile) {
+  const profile = cleanNutritionProfile(rawProfile)
+  const paused = new Set()
+  for (const key of NUTRITION_SAFETY_KEYS)
+    if (profile.safety[key] === true) SAFETY_RULES[key].pause.forEach(target => paused.add(target))
+  return ALL_TARGETS.filter(key => paused.has(key))
+}
+
 const ageOf = value => {
   if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null
   const number = Number(value)
@@ -156,9 +181,9 @@ export function nutritionReferenceState(rawProfile, { age, today } = {}) {
     if (profile.safety[key] !== true) continue
     const rule = SAFETY_RULES[key]
     rule.hide.forEach(id => hidden.add(id))
-    rule.pause.forEach(target => paused.add(target))
     notices.push({ code: `safety:${key}`, severity: rule.severity, message: rule.message })
   }
+  safetyPausedTargets(profile).forEach(target => paused.add(target))
   if (profile.targetReviewRequired) {
     ALL_TARGETS.forEach(target => paused.add(target))
     notices.push({ code: 'targets:review', severity: 'note', message: 'Your own targets stay paused until you confirm that you have reviewed them.' })
@@ -255,116 +280,6 @@ export const nnrRestingEnergyEstimate = ({ sex, age, heightCm, weightKg }) => {
         ? 0.0476 * weight + 2.26 * metres - 0.574
         : 0.0478 * weight + 2.26 * metres - 1.070
   return mj > 0 ? Math.round(mj * 239) : null
-}
-
-const ACTIVITY_PAL = {
-  range: { min: 1.4, max: 1.8 },
-  low: { min: 1.4, max: 1.4 },
-  moderate: { min: 1.6, max: 1.6 },
-  active: { min: 1.8, max: 1.8 }
-}
-const round10 = value => Math.round(value / 10) * 10
-const roundGram = value => Math.round(value * 10) / 10
-const energyRange = (min, max) => ({ min: round10(min), max: round10(max) })
-const macroGrams = ({ min, max }, { age, weightKg }) => {
-  const carbohydrate = (energy, percent) =>
-    (energy * percent / 100 - 3 * (energy / 239) * 2) / 4
-  const proteinMin = age > 70 ? weightKg * 1.2 : Math.max(min * 0.10 / 4, weightKg * 0.83)
-  const proteinMax = age > 70 ? weightKg * 1.5 : Math.max(max * 0.20 / 4, proteinMin)
-  const protein = {
-    min: roundGram(proteinMin), max: roundGram(proteinMax),
-    ...(age <= 70 && proteinMin >= max * 0.20 / 4 ? { operator: '≥' } : {})
-  }
-  return {
-    carb: { min: roundGram(carbohydrate(min, 45)), max: roundGram(carbohydrate(max, 60)) },
-    prot: protein,
-    fat: { min: roundGram(min * 0.25 / 9), max: roundGram(max * 0.40 / 9) },
-    sat: { min: roundGram(min * 0.10 / 9), max: roundGram(max * 0.10 / 9), operator: '<' },
-    sugar: null
-  }
-}
-
-/** Approximate energy and NNR macro ranges; manual targets remain authoritative and untouched. */
-export function nutritionPlanningValues(rawProfile, { sex, age, heightCm, weightKg, today = nutritionSafetyToday() } = {}) {
-  const profile = cleanNutritionProfile(rawProfile)
-  const adultAge = ageOf(age)
-  if (!profile.goal || adultAge == null || !allSafetyAnswered(profile) ||
-    !safetyReviewCurrent(profile.safetyReviewedAt, today)) return null
-  const referenceState = nutritionReferenceState(profile, { age: adultAge, today })
-  if (referenceState.adultStatus !== 'available' || referenceState.pausedTargets.includes('kcal')) return null
-  const basal = nnrRestingEnergyEstimate({ sex, age, heightCm, weightKg })
-  const height = numberOf(heightCm), weight = numberOf(weightKg)
-  if (!(basal > 0) || !Number.isFinite(height) || height <= 0 || !Number.isFinite(weight) || weight <= 0) return null
-
-  const pal = ACTIVITY_PAL[profile.activityLevel]
-  const maintenanceKcal = energyRange(basal * pal.min, basal * pal.max)
-  const bmi = weight / ((height / 100) ** 2)
-  let goalKcal = null, goalBasis = 'maintenance', goalStatus = 'maintenance_estimate'
-  if (profile.goal === 'lose' && bmi >= 25) {
-    goalKcal = energyRange(maintenanceKcal.min - 750, maintenanceKcal.max - 500)
-    goalBasis = 'loss_deficit'
-    goalStatus = 'planning_example'
-    if (goalKcal.min < 1200) {
-      goalKcal = null
-      goalStatus = 'low_energy_review'
-    }
-  } else if (profile.goal === 'lose') {
-    goalBasis = 'loss_not_applied_bmi_below_25'
-    goalStatus = 'loss_not_applied_bmi_below_25'
-  } else if (profile.goal === 'muscle') {
-    goalKcal = energyRange(maintenanceKcal.min * 1.05, maintenanceKcal.max * 1.20)
-    goalBasis = 'muscle_surplus'
-    goalStatus = 'planning_example'
-  }
-
-  const ownEnergy = profile.targets.kcal >= 1200 ? profile.targets.kcal : null
-  const estimatedEnergy = goalKcal || (goalStatus === 'low_energy_review' ? null : maintenanceKcal)
-  const macroBasisKcal = ownEnergy != null
-    ? { min: ownEnergy, max: ownEnergy, source: 'own_target' }
-    : estimatedEnergy && { ...estimatedEnergy, source: goalKcal ? 'estimated_goal' : 'estimated_maintenance' }
-  const grams = macroBasisKcal ? macroGrams(macroBasisKcal, { age: adultAge, weightKg: weight }) : null
-  for (const target of referenceState.pausedTargets) if (grams && target in grams) grams[target] = null
-  const planningExample = goalBasis === 'loss_deficit' || goalBasis === 'muscle_surplus'
-  return {
-    approximate: true,
-    activityLevel: profile.activityLevel,
-    pal: { ...pal },
-    maintenanceKcal,
-    goalKcal,
-    goalBasis,
-    goalStatus,
-    macroBasisKcal,
-    macroStatus: profile.targets.kcal > 0 && profile.targets.kcal < 1200 ? 'low_energy_review' : 'available',
-    grams,
-    basis: {
-      maintenance: { kind: 'estimate', sources: ['nnr_2023_henry', 'nnr_2023_pal'] },
-      goal: planningExample
-        ? {
-            kind: goalStatus === 'low_energy_review' ? 'review' : 'planning_example',
-            source: goalBasis === 'loss_deficit' ? 'aha_acc_2026' : 'resistance_training_surplus_2023',
-            rule: goalBasis
-          }
-        : { kind: 'estimate', sources: ['nnr_2023_henry', 'nnr_2023_pal'] },
-      macros: {
-        kind: 'population_reference_conversion', source: 'nnr_2023',
-        carbohydrateFibreAssumption: 'nnr_minimum_3_g_per_mj',
-        proteinRule: adultAge > 70 ? 'older_adult_1_2_1_5_g_per_kg' : 'adult_ri_0_83_g_per_kg_floor'
-      }
-    }
-  }
-}
-
-export function formatNutritionPlanningValue(value, locale = 'en-GB', unit = 'g/day') {
-  if (!value || typeof value !== 'object') return ''
-  const min = numberOf(value.min ?? value.max), max = numberOf(value.max ?? value.min)
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) return ''
-  const digits = unit.startsWith('kcal') ? 0 : 1
-  const fmt = number => number.toLocaleString(locale, {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
-  })
-  const amount = min === max ? fmt(min) : `${fmt(min)}–${fmt(max)}`
-  return `${value.operator || ''}≈${amount} ${unit}`
 }
 
 /** Convert only a weight whose unit was stored with the measurement. */

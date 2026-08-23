@@ -9,16 +9,19 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { dateLocale, t } from './lib/i18n.js'
 import { fmtNum, todayISO } from './lib/format.js'
-import { lastBW } from './lib/history.js'
+import { lastBW, weightIn } from './lib/history.js'
 import { coachProfileOf, cleanCoachProfile } from './lib/coach-profile.js'
 import { diabetesOn } from './lib/diabetes.js'
 import { NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import {
-  NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS, cleanNutritionProfile,
-  dailyNutritionReferences, finalizeNutritionProfile, formatNutritionPlanningValue,
-  formatNutritionReference, needsClinicianTargets, nnrRestingEnergyEstimate, nutritionPlanningValues,
+  CORE_SAFETY_KEYS, EXTENDED_SAFETY_KEYS, NUTRIENT_TARGETS, NUTRITION_SAFETY_KEYS,
+  cleanNutritionProfile, coreSafetyAnswered, dailyNutritionReferences, finalizeNutritionProfile,
+  formatNutritionReference, needsClinicianTargets, nnrRestingEnergyEstimate,
   nutritionReferenceState, nutritionSafetyToday, safetyReviewCurrent, weightKgOf
 } from './lib/nutrition-goals.js'
+import {
+  PLAN_NUTRIENTS, formatPlanAmount, limitPrefix, nutritionDayPlan, planAsTargets
+} from './lib/nutrition-plan.js'
 import { askNutrition, nutritionAssistContext } from './lib/nutrition-assist.js'
 import { Button, NumberField, Switch } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
@@ -33,7 +36,7 @@ const INCRETIN_NAME = {
 const PHASE_NAME = { active_loss: 'Active weight loss', maintenance: 'Weight-stable phase' }
 const FIBER_NAME = { range: 'Population interval', female: "Women's NNR reference", male: "Men's NNR reference" }
 const ACTIVITY_NAME = {
-  range: 'Not sure — show PAL 1.4–1.8',
+  range: 'Not sure — use the middle, PAL 1.6',
   low: 'Mostly sedentary · PAL 1.4',
   moderate: 'Sedentary work and active leisure · PAL 1.6',
   active: 'Active lifestyle · PAL 1.8'
@@ -59,6 +62,19 @@ const STATUS_TEXT = {
   safety_expired: 'Confirm the safety answers again; the previous review is older than 90 days.',
   blocked: 'The GLP-1 reference layer is hidden because a professional review is needed.',
   not_applicable: 'GLP-1 obesity-treatment references require Weight treatment or Weight and diabetes treatment.'
+}
+const BLOCKED_HINT = {
+  goal_missing: 'Choose a goal above.',
+  age_missing: 'Add your age above.',
+  age_not_adult: 'Daily values for under-18s belong with a care team, so Dagsnav does not estimate them.',
+  sex_missing: 'Choose the sex the equation should use.',
+  height_missing: 'Add your height above.',
+  weight_missing: 'Add your weight above.',
+  weight_unit_unknown: 'Your last weight was logged without a unit. Enter it again above.',
+  safety_unanswered: 'Answer the two health questions below.',
+  safety_expired: 'Confirm your health answers again — the last review is over 90 days old.',
+  clinical_review: 'Your health answers need professional adaptation, so no values are calculated.',
+  estimate_unavailable: 'Add age, sex, height and a weight above.'
 }
 const GOAL_NOTE = {
   maintain: 'The estimate shows maintenance energy; you decide whether to enter it as your own target.',
@@ -111,39 +127,65 @@ function GoalsSheet({ close }) {
   const [draft, setDraft] = useState(stored)
   const [safetyConfirmedAt, setSafetyConfirmedAt] = useState(null)
   const [targetsReviewed, setTargetsReviewed] = useState(false)
+  const [adopted, setAdopted] = useState([])
   const [age, setAge] = useState(person.age)
   const [heightCm, setHeight] = useState(person.heightCm)
   const [sex, setSex] = useState(person.sex)
 
+  // Weight is edited here rather than only on the workout screen. It is one of five fields
+  // the estimate needs, and being sent to another view to supply it — then back — was the
+  // one gap in this sheet that could not be closed from inside it.
   const bw = lastBW(S)
-  const weightKg = weightKgOf(bw)
+  const unit = S.unit === 'lb' ? 'lb' : 'kg'
+  const [weight, setWeight] = useState(weightIn(bw, unit))
+  const weightKg = weight == null ? null : weightIn({ w: weight, u: unit }, 'kg')
+  const weightChanged = weight != null && weight !== weightIn(bw, unit)
+
   const basal = nnrRestingEnergyEstimate({ sex, age, heightCm, weightKg })
   const profile = cleanNutritionProfile(draft)
   const safetyToday = nutritionSafetyToday()
-  const planning = nutritionPlanningValues(profile, { sex, age, heightCm, weightKg, today: safetyToday })
   const today = todayISO()
+  const plan = nutritionDayPlan(profile, {
+    sex, age, heightCm, weightKg, weightLogged: !!bw, today: safetyToday
+  })
   const referenceState = nutritionReferenceState(profile, { age, today: safetyToday })
   const safetyComplete = NUTRITION_SAFETY_KEYS.every(key => typeof profile.safety[key] === 'boolean')
-  const planningSafetyReady = safetyComplete && safetyReviewCurrent(profile.safetyReviewedAt, safetyToday)
-  const visiblePlanning = planning
+  const coreComplete = coreSafetyAnswered(profile)
   const clinician = needsClinicianTargets(profile, { diabetes: diabetesOn(S) }) ||
     ((typeof age === 'number' || (typeof age === 'string' && age.trim())) && Number(age) > 0 && Number(age) < 18)
+  // Adopting a whole target set is for the general adult case. Where a care team owns the
+  // numbers, the fields stay a place to type theirs in — not somewhere an estimate lands.
+  const canAdopt = !plan.blocked && !clinician
 
   const change = patch => setDraft(old => ({ ...old, ...patch }))
   const changeMedical = updater => {
     setDraft(old => ({ ...updater(old), safetyReviewedAt: null }))
     setSafetyConfirmedAt(null)
   }
-  const setTarget = (key, value) => setDraft(old => ({
-    ...old, targets: { ...old.targets, [key]: value }
-  }))
+  const setTarget = (key, value) => {
+    setAdopted(old => old.filter(adoptedKey => adoptedKey !== key))
+    setDraft(old => ({ ...old, targets: { ...old.targets, [key]: value } }))
+  }
   const setSafety = (key, value) => changeMedical(old => ({
     ...old, safety: { ...old.safety, [key]: value }
   }))
   const confirmSafety = () => {
-    if (!safetyComplete) return toast(t('Answer every safety question first.'))
+    if (!coreComplete) return toast(t('Answer both health questions first.'))
     setDraft(old => ({ ...old, safetyReviewedAt: safetyToday }))
     setSafetyConfirmedAt(safetyToday)
+  }
+  // The estimate becomes the targets in one step, and each field remembers that it did.
+  // Editing one afterwards makes that field the person's own again, which is the only way
+  // "use this plan" and "these are my numbers" can both stay true.
+  const adoptPlan = () => {
+    const targets = planAsTargets(plan)
+    if (!targets) return
+    setDraft(old => ({
+      ...old,
+      targets: { ...old.targets, ...Object.fromEntries(Object.entries(targets).filter(([, v]) => v != null)) }
+    }))
+    setAdopted(Object.keys(targets).filter(key => targets[key] != null))
+    toast(t('Daily values copied into your own targets'))
   }
   const save = () => {
     if (!profile.goal) { toast(t('Choose a nutrition goal.')); return }
@@ -153,6 +195,12 @@ function GoalsSheet({ close }) {
         ...coachProfileOf(state), age, heightCm, sex, updated: today
       })
       state.nutritionGoals = { ...saved, updated: today }
+      if (weightChanged) {
+        const existing = state.bodyweight.find(entry => entry.d === today)
+        if (existing) Object.assign(existing, { w: weight, u: unit, t: Date.now() })
+        else state.bodyweight.push({ d: today, w: weight, u: unit, t: Date.now() })
+        state.bodyweight.sort((a, b) => (a.d < b.d ? -1 : 1))
+      }
     })
     close()
     toast(t('Nutrition goals saved'))
@@ -178,10 +226,16 @@ function GoalsSheet({ close }) {
       <label><span>{t('Height')}</span><span className="nwith-unit"><NumberField className="input" value={heightCm} nullable decimal={false}
         aria-label={t('Height in cm')} onChange={setHeight} /><i>cm</i></span></label>
     </div>
+    <div className="nprofile-grid" style={{ marginTop: 10 }}>
+      <label><span>{t('Weight')}</span><span className="nwith-unit"><NumberField className="input" value={weight} nullable
+        aria-label={t('Body weight')} onChange={setWeight} /><i>{unit}</i></span></label>
+    </div>
     <div className="nsex" role="group" aria-label={t('Sex used by the resting-energy equation')}>
       {['female', 'male'].map(value => <button key={value} className={sex === value ? 'on' : ''}
         aria-pressed={sex === value} onClick={() => setSex(value)}>{t(value === 'female' ? 'Female' : 'Male')}</button>)}
     </div>
+    {weightChanged && <div className="dnote">{t('Saving also logs this weight for today.')}</div>}
+    {!weightChanged && bw?.d && <div className="dnote">{t('Latest weight: {0} {1} on {2}', fmtNum(bw.w), bw.u || '?', bw.d)}</div>}
 
     <div className="nbmr">
       <span className="nbmr-icon"><Icon name="flame" /></span>
@@ -189,13 +243,8 @@ function GoalsSheet({ close }) {
         <div className="small dim">{t('Estimated resting energy · NNR 2023 Henry')}</div>
         <div className="nbmr-value">{basal == null ? '—' : t('≈ {0} kcal/day', fmtNum(basal))}</div>
         <div className="dim small">{basal == null
-          ? t(bw && !bw.u
-            ? 'Log a new weight so its unit is known before BMR is estimated.'
-            : 'Add adult age, sex, height and a logged weight to show the estimate.')
+          ? t('Add adult age, sex, height and a weight to show the estimate.')
           : t('Resting energy is an equation-based estimate, not a daily calorie target.')}</div>
-        {bw?.u && <div className="dim small" style={{ marginTop: 4 }}>
-          {t('Latest weight: {0} {1} on {2}', fmtNum(bw.w), bw.u, bw.d)}
-        </div>}
       </div>
     </div>
 
@@ -203,55 +252,70 @@ function GoalsSheet({ close }) {
     <ChoiceGrid label="Activity used for the energy estimate" names={ACTIVITY_NAME}
       value={profile.activityLevel} onChange={activityLevel => change({ activityLevel })} />
     <div className="nreference-note">
-      {t('PAL is not inferred from workouts. Choose a level, or keep the full PAL 1.4–1.8 range when unsure.')}{' '}
+      {t('PAL is not inferred from workouts. Choose a level, or keep the middle of the NNR range when unsure.')}{' '}
       <a href="https://pub.norden.org/nord2023-003/appendix.html" target="_blank" rel="noopener">
         {t('Source: Nordic Nutrition Recommendations 2023')}
       </a>
     </div>
 
-    {profile.goal && !planningSafetyReady && <div className="nmedical" role="note">
-      <Icon name="shield" /><div>{t('Answer and confirm every safety question below before calculated kcal and gram ranges are shown.')}</div>
-    </div>}
+    <h4 className="sec">{t('Health questions')}</h4>
+    <div className="sect-b">
+      {CORE_SAFETY_KEYS.map(key => <div className="nsafety-row" key={key}>
+        <span>{t(SAFETY_QUESTION[key])}</span>
+        <span className="nsafety-buttons" role="group" aria-label={t(SAFETY_QUESTION[key])}>
+          <button aria-pressed={profile.safety[key] === true} className={profile.safety[key] === true ? 'on' : ''}
+            onClick={() => setSafety(key, true)}>{t('Yes')}</button>
+          <button aria-pressed={profile.safety[key] === false} className={profile.safety[key] === false ? 'on' : ''}
+            onClick={() => setSafety(key, false)}>{t('No / not applicable')}</button>
+        </span>
+      </div>)}
+    </div>
+    <div className="nreference-note">
+      {t('These two decide whether a general adult estimate applies at all. The rest are further down and refine the references rather than gate them.')}
+    </div>
+    {coreComplete && !safetyReviewCurrent(profile.safetyReviewedAt, safetyToday) && <>
+      <div style={{ height: 10 }} />
+      <Button variant="tinted" icon="shield" onClick={confirmSafety}>{t('Confirm health answers')}</Button>
+    </>}
 
-    {visiblePlanning && <div className="nbmr">
-      <span className="nbmr-icon"><Icon name="target" /></span>
-      <div className="grow">
-        <div className="small dim">{t('Estimated maintenance energy')}</div>
-        <div className="nbmr-value">{formatNutritionPlanningValue(
-          visiblePlanning.maintenanceKcal, dateLocale(), t('kcal/day'))}</div>
-        {visiblePlanning.goalKcal && <>
-          <div className="small dim" style={{ marginTop: 8 }}>{t(visiblePlanning.goalBasis === 'loss_deficit'
-            ? 'Sourced weight-loss planning interval'
-            : visiblePlanning.goalBasis === 'muscle_surplus'
-              ? 'Sourced muscle-gain planning interval'
-              : 'Calculated daily energy')}</div>
-          <div className="nbmr-value">{formatNutritionPlanningValue(
-            visiblePlanning.goalKcal, dateLocale(), t('kcal/day'))}</div>
-        </>}
-        {visiblePlanning.goalBasis === 'loss_deficit' && <div className="dim small">
-          {t('The 500–750 kcal deficit comes from clinician-led multicomponent programmes for adults with overweight or obesity and is shown only as a planning example.')}
-        </div>}
-        {visiblePlanning.goalBasis === 'muscle_surplus' && <div className="dim small">
-          {t('The 5–20% surplus is a research-based example for resistance-trained adults; larger surpluses mainly increased skinfolds.')}
-        </div>}
-        <div className="dim small" style={{ marginTop: 6 }}>
-          <a href="https://pub.norden.org/nord2023-003/appendix.html" target="_blank" rel="noopener">NNR 2023 · Henry + PAL</a>
-          {visiblePlanning.goalBasis === 'loss_deficit' && <>
-            {' · '}<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC13399222/" target="_blank" rel="noopener">AHA/ACC 2026</a>
-          </>}
-          {visiblePlanning.goalBasis === 'muscle_surplus' && <>
-            {' · '}<a href="https://pubmed.ncbi.nlm.nih.gov/37914977/" target="_blank" rel="noopener">Helms et al. 2023</a>
-          </>}
-        </div>
-        <div className="dim small">{t('These are equation-based estimates, not measured expenditure, and nothing is copied into your own targets.')}</div>
+    <h4 className="sec">{t('Your daily values')}</h4>
+    {plan.blocked
+      ? <div className="dblocked" role="note">
+        <Icon name={plan.blocked.fix === 'clinician' ? 'shield' : 'target'} />
+        <div>{t(BLOCKED_HINT[plan.blocked.reason] || '')}</div>
       </div>
-    </div>}
-    {visiblePlanning?.goalStatus === 'low_energy_review' && <div className="nmedical" role="note">
-      <Icon name="info" /><div>{t('No weight-loss interval is shown because the calculation would go below 1,200 kcal/day. Use an individually reviewed energy target instead.')}</div>
-    </div>}
-    {visiblePlanning?.goalStatus === 'loss_not_applied_bmi_below_25' && <div className="nreference-note">
-      {t('No automatic calorie deficit is applied below BMI 25; estimated maintenance energy is shown instead.')}
-    </div>}
+      : <>
+        <div className="nplan">
+          {PLAN_NUTRIENTS.filter(key => plan.values[key] != null).map(key => <div key={key} className="nplan-row">
+            <span>{t(NUTRIENT_NAME[key])}</span>
+            <strong>{limitPrefix(key)}{formatPlanAmount(plan.values[key], key, dateLocale())} {NUTRIENT_UNIT[key]}</strong>
+          </div>)}
+        </div>
+        <div className="nreference-note">
+          {t(plan.goalBasis === 'loss_deficit'
+            ? 'Energy is your estimated maintenance less the sourced 500–750 kcal deficit, shown at its midpoint.'
+            : plan.goalBasis === 'muscle_surplus'
+              ? 'Energy is your estimated maintenance plus the sourced 5–20% surplus, shown at its midpoint.'
+              : plan.goalBasis === 'loss_not_applied_bmi_below_25'
+                ? 'No automatic deficit is applied below BMI 25, so this is your estimated maintenance energy.'
+                : 'This is your estimated maintenance energy.')}
+          {' '}{t('Carbohydrate is the energy left after protein, fat and fibre, which is why these are single numbers rather than population intervals.')}
+        </div>
+        {plan.energy.floorApplied && <div className="nmedical" role="note">
+          <Icon name="info" /><div>{t('The calculation landed below 1,200 kcal/day and was raised to that floor. Use an individually reviewed energy target instead of going lower.')}</div>
+        </div>}
+        {plan.energy.belowMicronutrientWatch && <div className="nmedical" role="note">
+          <Icon name="info" /><div>{t('This plan is below 1,500 kcal/day, where the source identifies a high risk of inadequate micronutrient intake.')}</div>
+        </div>}
+        {canAdopt && <>
+          <div style={{ height: 10 }} />
+          <Button variant="primary" icon="target" onClick={adoptPlan}>{t('Use these as my targets')}</Button>
+          <div className="dnote">{t('They become your own editable targets. Change any field afterwards and that field stops following the plan.')}</div>
+        </>}
+        {!canAdopt && clinician && <div className="nmedical" role="note">
+          <Icon name="shield" /><div>{t('Because a health flag is set, these values are shown for discussion with your care team rather than copied into your targets.')}</div>
+        </div>}
+      </>}
 
     <h4 className="sec">{t('Health boundary')}</h4>
     <div className="sect-b">
@@ -276,23 +340,15 @@ function GoalsSheet({ close }) {
     <ChoiceGrid label="Fibre reference" names={FIBER_NAME} value={profile.fiberReference}
       onChange={fiberReference => change({ fiberReference })} />
 
-    <h4 className="sec">{t('Safety questions')}</h4>
-    <div className="sect-b">
-      {['pregnancyOrBreastfeeding'].map(key => <div className="nsafety-row" key={key}>
-        <span>{t(SAFETY_QUESTION[key])}</span>
-        <span className="nsafety-buttons" role="group" aria-label={t(SAFETY_QUESTION[key])}>
-          <button aria-pressed={profile.safety[key] === true} className={profile.safety[key] === true ? 'on' : ''}
-            onClick={() => setSafety(key, true)}>{t('Yes')}</button>
-          <button aria-pressed={profile.safety[key] === false} className={profile.safety[key] === false ? 'on' : ''}
-            onClick={() => setSafety(key, false)}>{t('No / not applicable')}</button>
-        </span>
-      </div>)}
-    </div>
     <details className="nreference"
-      open={!planningSafetyReady || (profile.incretinUse != null && profile.incretinUse !== 'none') || profile.condition || profile.medication}>
-      <summary>{t('Safety questions')}</summary>
+      open={(profile.incretinUse != null && profile.incretinUse !== 'none') || profile.condition || profile.medication}>
+      <summary>{t('More health questions ({0} of {1} answered)',
+        EXTENDED_SAFETY_KEYS.filter(key => typeof profile.safety[key] === 'boolean').length, EXTENDED_SAFETY_KEYS.length)}</summary>
       <div>
-        {NUTRITION_SAFETY_KEYS.filter(key => key !== 'pregnancyOrBreastfeeding').map(key => <div className="nsafety-row" key={key}>
+        <div className="nreference-note" style={{ marginTop: 0, padding: 0 }}>
+          {t('These narrow which references apply and are required for the GLP-1 layer. Your daily values do not wait for them.')}
+        </div>
+        {EXTENDED_SAFETY_KEYS.map(key => <div className="nsafety-row" key={key}>
           <span>{t(SAFETY_QUESTION[key])}</span>
           <span className="nsafety-buttons" role="group" aria-label={t(SAFETY_QUESTION[key])}>
             <button aria-pressed={profile.safety[key] === true} className={profile.safety[key] === true ? 'on' : ''}
@@ -304,7 +360,7 @@ function GoalsSheet({ close }) {
       </div>
     </details>
     {safetyComplete && !safetyReviewCurrent(profile.safetyReviewedAt, safetyToday) &&
-      <Button variant="tinted" icon="shield" onClick={confirmSafety}>{t('Confirm safety answers')}</Button>}
+      <Button variant="tinted" icon="shield" onClick={confirmSafety}>{t('Confirm health answers')}</Button>}
     {clinician && <div className="nmedical" role="note">
       <Icon name="shield" />
       <div><strong>{t('Own targets need review')}</strong><br />
@@ -314,41 +370,27 @@ function GoalsSheet({ close }) {
       {t('References are general source values, not personal treatment targets or medical advice. Your care plan and advice from your care team take priority.')}
     </div>
 
-    <h4 className="sec">{t('Recommendations and own targets')}</h4>
+    <h4 className="sec">{t('Own targets')}</h4>
     <div className="nreference-note">
-      {t('Calculated values are marked with ≈ and shown in kcal or grams before each editable field. Nothing is copied into your own target.')}{' '}
+      {t('These fields are yours. A value copied from the plan is marked as such until you edit it.')}{' '}
       <a href="https://pub.norden.org/nord2023-003/recommendations.html" target="_blank" rel="noopener">
         {t('Source: Nordic Nutrition Recommendations 2023')}
       </a>
       <br />{t('Carbohydrate grams exclude fibre, matching EU food labels. The conversion reserves fibre energy using the NNR minimum of 3 g/MJ.')}
-      <br />{t('Protein grams use at least the NNR RI of 0.83 g/kg; for adults over 70, the NNR range 1.2–1.5 g/kg is used.')}
     </div>
-    {visiblePlanning?.macroStatus === 'low_energy_review' && <div className="nmedical" role="note">
-      <Icon name="info" /><div>{t('Your energy target below 1,200 kcal/day is not used to calculate gram ranges; the sourced planning estimate is used instead when available.')}</div>
-    </div>}
     <div className="ntargets">
       {NUTRIENT_TARGETS.map(key => {
         const paused = referenceState.pausedTargets.includes(key)
         const references = dailyNutritionReferences(referenceState, key)
-        const calculated = !paused && visiblePlanning && (key === 'kcal'
-          ? visiblePlanning.goalKcal || visiblePlanning.maintenanceKcal
-          : visiblePlanning.grams?.[key])
+        const planned = !paused && !plan.blocked ? plan.values[key] : null
         return <label key={key} className={paused ? 'paused' : ''}>
           <span className="ntarget-copy">
             <span className="ntarget-name">{t(NUTRIENT_NAME[key])}</span>
-            {calculated && <small className="ntarget-reference ntarget-calculated">
-              <span className="ntarget-reference-value">{t(key === 'kcal'
-                ? visiblePlanning.goalKcal && visiblePlanning.goalBasis === 'loss_deficit'
-                  ? 'Weight-loss planning interval: {0}'
-                  : visiblePlanning.goalKcal && visiblePlanning.goalBasis === 'muscle_surplus'
-                    ? 'Muscle-gain planning interval: {0}'
-                    : 'Estimated maintenance energy: {0}'
-                : visiblePlanning.macroBasisKcal.source === 'own_target'
-                  ? 'Converted from your own energy target: {0}'
-                  : visiblePlanning.macroBasisKcal.source === 'estimated_maintenance'
-                    ? 'Calculated from estimated maintenance energy: {0}'
-                  : 'Calculated range: {0}',
-              formatNutritionPlanningValue(calculated, dateLocale(), t(key === 'kcal' ? 'kcal/day' : 'g/day')))}</span>
+            {planned != null && <small className="ntarget-reference ntarget-calculated">
+              <span className="ntarget-reference-value">{t(adopted.includes(key)
+                ? 'From the calculated plan: {0}'
+                : 'Calculated plan: {0}',
+              `${limitPrefix(key)}${formatPlanAmount(planned, key, dateLocale())} ${NUTRIENT_UNIT[key]}`)}</span>
             </small>}
             {references.map(reference => <small className="ntarget-reference" key={reference.id}>
               <span className="ntarget-reference-value">{t(reference.layer === 'adult'
@@ -357,12 +399,6 @@ function GoalsSheet({ close }) {
               formatNutritionReference(reference, dateLocale(), t(reference.unit)))}</span>
               <span> · {t(reference.source)}</span>
             </small>)}
-            {!paused && !calculated && !planningSafetyReady && key === 'kcal' && <small className="ntarget-reference">
-              {t('Confirm the safety answers to show the calculated interval.')}
-            </small>}
-            {!paused && !calculated && planningSafetyReady && references.length === 0 && key === 'kcal' && <small className="ntarget-reference">
-              {t('Add a goal, adult age, sex, height and a logged weight to calculate an energy interval.')}
-            </small>}
             {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
               {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}
             </small>}
@@ -405,6 +441,100 @@ function GoalsSheet({ close }) {
 
 export const nutritionGoalsSheet = () =>
   useUI.getState().openSheet(close => <GoalsSheet close={close} />)
+
+/* ======================= where one number came from ======================= */
+
+// Sourcing used to sit under every field, which meant the reader had to walk past three
+// citations to reach the figure they came for. It is all still here, one tap away, with
+// the arithmetic spelled out rather than summarised — a number you cannot reconstruct is
+// a number you have to take on faith, and this screen has no business asking for that.
+
+const PLAN_RULE = {
+  kcal: 'Resting energy from the NNR 2023 Henry equation, multiplied by your activity level.',
+  carb: 'The energy left over once protein, fat and fibre are covered. This is why the figure is one number rather than the 45–60 E% population interval.',
+  prot: 'Grams per kilo of reference weight, from the NNR protein recommendation for your age and goal.',
+  fat: '30% of the day’s energy — the middle of the NNR 25–40 E% interval.',
+  fib: '3 g per MJ of energy, the NNR minimum.',
+  sat: 'Under 10% of the day’s energy, the NNR maximum.',
+  salt: 'The NNR maximum, equivalent to 2.3 g of sodium.'
+}
+const LIMIT_NOTE = {
+  min: 'This is a floor to reach, not a ceiling. Going over it is not a problem.',
+  max: 'This is a ceiling to stay under, not an amount to reach.',
+  target: 'This is a figure to land near across the day.'
+}
+
+function GoalInfoSheet({ row, profile, plan, referenceState, close }) {
+  const key = row.key
+  const unit = NUTRIENT_UNIT[key]
+  const references = (referenceState?.references || []).filter(reference => reference.nutrient === key)
+  const energy = plan?.energy
+
+  return <>
+    <h3>{t(NUTRIENT_NAME[key])}</h3>
+    <div className="nbmr">
+      <span className="nbmr-icon"><Icon name="target" /></span>
+      <div className="grow">
+        <div className="small dim">{t(row.source === 'own' ? 'Your own target' : 'Calculated plan')}</div>
+        <div className="nbmr-value">{row.goal == null ? '—' : `${limitPrefix(key)}${formatPlanAmount(row.goal, key, dateLocale())} ${unit}`}</div>
+        <div className="dim small">{t(LIMIT_NOTE[row.limit] || LIMIT_NOTE.target)}</div>
+      </div>
+    </div>
+
+    <h4 className="sec">{t('Where this number comes from')}</h4>
+    {row.source === 'own'
+      ? <p className="muted small" style={{ lineHeight: 1.5 }}>
+        {t('You entered this target yourself. Nothing calculated replaces it.')}
+      </p>
+      : <>
+        <p className="muted small" style={{ lineHeight: 1.5 }}>{t(PLAN_RULE[key] || '')}</p>
+        {key === 'kcal' && energy && <div className="nai-preview">
+          <div><span>{t('Estimated resting energy')}</span><strong>{t('≈ {0} kcal/day', fmtNum(energy.basal))}</strong></div>
+          <div><span>{t('Activity level (PAL)')}</span><strong>{fmtNum(energy.pal)}{energy.palAssumed ? ` · ${t('assumed')}` : ''}</strong></div>
+          <div><span>{t('Estimated maintenance energy')}</span><strong>{t('≈ {0} kcal/day', fmtNum(energy.maintenance))}</strong></div>
+          {plan.goalBasis === 'loss_deficit' && <div><span>{t('Weight-loss deficit')}</span><strong>−{fmtNum(plan.basis.goal.deficitKcal)} kcal</strong></div>}
+          {plan.goalBasis === 'muscle_surplus' && <div><span>{t('Muscle-gain surplus')}</span><strong>+{fmtNum(plan.basis.goal.surplus * 100)}%</strong></div>}
+          <div><span>{t('Daily plan')}</span><strong>{t('≈ {0} kcal/day', fmtNum(energy.plan))}</strong></div>
+        </div>}
+        {key === 'prot' && plan?.protein && <div className="nai-preview">
+          <div><span>{t('Reference weight')}</span><strong>{fmtNum(plan.protein.referenceWeightKg)} kg</strong></div>
+          <div><span>{t('Protein per kilo')}</span><strong>{fmtNum(plan.protein.perKg)} g/kg</strong></div>
+        </div>}
+        {key === 'prot' && plan?.protein?.adjusted && <div className="dnote">
+          {t('Above BMI 25 only 40% of the weight over that point is counted, so grams per kilo are not multiplied by weight that is largely fat mass.')}
+        </div>}
+        {key === 'kcal' && energy?.floorApplied && <div className="nmedical" role="note">
+          <Icon name="info" /><div>{t('The calculation landed below 1,200 kcal/day and was raised to that floor. Use an individually reviewed energy target instead of going lower.')}</div>
+        </div>}
+        {key === 'kcal' && energy?.belowMicronutrientWatch && <div className="nmedical" role="note">
+          <Icon name="info" /><div>{t('This plan is below 1,500 kcal/day, where the source identifies a high risk of inadequate micronutrient intake.')}</div>
+        </div>}
+        <div className="dnote">{t('This is an equation-based estimate, not measured expenditure, and not a treatment target.')}</div>
+      </>}
+
+    {references.length > 0 && <>
+      <h4 className="sec">{t('Population references')}</h4>
+      <div className="nref-list">
+        {references.map(reference => <ReferenceCard key={reference.id}
+          reference={reference} paused={referenceState.pausedTargets} />)}
+      </div>
+    </>}
+
+    <div className="nreference-note" role="note">
+      {t('References are general source values, not personal treatment targets or medical advice. Your care plan and advice from your care team take priority.')}
+    </div>
+    <div style={{ height: 14 }} />
+    <Button variant="tinted" icon="target" onClick={() => { close(); nutritionGoalsSheet() }}>
+      {t('Open nutrition goals')}
+    </Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Close')}</Button>
+  </>
+}
+
+export const nutritionGoalInfoSheet = (row, profile, plan, referenceState) =>
+  useUI.getState().openSheet(close => <GoalInfoSheet row={row} profile={profile}
+    plan={plan} referenceState={referenceState} close={close} />)
 
 function AssistSheet({ date, totals, close }) {
   const S = useStore(s => s.S)
