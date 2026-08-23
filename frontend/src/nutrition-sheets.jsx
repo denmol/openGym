@@ -91,6 +91,17 @@ const ASSIST_ERROR = {
   'the model took too long': 'the model took too long'
 }
 
+/**
+ * The calculated figure as a hint inside the empty field.
+ *
+ * A bare number in a text box reads as something already entered, so every suggestion
+ * carries a sign: ≈ for a figure to land near, ≥ and ≤ for a floor and a ceiling. It is a
+ * placeholder rather than a value, so typing replaces it and nothing is saved unless the
+ * person saves it — the same rule the rest of this sheet follows.
+ */
+const suggestion = (key, value) =>
+  (limitPrefix(key) || '≈ ') + formatPlanAmount(value, key, dateLocale())
+
 const update = (...args) => useStore.getState().update(...args)
 const toast = message => useUI.getState().toast(message)
 
@@ -406,8 +417,11 @@ function GoalsSheet({ close }) {
           </span>
           <span className="nwith-unit">
             <NumberField id={`nutrition-target-${key}`} className="input" value={profile.targets[key]} nullable
-              placeholder={t('Own target')}
-              aria-label={t('Daily target for {0}', t(NUTRIENT_NAME[key]))}
+              placeholder={planned == null ? t('Own target') : suggestion(key, planned)}
+              aria-label={planned == null
+                ? t('Daily target for {0}', t(NUTRIENT_NAME[key]))
+                : t('Daily target for {0}. Suggested: {1} {2}', t(NUTRIENT_NAME[key]),
+                  suggestion(key, planned), NUTRIENT_UNIT[key])}
               onChange={value => setTarget(key, value)} />
             <i>{NUTRIENT_UNIT[key]}</i>
           </span>

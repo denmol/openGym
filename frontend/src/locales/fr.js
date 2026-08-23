@@ -635,4 +635,5 @@ export default {
   '{0} {1} over': '{0} {1} de trop',
   '{0} {1} over the maximum': '{0} {1} au-dessus du maximum',
   '{0} {1} to go': 'encore {0} {1}',
+  'Daily target for {0}. Suggested: {1} {2}': 'Objectif journalier pour {0}. Suggestion : {1} {2}',
 }

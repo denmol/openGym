@@ -635,4 +635,5 @@ export default {
   '{0} {1} over': '{0} {1} fazla',
   '{0} {1} over the maximum': 'üst sınırın {0} {1} üzerinde',
   '{0} {1} to go': '{0} {1} eksik',
+  'Daily target for {0}. Suggested: {1} {2}': '{0} için günlük hedef. Öneri: {1} {2}',
 }
