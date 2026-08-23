@@ -15,6 +15,7 @@ import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sh
 import { coachProfileOf, isCoachReady } from '../lib/coach-profile.js'
 import { healthSheet, healthSummary, importGlucoseSheet, undoImport, hasImported } from '../glucose-sheets.jsx'
 import { diabetesOn } from '../lib/diabetes.js'
+import { barcodeDiagnostics } from '../barcode-sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
@@ -250,6 +251,9 @@ export default function Settings() {
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
         accessory="chevron" onClick={() => importRef.current.click()} />
+      <Row icon="barcode" iconTint="var(--teal)" title={t('Can this phone scan?')}
+        subtitle={t('Checks the camera and the barcode decoder on this device')}
+        accessory="chevron" onClick={barcodeDiagnostics} />
       <Row icon="upload" iconTint="var(--blue)" title={t('Import backup')} accessory="chevron" onClick={() => fileRef.current.click()} />
       <Row icon="download" iconTint="var(--blue)" title={t('Export backup (JSON)')} accessory="chevron" onClick={doExport} />
       <Row icon="trash" iconTint="var(--red)" title={t('Reset everything')} danger onClick={() => confirmSheet({ title: t('Reset everything?'), message: t('Deletes your plan, workouts and body weight on this device. This cannot be undone.'), confirmText: t('Delete everything'), danger: true, onConfirm: () => { replaceState(JSON.parse(JSON.stringify(DEF)), true); nav('/home'); toast(t('All data reset')) } })} />

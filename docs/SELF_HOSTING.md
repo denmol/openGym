@@ -142,6 +142,24 @@ removes the imported account, and grants the remaining profile the admin panel. 
 `--dry-run` first; it changes nothing and prints what it would do. It is a one-off and can be
 deleted once it has run.
 
+## 5b. Barcode scanning
+
+Scanning a packet looks its barcode up in Open Food Facts and offers the values for
+confirmation against the packet before saving them. The lookup goes through your own API
+container, not from the browser: your phones never tell a third party what they are eating,
+the User-Agent Open Food Facts asks for is set in one place, and answers are cached under
+`DATA_DIR/off` so the same packet is only ever fetched once. `OFF_ENABLED=0` turns the whole
+thing off; the rest of the settings are in `.env.example`.
+
+The decoding happens in WebAssembly rather than through the browser's own barcode API,
+because Safari does not implement that one and on iOS every browser is Safari underneath.
+The decoder is ~1 MB and loads the first time someone taps Scan, not at startup.
+
+**Settings → Can this phone scan?** reports what a given phone actually supports — HTTPS,
+camera, WebAssembly, whether the decoder loads and whether the camera opens — and offers a
+real scan. Worth running once per phone. Where the live camera cannot be used there are two
+fallbacks that need less of the browser: photographing the barcode, and typing the digits.
+
 ## 6. Notifications
 
 openGym can push two kinds of alert to your phone/desktop, even when the app isn't open:

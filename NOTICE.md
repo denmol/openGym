@@ -54,3 +54,15 @@ and are **not** covered by openGym's AGPL license — they remain under that dat
 The media files are not distributed in this repository; they are downloaded from the upstream
 source on first run. If you redistribute openGym with the media included, review the upstream
 license first.
+
+## Open Food Facts
+
+Barcode lookups query [Open Food Facts](https://world.openfoodfacts.org/), whose product
+database is made available under the [Open Database License](https://opendatacommons.org/licenses/odbl/)
+(ODbL). openGym queries it per barcode rather than redistributing the database, and shows the
+attribution on the screen where a scanned product is confirmed.
+
+Values there are transcribed from packets by volunteers, not measured in a laboratory, and
+openGym treats them accordingly: a scanned product is shown for confirmation against the
+packet in the user's hand before it is saved, and it is saved as one of that profile's own
+foods rather than into the bundled catalogue.

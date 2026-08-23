@@ -12,6 +12,7 @@ import { uid, fmtNum } from './lib/format.js'
 import { Button, Segmented, Stepper } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
 import { searchFoods, foodMap, foodOf, hasFoodDb, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
+import { scanSheet } from './barcode-sheets.jsx'
 import { totalsOf, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
 import {
   unitsFor, unitById, gramsOf, lastAmounts, defaultAmount, amountLabel,
@@ -235,6 +236,8 @@ function MealForm({ existing, preset, close }) {
     </div>}
 
     <div style={{ height: 6 }} />
+    <Button icon="barcode" onClick={() => scanSheet(add)}>{t('Scan a barcode')}</Button>
+    <div style={{ height: 8 }} />
     <Button icon="plus" onClick={() => ui().openSheet(c => <OwnFoodForm close={c} onDone={add} prefill={q} />)}>
       {t('Create my own food')}
     </Button>
