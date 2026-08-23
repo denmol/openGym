@@ -23,7 +23,13 @@ docker compose up -d --build      # api + web + media on :8080
 cd frontend && npm install && npm run dev
 # training logic (progression rules, 1RM, how a session is read back):
 cd frontend && npm test
+# the backend's own tests:
+cd api && npm test
 ```
+
+CI runs exactly these two, plus `cd frontend && npm run build`, on every pull request and on
+every push to `main` (`.github/workflows/ci.yml`). Running them before you push is the whole
+difference between a review that discusses your change and one that discusses your red build.
 
 ## Guidelines
 

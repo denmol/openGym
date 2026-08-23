@@ -1,0 +1,61 @@
+# Tests and a build, on every pull request and every push to main.
+#
+# Two jobs rather than one, because "CI failed" should already say which half broke: the
+# frontend carries the app and its unit tests, the api is a separate package with its own
+# lockfile and its own node --test run. They share nothing at build time, so running them
+# in parallel costs nothing and reads better in the checks list.
+#
+# Node 22 is what both Dockerfiles pin. CI drifting ahead of what actually ships is how a
+# green build stops meaning anything.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run irrelevant; don't pay for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend — tests and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # The build is a test of its own: an unresolved import or a broken JSX file passes
+      # the unit tests and still leaves nothing to deploy. Runs without the generated food
+      # database, which is how a fresh clone builds and must keep working.
+      - run: npm run build
+
+  api:
+    name: API — tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm test
