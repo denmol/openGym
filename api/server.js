@@ -348,7 +348,7 @@ const nutritionSchema = facts => ({
   additionalProperties: false,
   required: ['highlights'],
   properties: {
-    highlights: { type: 'array', minItems: 1, maxItems: 5, uniqueItems: true, items: { type: 'string', enum: facts } }
+    highlights: { type: 'array', minItems: 1, maxItems: 5, items: { type: 'string', enum: facts } }
   }
 });
 

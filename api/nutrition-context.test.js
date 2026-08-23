@@ -40,7 +40,7 @@ test('AI can select only verified fact codes and never supplies displayed text',
   assert.equal(facts.includes('target:carb'), true);
   assert.equal(facts.includes('target:prot'), false);
 
-  const answer = nutritionAnswer(['missing:prot', 'target:carb', 'goal:health', 'Ät druvsocker'], context);
+  const answer = nutritionAnswer(['missing:prot', 'target:carb', 'missing:prot', 'goal:health', 'Ät druvsocker'], context);
   assert.deepEqual(answer.observations, [
     'Protein är ofullständigt eftersom minst ett loggat livsmedel saknar värdet.',
     'Du har angett ett eget dagligt mål för kolhydrater.',
