@@ -62,6 +62,28 @@ function linksOf(row) {
   return out
 }
 
+/**
+ * Absolute URLs to try for a link href.
+ *
+ * The API is mounted under a path (…/livsmedel/api/v1/livsmedel) but advertises its links
+ * from the app root (/api/v1/livsmedel/1/…). Resolving those with `new URL(href, API)` walks
+ * to the server root and loses the mount, so find the mount back: the prefix of the API path
+ * that makes the href line up with it again.
+ */
+function urlsFor(href) {
+  if (/^https?:/i.test(href)) return [href]
+  const base = new URL(API)
+  const path = href.startsWith('/') ? href : '/' + href
+  const segs = base.pathname.split('/').filter(Boolean)
+  const out = []
+  for (let k = 0; k <= segs.length; k++) {
+    const mount = k ? '/' + segs.slice(0, k).join('/') : ''
+    if ((mount + path).startsWith(base.pathname)) out.push(base.origin + mount + path)
+  }
+  out.push(base.origin + path)
+  return [...new Set(out)]
+}
+
 async function getJSON(url) {
   const res = await fetch(url, { headers: { Accept: 'application/json' } })
   if (!res.ok) { const e = new Error(`${res.status} ${url}`); e.status = res.status; throw e }
@@ -82,22 +104,32 @@ async function fetchList(cap) {
     if (rows.length < limit) break
     offset += limit
   }
-  process.stdout.write(`\r✓ ${out.length} livsmedel i listan.            \n`)
-  return cap ? out.slice(0, cap) : out
+  const kept = cap ? out.slice(0, cap) : out
+  process.stdout.write(`\r✓ ${kept.length} livsmedel i listan.            \n`)
+  return kept
 }
 
-/** The nutrient sub-resource for one food, trying the advertised link then the plain path. */
-async function fetchNutrients(row, rel) {
+/** Every URL worth trying for one food's nutrients, best guess first. */
+function nutrientURLs(row, rel) {
   const id = row.nummer ?? row.id
   const link = linksOf(row).find(l => norm0(l.rel) === norm0(rel))
-  const tries = []
-  if (link) tries.push(new URL(link.href, API).href)
-  tries.push(`${API}/${id}/${rel}`)
-  let last
+  const tries = link ? urlsFor(link.href) : []
+  // The rel and the path it points at need not match — Livsmedelsverket advertises
+  // rel "naringvarden" for a path spelled "naringsvarden" — so build the fallback from
+  // the href's own last segment before falling back to the rel name.
+  const seg = link ? link.href.split('?')[0].split('/').filter(Boolean).pop() : null
+  for (const s of new Set([seg, rel].filter(Boolean))) tries.push(`${API}/${id}/${s}`)
+  return [...new Set(tries)]
+}
+
+/** The nutrient sub-resource for one food. Reports every URL tried, not just the last. */
+async function fetchNutrients(row, rel) {
+  const tries = nutrientURLs(row, rel)
+  const errs = []
   for (const url of tries) {
-    try { return await getJSON(url) } catch (e) { last = e }
+    try { return await getJSON(url) } catch (e) { errs.push(`${e.message}`) }
   }
-  throw last
+  throw new Error(errs.join(' | '))
 }
 
 /** Resolve requests a few at a time: 2 600 of them, and nobody's API deserves a stampede. */
@@ -133,6 +165,11 @@ const WANT = {
   salt:  ['salt', 'natriumklorid', 'nacl']
 }
 
+// Sources that carry both energy fields list kilojoules too, and "Energi (kJ)" answers to a
+// bare "energi" just as readily as the kcal one does. Picking it would make every food in the
+// database look 4.2x more energetic than it is, silently, so kcal refuses a kJ field outright.
+const REJECT = { kcal: /\bkj\b|kilojoule/ }
+
 const norm = s => String(s || '').toLowerCase()
   .replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/\s+/g, ' ').trim()
 
@@ -162,8 +199,8 @@ function flatten(row) {
   return flat
 }
 
-function pick(flat, names) {
-  const keys = Object.keys(flat)
+function pick(flat, names, reject) {
+  const keys = Object.keys(flat).filter(k => !(reject && reject.test(norm(k))))
   for (const want of names) {
     const w = norm(want)
     const hit = keys.find(k => norm(k) === w)
@@ -177,6 +214,9 @@ function pick(flat, names) {
   }
   return null
 }
+
+/** One mapped field, by meaning. */
+const field = (flat, key) => pick(flat, WANT[key], REJECT[key])
 
 const num = v => {
   if (v == null) return null
@@ -205,12 +245,16 @@ if (inspect) {
   }
   console.log('\nLänkar posten pekar på:\n')
   for (const l of linksOf(list[0])) console.log('  ' + l.rel.padEnd(24) + l.href.slice(0, 60))
-  console.log(`\nHämtar näringsvärden via: ${rel}\n`)
+  console.log(`\nHämtar näringsvärden via rel: ${rel}`)
+  console.log('Adresser skriptet provar, i tur och ordning:\n')
+  for (const u of nutrientURLs(list[0], rel)) console.log('  ' + u)
+  console.log('')
 
   let sample
   try { sample = await fetchNutrients(list[0], rel) } catch (e) {
-    console.log('  ✗ gick inte att hämta: ' + e.message)
-    console.log('\n  Skicka länklistan ovan så pekar jag om skriptet.\n')
+    console.log('  ✗ ingen av dem svarade:\n')
+    for (const m of e.message.split(' | ')) console.log('    ' + m)
+    console.log('\n  Skicka den här utskriften så pekar jag om skriptet.\n')
     process.exit(1)
   }
   const flat = flatten(sample)
@@ -219,8 +263,8 @@ if (inspect) {
     console.log('  ' + String(k).padEnd(42) + String(v).slice(0, 24))
   }
   console.log('\nSå här matchar mappningen:\n')
-  for (const [key, names] of Object.entries(WANT)) {
-    const v = pick(flat, names)
+  for (const key of Object.keys(WANT)) {
+    const v = field(flat, key)
     console.log('  ' + key.padEnd(7) + (v == null ? '✗ INGEN TRÄFF' : '✓ ' + v))
   }
   console.log('\nSaknas något: skicka listan ovan så rättar jag WANT-tabellen.\n')
@@ -242,7 +286,7 @@ list.forEach((row, i) => {
   const flat = flatten(src)
   const per100 = {}
   for (const key of Object.keys(WANT)) {
-    const v = num(pick(flat, WANT[key]))
+    const v = num(field(flat, key))
     if (v != null) per100[key] = v
   }
   // A row with no energy and no carbohydrate is not a food anyone can log against.
