@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   NNR_REFERENCE,
+  NUTRITION_REFERENCE_CATALOG,
   NUTRIENT_TARGETS,
   NUTRITION_SAFETY_KEYS,
   NUTRITION_GOALS,
@@ -8,8 +9,10 @@ import {
   cleanNutritionProfile,
   finalizeNutritionProfile,
   needsClinicianTargets,
+  nutritionReferenceState,
   nutritionSafetyToday,
   safetyReviewCurrent,
+  formatNutritionReference,
   weightKgOf
 } from './nutrition-goals.js'
 
@@ -24,6 +27,12 @@ const SAFE = {
   otherClinicalNutrition: false,
   hypoglycemiaRiskMedication: false
 }
+const CURRENT_GLP = {
+  goal: 'lose', targets: completeTargets,
+  incretinUse: 'weight', weightPhase: 'active_loss', fiberReference: 'range',
+  safety: SAFE, safetyReviewedAt: '2026-05-25', targetReviewRequired: false
+}
+const reference = (state, id) => state.references.find(item => item.id === id)
 
 describe('cleanNutritionProfile', () => {
   it('keeps only supported goals and finite nonnegative daily targets', () => {
@@ -182,5 +191,156 @@ describe('NNR reference', () => {
     expect(NNR_REFERENCE.audience).toBe('healthy adults')
     expect(NNR_REFERENCE.ranges).not.toHaveProperty('kcal')
     expect(NNR_REFERENCE.ranges.carb).toEqual({ min: 45, max: 60, unit: 'E%' })
+  })
+})
+
+describe('nutrition reference engine', () => {
+  it('returns exact adult values and never turns free sugar into a log target', () => {
+    const state = nutritionReferenceState(CURRENT_GLP, { age: 18, today: '2026-08-23' })
+    expect(reference(state, 'nnr-carb').value).toEqual({ min: 45, max: 60 })
+    expect(reference(state, 'nnr-protein').value).toEqual({ min: 10, max: 20 })
+    expect(reference(state, 'nnr-fat').value).toEqual({ min: 25, max: 40 })
+    expect(reference(state, 'nnr-saturated')).toMatchObject({ value: 10, operator: '<' })
+    expect(reference(state, 'nnr-salt').value).toBe(5.75)
+    expect(reference(state, 'nnr-free-sugar')).toMatchObject({ kind: 'max', value: 10, operator: '<', daily: false })
+    expect(reference(state, 'nnr-fiber-range').value).toEqual({ min: 25, max: 35 })
+  })
+
+  it('returns the sourced GLP values without deriving a personal number', () => {
+    const state = nutritionReferenceState(CURRENT_GLP, { age: 40, today: '2026-08-23' })
+    expect(reference(state, 'glp-protein-example').value).toEqual({ min: 80, max: 120 })
+    expect(reference(state, 'glp-protein-reference-weight').value).toEqual({ min: 1, max: 1.5 })
+    expect(reference(state, 'glp-protein-floor').value).toBe(60)
+    expect(reference(state, 'glp-fiber').value).toBe(25)
+    expect(reference(state, 'glp-fluid').value).toEqual({ min: 2, max: 2.5 })
+    expect(reference(state, 'glp-energy-1500').value).toBe(1500)
+    expect(reference(state, 'glp-energy-1200').value).toBe(1200)
+    expect(reference(state, 'glp-energy-800').value).toBe(800)
+  })
+
+  it('requires adult age and an explicit non-pregnancy answer', () => {
+    expect(nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, pregnancyOrBreastfeeding: false } }, { age: 17, today: '2026-08-23' }).references).toEqual([])
+    expect(nutritionReferenceState(CURRENT_GLP, { age: 18, today: '2026-08-23' }).adultStatus).toBe('available')
+    expect(nutritionReferenceState(CURRENT_GLP, { age: 100, today: '2026-08-23' }).adultStatus).toBe('available')
+    expect(nutritionReferenceState(CURRENT_GLP, { age: 101, today: '2026-08-23' }).references).toEqual([])
+    expect(nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, pregnancyOrBreastfeeding: null } }, { age: 18, today: '2026-08-23' }).adultStatus).toBe('pregnancy_required')
+    expect(nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, pregnancyOrBreastfeeding: true } }, { age: 18, today: '2026-08-23' }).pausedTargets).toEqual(NUTRIENT_TARGETS)
+  })
+
+  it('uses the explicit fibre reference and ignores body or current weight', () => {
+    const female = nutritionReferenceState({ ...CURRENT_GLP, fiberReference: 'female', body: 'male', weightKg: 80 }, { age: 40, today: '2026-08-23', weightKg: 80 })
+    const male = nutritionReferenceState({ ...CURRENT_GLP, fiberReference: 'male' }, { age: 40, today: '2026-08-23' })
+    expect(reference(female, 'nnr-fiber-female').value).toBe(25)
+    expect(reference(male, 'nnr-fiber-male').value).toBe(35)
+    expect(reference(female, 'glp-protein-reference-weight').value).toEqual({ min: 1, max: 1.5 })
+    expect(female.references.some(item => item.derivedGrams != null)).toBe(false)
+  })
+
+  it('uses strict energy thresholds only from the manual target', () => {
+    const signal = kcal => nutritionReferenceState({ ...CURRENT_GLP, targets: { ...completeTargets, kcal } }, { age: 40, today: '2026-08-23' })
+    expect(signal(1500).energySignal).toBeNull()
+    expect(signal(1499.9).energySignal).toBe('under_1500')
+    expect(signal(1200).energySignal).toBe('under_1500')
+    expect(signal(1199.9).energySignal).toBe('under_1200')
+    expect(signal(800).energySignal).toBe('under_1200')
+    expect(signal(799.9).energySignal).toBe('under_800')
+    expect(signal(799.9).pausedTargets).toContain('kcal')
+    expect(signal(0).energySignal).toBeNull()
+  })
+
+  it.each([
+    ['kidneyOrProteinRestriction', ['prot', 'salt']],
+    ['fluidOrSodiumRestriction', ['salt']],
+    ['pregnancyOrBreastfeeding', NUTRIENT_TARGETS],
+    ['eatingDisorder', NUTRIENT_TARGETS],
+    ['severeGI', ['kcal', 'prot', 'fib']],
+    ['malnutritionRisk', NUTRIENT_TARGETS],
+    ['otherClinicalNutrition', NUTRIENT_TARGETS],
+    ['hypoglycemiaRiskMedication', ['kcal', 'carb']]
+  ])('pauses the exact safety-matrix targets for %s', (key, expected) => {
+    const state = nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, [key]: true } }, { age: 40, today: '2026-08-23' })
+    expect(state.pausedTargets).toEqual(expected)
+  })
+
+  it('keeps source precision in Swedish display', () => {
+    const state = nutritionReferenceState(CURRENT_GLP, { age: 40, today: '2026-08-23' })
+    expect(formatNutritionReference(reference(state, 'nnr-salt'), 'sv-SE', 'g/dag')).toBe('≤5,75 g/dag')
+    expect(formatNutritionReference(reference(state, 'glp-fluid'), 'sv-SE', 'liter/dag')).toBe('2,0–2,5 liter/dag')
+    expect(formatNutritionReference(reference(state, 'glp-protein-reference-weight'), 'sv-SE', 'g/kg justerad referensvikt/dag')).toBe('1,0–1,5 g/kg justerad referensvikt/dag')
+  })
+
+  it('blocks GLP at day 91 and for non-weight indications', () => {
+    const expired = nutritionReferenceState({ ...CURRENT_GLP, safetyReviewedAt: '2026-05-24' }, { age: 40, today: '2026-08-23' })
+    expect(expired.glpStatus).toBe('safety_expired')
+    expect(expired.references.every(item => item.layer !== 'glp1')).toBe(true)
+    for (const incretinUse of ['diabetes', 'other', 'none', null]) {
+      const state = nutritionReferenceState({ ...CURRENT_GLP, incretinUse }, { age: 40, today: '2026-08-23' })
+      expect(state.glpStatus).toBe('not_applicable')
+      expect(state.references.every(item => item.layer !== 'glp1')).toBe(true)
+    }
+  })
+
+  it('removes only the active-loss protein example during maintenance', () => {
+    const state = nutritionReferenceState({ ...CURRENT_GLP, weightPhase: 'maintenance' }, { age: 40, today: '2026-08-23' })
+    expect(reference(state, 'glp-protein-example')).toBeUndefined()
+    expect(reference(state, 'glp-protein-reference-weight')).toBeDefined()
+    expect(reference(state, 'glp-fluid')).toBeDefined()
+  })
+
+  it('pauses all comparisons while sticky target review remains', () => {
+    const state = nutritionReferenceState({ ...CURRENT_GLP, targetReviewRequired: true }, { age: 40, today: '2026-08-23' })
+    expect(state.pausedTargets).toEqual(NUTRIENT_TARGETS)
+  })
+
+  it.each([
+    ['pregnancyOrBreastfeeding', NUTRITION_REFERENCE_CATALOG.map(item => item.id)],
+    ['eatingDisorder', NUTRITION_REFERENCE_CATALOG.map(item => item.id)],
+    ['malnutritionRisk', NUTRITION_REFERENCE_CATALOG.map(item => item.id)],
+    ['kidneyOrProteinRestriction', ['nnr-protein', 'nnr-salt', 'glp-protein-example', 'glp-protein-reference-weight', 'glp-protein-floor', 'glp-fluid']],
+    ['fluidOrSodiumRestriction', ['nnr-salt', 'glp-fluid']],
+    ['severeGI', ['nnr-fiber-range', 'glp-protein-example', 'glp-protein-reference-weight', 'glp-protein-floor', 'glp-fiber', 'glp-fluid', 'glp-energy-1500', 'glp-energy-1200', 'glp-energy-800']],
+    ['otherClinicalNutrition', ['glp-protein-example', 'glp-protein-reference-weight', 'glp-protein-floor', 'glp-fiber', 'glp-fluid', 'glp-energy-1500', 'glp-energy-1200', 'glp-energy-800']],
+    ['hypoglycemiaRiskMedication', ['nnr-carb', 'glp-energy-1500', 'glp-energy-1200', 'glp-energy-800']]
+  ])('hides the exact references for %s', (key, hidden) => {
+    const ids = nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, [key]: true } }, { age: 40, today: '2026-08-23' })
+      .references.map(item => item.id)
+    for (const id of hidden) expect(ids).not.toContain(id)
+  })
+
+  it('locks reference kind, operator, placement and source family for every catalogue row', () => {
+    const NNR_URL = 'https://pub.norden.org/nord2023-003/recommendations.html'
+    const JOINT_URL = 'https://doi.org/10.1016/j.obpill.2025.100181'
+    const EASO_URL = 'https://easo.org/wp-content/uploads/2026/07/obesity-incretin-based-therapy_v6.pdf'
+    const families = {
+      nnr: ['Nordic Nutrition Recommendations 2023', 2023, NNR_URL, 'Adults not pregnant, planning pregnancy or breastfeeding'],
+      joint: ['ACLM/ASN/OMA/TOS joint advisory', 2025, JOINT_URL, 'Adults using GLP-1 therapy for obesity during active weight loss'],
+      easo: ['EASO/EFAD/ECPO clinical infographic', 2026, EASO_URL, 'Adults using incretin-based therapy for obesity']
+    }
+    const expected = [
+      ['nnr-carb', 'range', null, true, null, 'nnr'], ['nnr-protein', 'range', null, true, null, 'nnr'], ['nnr-fat', 'range', null, true, null, 'nnr'],
+      ['nnr-saturated', 'max', '<', true, null, 'nnr'], ['nnr-fiber-range', 'range', null, true, 'fib', 'nnr'], ['nnr-fiber-female', 'min', '≥', true, 'fib', 'nnr'],
+      ['nnr-fiber-male', 'min', '≥', true, 'fib', 'nnr'], ['nnr-salt', 'max', '≤', true, 'salt', 'nnr'], ['nnr-free-sugar', 'max', '<', false, null, 'nnr'],
+      ['glp-protein-example', 'example', null, true, null, 'joint'], ['glp-protein-reference-weight', 'range', null, false, null, 'easo'],
+      ['glp-protein-floor', 'min', '≥', false, null, 'easo'], ['glp-fiber', 'min', '≥', true, 'fib', 'easo'], ['glp-fluid', 'range', null, false, null, 'easo'],
+      ['glp-energy-1500', 'warning', '<', false, null, 'easo'], ['glp-energy-1200', 'warning', '<', false, null, 'easo'], ['glp-energy-800', 'warning', '<', false, null, 'easo']
+    ]
+    for (const [id, kind, operator, daily, targetField, family] of expected) {
+      const item = NUTRITION_REFERENCE_CATALOG.find(reference => reference.id === id)
+      const [source, year, sourceUrl, audience] = families[family]
+      expect(item).toMatchObject({ id, kind, daily, source, year, sourceUrl, audience })
+      expect(item.operator ?? null).toBe(operator)
+      expect(item.targetField ?? null).toBe(targetField)
+    }
+    expect(NUTRITION_REFERENCE_CATALOG).toHaveLength(expected.length)
+  })
+
+  it('keeps hypoglycaemia safety text within the approved medical boundary', () => {
+    const state = nutritionReferenceState({ ...CURRENT_GLP, safety: { ...SAFE, hypoglycemiaRiskMedication: true } }, { age: 40, today: '2026-08-23' })
+    const message = state.notices.find(notice => notice.code === 'safety:hypoglycemiaRiskMedication').message
+    expect(message).toContain('prescribed emergency plan')
+    expect(message).toContain('urgent help')
+    expect(message).toContain('repeated episodes')
+    expect(message).toContain('diabetes team')
+    expect(/carbohydrate amount|bolus|correction factor|insulin-on-board/i.test(message)).toBe(false)
   })
 })
