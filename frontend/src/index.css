@@ -251,11 +251,11 @@ h4.sec{
 .nmedical{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px;border-radius:var(--r);background:color-mix(in srgb,var(--orange) 12%,var(--surface));color:var(--orange);font-size:13px;line-height:1.45}
 .nmedical>.icn{font-size:19px;flex:none;margin-top:1px}
 .ntargets{margin-top:6px;border-radius:var(--r);background:var(--surface);padding:0 12px}
-.ntargets label{min-height:60px;align-items:flex-start;border-top:var(--hair) solid var(--sep);font-size:14px;padding:8px 0}
+.ntargets label{min-height:60px;align-items:stretch;flex-direction:column;border-top:var(--hair) solid var(--sep);font-size:14px;padding:8px 0}
 .ntargets label:first-child{border-top:0}
 .ntarget-copy{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px;overflow-wrap:anywhere}
 .ntarget-name{line-height:1.35}
-.ntargets .nwith-unit{width:132px;flex:none}
+.ntargets .nwith-unit{width:100%;flex:none}
 .ntargets .input{min-height:44px;padding:8px 10px}
 .ntarget-reference{display:block;color:var(--label-3);font-size:11px;line-height:1.4}
 .ntarget-reference-value{font-variant-numeric:tabular-nums;color:var(--label-2)}
