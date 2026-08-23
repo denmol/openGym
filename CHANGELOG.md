@@ -29,6 +29,17 @@ describe a treadmill, and it vanished from every summary the moment it was logge
   logged before the volume figure existed. Workout rows, the workout detail sheet and the
   calendar's monthly line now show minutes and distance alongside volume, and each half is
   left out when there is none of it.
+- 📥 **Import cardio from a watch.** An Apple Health `export.xml` now brings its workouts
+  across, not only its body weight — read by scanning rather than parsing, because the file
+  runs to hundreds of megabytes and a DOM would take the tab with it. Both shapes Health has
+  written are handled: the older one with duration and distance on the element, and the iOS 16
+  one that moved distance into a child alongside the heart rate. Miles, metres and seconds are
+  converted on the way in.
+- **Garmin and Strava activity CSVs keep their distance.** The importer already read cardio
+  rows, but collapsed the measured distance into a speed — the one figure the file was sure
+  of, thrown away. It is stored as measured now, and an average heart-rate column comes with
+  it. Activities the exercise library has no entry for become one of your own, as they do for
+  strength imports.
 - Cardio still does not join the volume figure, and should not: multiplying a duration into a
   weight × reps total would make two incomparable things look like one number.
 - Translated into all 13 UI languages.

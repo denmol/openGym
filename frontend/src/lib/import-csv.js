@@ -79,6 +79,9 @@ const COLUMNS = [
   ['seconds', ['seconds', 'duration seconds']],
   ['time', ['time', 'duration']],
   ['setType', ['set type']],
+  // Garmin and Strava both write one average heart rate per activity. Nothing that logs
+  // weighted sets exports a pulse, so this only ever reaches a cardio row.
+  ['hr', ['avg hr', 'average heart rate', 'avg heart rate', 'heart rate', 'average hr']],
   ['note', ['comment', 'comments', 'notes', 'note']],
 ]
 
@@ -359,9 +362,15 @@ export function parseWorkoutCSV(text, { unit = 'kg' } = {}) {
     const isCardio = (km > 0 || mins > 0) && !reps
     // `u` carries the row's own unit into the conversion pass below and is dropped there —
     // it never reaches the stored set.
+    // The distance is what the watch measured, so it is what gets stored — collapsing it
+    // into a speed and deriving it back would lose the only figure the file was sure of.
     const set = isCardio
-      ? { min: mins || 0, speed: mins > 0 ? Math.round(km / (mins / 60) * 10) / 10 : 0, done: true }
+      ? { min: mins || 0, ...(km > 0 ? { km: Math.round(km * 100) / 100 } : {}), done: true }
       : { w, r: reps || 0, done: true, u: rowUnit }
+    if (isCardio) {
+      const hr = num(cell(r, 'hr'))
+      if (hr > 0) set.hr = Math.round(hr)
+    }
     // Effort rides along only where the app can show it again: a weighted rep set. A treadmill
     // row with an RPE would have nowhere to put it. A set is kept on one scale, so a file
     // carrying both columns is read as RIR — the same precedence setLabel reads them back with.
@@ -498,9 +507,132 @@ export function parseBodyweight(text, { unit = 'kg' } = {}) {
   }
 }
 
+/**
+ * Cardio sessions out of an Apple Health export.
+ *
+ * Same scan-don't-parse approach the body-mass reader uses, and for the same reason: the
+ * file is often several hundred megabytes and building a DOM would take the tab with it.
+ *
+ * Health has written workouts two ways. Older exports put everything on the element —
+ * duration, totalDistance and their units as attributes. Since iOS 16 the distance moved
+ * into a WorkoutStatistics child, and the heart rate has always lived there. Both shapes are
+ * read, because an export sitting on someone's disk is whatever iOS wrote the day they made
+ * it, not whatever is current.
+ *
+ * Activities the exercise catalogue has no entry for become one of your own exercises rather
+ * than being dropped — the same promise the workout importer already makes.
+ */
+export function parseHealthWorkouts(text) {
+  const s = String(text)
+  if (!s.includes('<Workout ')) return { error: 'unrecognised' }
+
+  const attr = (tag, name) => {
+    const m = new RegExp(name + '="([^"]*)"').exec(tag)
+    return m ? m[1] : ''
+  }
+  // A metre or a mile in the file is still a kilometre in the app.
+  const toKmUnit = (value, unit) => {
+    const v = num(value)
+    if (!(v > 0)) return 0
+    const u = String(unit || 'km').toLowerCase()
+    if (u.startsWith('mi')) return v * 1.609344
+    if (u === 'm') return v / 1000
+    if (u === 'yd') return v * 0.0009144
+    return v
+  }
+  const toMinutes = (value, unit) => {
+    const v = num(value)
+    if (!(v > 0)) return 0
+    const u = String(unit || 'min').toLowerCase()
+    return u.startsWith('s') ? v / 60 : u.startsWith('h') ? v * 60 : v
+  }
+
+  const byDate = new Map()
+  const created = new Map(), resolved = new Map(), unmatched = new Set()
+  let matched = 0, sets = 0, skipped = 0
+  const blocks = s.match(/<Workout\b[^>]*(?:\/>|>[\s\S]*?<\/Workout>)/g) || []
+
+  for (const block of blocks) {
+    const open = /<Workout\b[^>]*?(?:\/?>)/.exec(block)?.[0] || block
+    const when = parseWhen(attr(open, 'startDate'))
+    if (!when) { skipped++; continue }
+
+    let min = toMinutes(attr(open, 'duration'), attr(open, 'durationUnit'))
+    let km = toKmUnit(attr(open, 'totalDistance'), attr(open, 'totalDistanceUnit'))
+    let hr = 0
+    for (const stat of block.match(/<WorkoutStatistics\b[^>]*>/g) || []) {
+      const type = attr(stat, 'type')
+      if (/DistanceWalkingRunning|DistanceCycling|DistanceSwimming/.test(type) && !(km > 0)) {
+        km = toKmUnit(attr(stat, 'sum'), attr(stat, 'unit'))
+      } else if (/HeartRate/.test(type)) {
+        hr = num(attr(stat, 'average'))
+      }
+    }
+    if (!(min > 0) && !(km > 0)) { skipped++; continue }
+
+    // "HKWorkoutActivityTypeHighIntensityIntervalTraining" is not a name anybody reads.
+    const raw = attr(open, 'workoutActivityType').replace(/^HKWorkoutActivityType/, '')
+    const name = (raw.replace(/([a-z])([A-Z])/g, '$1 $2').trim() || 'workout').toLowerCase()
+    const key = keyOf(name)
+    let id = resolved.get(key)
+    if (id === undefined) { id = matchExercise(name); resolved.set(key, id) }
+    if (id) matched++
+    else {
+      let c = created.get(key)
+      if (!c) {
+        c = { id: 'im' + uid(), n: name, custom: true, eq: 'custom', tg: '', desc: '', bp: 'cardio' }
+        created.set(key, c)
+        unmatched.add(name)
+      }
+      id = c.id
+    }
+
+    const set = {
+      min: Math.round(min),
+      ...(km > 0 ? { km: Math.round(km * 100) / 100 } : {}),
+      ...(hr > 0 ? { hr: Math.round(hr) } : {}),
+      done: true
+    }
+    let day = byDate.get(when.d)
+    if (!day) byDate.set(when.d, day = { ex: new Map(), start: when.t })
+    if (!day.ex.has(id)) day.ex.set(id, [])
+    day.ex.get(id).push(set)
+    sets++
+  }
+
+  if (!sets) return { error: 'unrecognised' }
+  const dates = [...byDate.keys()].sort()
+  const workouts = dates.map(d => {
+    const day = byDate.get(d)
+    const base = new Date(d + 'T00:00:00').getTime()
+    const start = base + (day.start ?? 12 * 3600000)
+    const minutes = [...day.ex.values()].flat().reduce((n, x) => n + (x.min || 0), 0)
+    return {
+      id: 'iw' + uid(), d, start, end: start + minutes * 60000,
+      routineId: null, name: 'Apple Health', prs: [],
+      // The mode is carried explicitly: a custom exercise created here is cardio by body
+      // part, but a matched catalogue entry must not be re-read as a set of reps.
+      entries: [...day.ex.entries()].map(([id, ss]) => ({ id, target: { mode: 'cardio' }, sets: ss, topW: null }))
+    }
+  })
+  return {
+    kind: 'workouts', source: 'Apple Health',
+    workouts, customEx: [...created.values()],
+    sets, matched, created: created.size, unmatched: [...unmatched], skipped,
+    fileUnit: '', mixedUnits: false, converted: false, warmups: 0, rirSets: 0, rpeSets: 0,
+    from: dates[0], to: dates[dates.length - 1]
+  }
+}
+
 /** Sniff the file and parse it as whatever it is. */
 export function parseImport(text, opts) {
   const s = String(text)
+  // A Health export usually holds both; workouts are the more specific find, so they win
+  // and the weight reader stays the fallback it always was.
+  if (s.includes('<Workout ')) {
+    const asCardio = parseHealthWorkouts(s)
+    if (!asCardio.error) return asCardio
+  }
   if (s.includes('HKQuantityTypeIdentifier') || /^\s*</.test(s)) return parseBodyweight(s, opts)
   const asWorkouts = parseWorkoutCSV(s, opts)
   if (!asWorkouts.error) return asWorkouts
