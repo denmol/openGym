@@ -672,7 +672,7 @@ export default {
   'model did not return json': 'Modellen svarade inte med en plan. Försök igen.',
   'not signed in': 'Du är inte inloggad.',
   // --- food and nutrition ---
-  'Food': 'Mat',
+  'Food': 'Kost',
   'Carbs': 'Kolhydrater',
   'Calories': 'Kalorier',
   'of which sugars': 'varav sockerarter',

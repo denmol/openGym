@@ -16,6 +16,7 @@ const P = {
   /* ---- navigation ---- */
   house: <path d="M3.5 10.7 12 3.8l8.5 6.9M5.9 9.4V19a1.4 1.4 0 0 0 1.4 1.4h9.4A1.4 1.4 0 0 0 18.1 19V9.4" />,
   calendar: <><rect x="3.4" y="5.2" width="17.2" height="15.4" rx="3.2" /><path d="M8.2 3.4v3.4M15.8 3.4v3.4M3.4 10.2h17.2" /></>,
+  forkKnife: <><path d="M6 3.6v6.2M3.8 3.6v4.1A2.2 2.2 0 0 0 6 9.9a2.2 2.2 0 0 0 2.2-2.2V3.6M6 9.9v10.5" /><path d="M15.8 20.4V3.6c2.8 1.6 4.4 4.2 4.4 7.2h-4.4" /></>,
   chart: <path d="M4.5 20.2V13M9.5 20.2V6.4M14.5 20.2v-5.1M19.5 20.2V9.6" />,
   magnifier: <><circle cx="11" cy="11" r="7" /><path d="m20.5 20.5-4.4-4.4" /></>,
   // Body, lens and the little bump over the shutter. Drawn rather than borrowed so it
