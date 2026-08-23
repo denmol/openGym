@@ -26,6 +26,9 @@ export const DEF = {
   // ("my breakfast") and myFoods are the user's own entries — the same relationship
   // customEx has with the exercise catalogue.
   meals: [], myMeals: [], myFoods: [],
+  // Portions the user weighed once, per food (lib/portions.js): "1 st = 61 g" for their
+  // eggs, their bread. What makes logging possible without a scale on the counter.
+  portions: [],
   // Diabetes mode (lib/diabetes.js). null until someone turns it on in Settings — read it
   // through healthOf, which overlays the defaults, rather than reaching in here.
   health: null,

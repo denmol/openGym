@@ -258,6 +258,17 @@ h4.sec{
   letter-spacing:-.012em;background:var(--surface-2);color:var(--label);
   transition:transform var(--fast) var(--ease),background var(--fast),opacity var(--fast);
 }
+/* .btn is full-width by default, which is right for the stacked buttons that fill a sheet
+   and wrong for a control sitting inside a row. Two of them beside a stepper each claimed
+   the whole row, squeezed the stepper to nothing and overlapped each other — and an
+   icon-only ghost button did the same to the text beside it, one word per line, which is
+   what a 44px cross had been doing to the meal form since it was written. flex:none does
+   not help: its basis is auto, which resolves to that width:100%. */
+.btn.inline{width:auto;flex:0 0 auto;padding:11px 13px;font-size:15px;gap:5px}
+.btn.inline .icn{font-size:15px}
+.btn.icon{width:auto;flex:0 0 auto;padding:8px}
+.row > .grow{flex:1;min-width:0}
+.stp.grow{flex:1;min-width:96px}
 .btn .icn{font-size:19px}
 .btn:active{transform:scale(.975)}
 .btn.primary{background:var(--acc);color:var(--on-acc)}

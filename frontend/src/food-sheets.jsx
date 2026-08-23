@@ -13,6 +13,10 @@ import { Button, Segmented, Stepper } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
 import { searchFoods, foodMap, foodOf, hasFoodDb, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import { totalsOf, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
+import {
+  unitsFor, unitById, gramsOf, lastAmounts, defaultAmount, amountLabel,
+  newPortion, densityFor, UNIT_LABEL
+} from './lib/portions.js'
 
 const update = (...a) => useStore.getState().update(...a)
 const ui = () => useUI.getState()
@@ -31,6 +35,87 @@ export function Macros({ totals, big }) {
   </div>
 }
 
+/* ============================ how much of it ============================ */
+
+// A unit's name as shown. The catalogue is Swedish and so are the measures in it, so the
+// abbreviations pass through t() rather than being printed raw.
+const unitName = u => (u ? t(UNIT_LABEL[u.n] || u.n) : 'g')
+
+/**
+ * "≈ 58 g" for an estimate, "58 g" for something weighed. The ≈ is doing real work, so it
+ * has to mean the same thing everywhere: a suggested portion and a volume measure are both
+ * approximations — one from an average, one from an assumed density — and only a portion
+ * someone put on a scale is not.
+ */
+export const isEstimate = u => !!u && !u.base && (u.suggested || u.volume)
+const grams = (u, g) => (isEstimate(u) ? '≈ ' : '') + g + ' g'
+const unitWeight = u => (u.base ? null : grams(u, u.g))
+
+function WeighForm({ food, name, close, onSaved }) {
+  const [n, setN] = useState(name || '')
+  const [g, setG] = useState('')
+  const save = () => {
+    const p = newPortion({ fid: food.id, n, g: String(g).replace(',', '.') })
+    if (!p) { toast(t('Give it a name and a weight in grams.')); return }
+    // Re-weighing replaces the old one rather than sitting beside it: two portions called
+    // "st" for the same food is a choice nobody should be asked to make.
+    update(s => {
+      s.portions = [...(s.portions || []).filter(x => !(x.fid === p.fid && x.n === p.n)), p]
+    })
+    close()
+    toast(t('1 {0} is {1} g from now on', t(UNIT_LABEL[p.n] || p.n), p.g))
+    if (onSaved) onSaved(p)
+  }
+  return <>
+    <h3>{t('Weigh it once')}</h3>
+    <div className="muted small" style={{ marginBottom: 12, lineHeight: 1.45 }}>
+      {t('Put one on the scale and type what it says. From then on openGym counts yours, not an average — and you never weigh it again.')}
+    </div>
+    <div className="dim small" style={{ marginBottom: 10 }}>{food.n}</div>
+    <div className="row" style={{ gap: 10 }}>
+      <input className="input" style={{ flex: 1 }} placeholder={t('st')} value={n} onChange={e => setN(e.target.value)} />
+      <input className="input" inputMode="decimal" style={{ width: 110, textAlign: 'right' }}
+        placeholder="g" value={g} onChange={e => setG(e.target.value)} />
+    </div>
+    <div style={{ height: 14 }} />
+    <Button variant="primary" onClick={save}>{t('Save')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </>
+}
+
+export const weighSheet = (food, name, onSaved) =>
+  ui().openSheet(close => <WeighForm food={food} name={name} close={close} onSaved={onSaved} />)
+
+function UnitPicker({ food, current, close, onPick }) {
+  const S = useStore(s => s.S)
+  const units = unitsFor(S, food)
+  const dens = densityFor(food)
+  return <>
+    <h3>{t('Amount in')}</h3>
+    <div className="dim small" style={{ marginBottom: 10 }}>{food.n}</div>
+    {units.map(u => <button key={u.id} className="lrow tap" onClick={() => { close(); onPick(u) }}>
+      <span className="lrow-m">
+        <span className="lrow-t">{u.base ? t('Grams') : '1 ' + unitName(u)}</span>
+        {!u.base && <span className="lrow-s">
+          {unitWeight(u)}
+          {u.suggested && ' · ' + (u.vary ? t('a rough average — worth weighing') : t('an average, tap Weigh to use yours'))}
+          {u.volume && dens.water && ' · ' + t('counted as water')}
+          {u.volume && dens.vary && ' · ' + t('varies with how you pack it')}
+        </span>}
+      </span>
+      {u.id === current && <Icon name="check" className="lrow-k" />}
+    </button>)}
+    <div style={{ height: 12 }} />
+    <Button icon="scale" onClick={() => { close(); weighSheet(food, '', onPick) }}>{t('Weigh a portion')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </>
+}
+
+const unitSheet = (food, current, onPick) =>
+  ui().openSheet(close => <UnitPicker food={food} current={current} close={close} onPick={onPick} />)
+
 /* ============================ add / edit a meal ============================ */
 
 function MealForm({ existing, preset, close }) {
@@ -42,10 +127,26 @@ function MealForm({ existing, preset, close }) {
 
   const totals = totalsOf(items, foods)
   const hits = q.trim() ? searchFoods(st, q, 25) : []
+  const last = lastAmounts(st)
 
-  const add = f => { setItems(x => [...x, { fid: f.id, g: 100 }]); setQ('') }
-  const setG = (i, g) => setItems(x => x.map((it, n) => (n === i ? { ...it, g: Math.max(1, g) } : it)))
+  // A food opens at the amount it was logged at last time, which after a week is the amount
+  // it is always logged at. Failing that, one of whatever it is counted in.
+  const add = f => {
+    const d = defaultAmount(st, f, last)
+    setItems(x => [...x, { fid: f.id, u: d.unit.id, q: d.q, g: gramsOf(d.unit, d.q) }])
+    setQ('')
+  }
   const drop = i => setItems(x => x.filter((_, n) => n !== i))
+
+  // Grams are recomputed from unit × count on every change and stored alongside, so the
+  // nutrition arithmetic never has to know that portions exist and a portion reweighed
+  // next month cannot rewrite what was eaten today.
+  const setAmount = (i, unit, qty) => setItems(x => x.map((it, n) => {
+    if (n !== i) return it
+    const qq = Math.max(unit.base ? 1 : 0.25, Number(qty) || 0)
+    const g = gramsOf(unit, qq)
+    return unit.base ? { fid: it.fid, u: 'g', q: g, g } : { fid: it.fid, u: unit.id, q: qq, g }
+  }))
 
   const save = () => {
     const clean = items.filter(i => i.fid && Number(i.g) > 0)
@@ -77,15 +178,35 @@ function MealForm({ existing, preset, close }) {
       {items.map((it, i) => {
         const f = foods[it.fid]
         const one = totalsOf([it], foods)
-        return <div key={i} className="row between" style={{ gap: 10, padding: '9px 0', borderBottom: '1px solid var(--sep)' }}>
-          <div className="grow" style={{ minWidth: 0 }}>
-            <div className="tt" style={{ fontSize: 15 }}>{f ? f.n : t('Unknown food')}</div>
-            <div className="small dim">{fmtNum(one.carb)} g {t('Carbs')} · {fmtNum(one.kcal)} kcal</div>
+        const unit = unitById(st, f, it.u || 'g')
+        const isG = unit.base
+        return <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--sep)' }}>
+          <div className="row between" style={{ gap: 10 }}>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <div className="tt" style={{ fontSize: 15 }}>{f ? f.n : t('Unknown food')}</div>
+              <div className="small dim">
+                {fmtNum(one.carb)} g {t('Carbs')} · {fmtNum(one.kcal)} kcal
+                {/* The grams are always on screen, so a portion weight that is wrong is
+                    something you can see rather than something you find out later. */}
+                {!isG && ' · ' + grams(unit, it.g)}
+              </div>
+            </div>
+            <button className="btn ghost icon" onClick={() => drop(i)} aria-label={t('Remove')}>
+              <Icon name="xmark" />
+            </button>
           </div>
-          <Stepper value={it.g} step={10} decimal={false} unit="g" onChange={v => setG(i, v)} />
-          <button className="btn ghost" style={{ padding: 6 }} onClick={() => drop(i)} aria-label={t('Remove')}>
-            <Icon name="xmark" />
-          </button>
+          <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+            <Stepper className="grow" value={it.q} step={isG ? 10 : 1} decimal={!isG}
+              onChange={v => setAmount(i, unit, v)} />
+            <button className="btn inline"
+              onClick={() => unitSheet(f, unit.id, u => setAmount(i, u, u.base ? it.g : 1))}>
+              {unitName(unit)}<Icon name="chevronDown" />
+            </button>
+            {unit.suggested && <button className="btn inline ghost"
+              onClick={() => weighSheet(f, unit.n, p => setAmount(i, { ...p, id: p.id }, it.q))}>
+              {t('Weigh')}
+            </button>}
+          </div>
         </div>
       })}
       <div style={{ paddingTop: 12 }}><Macros totals={totals} big /></div>
@@ -96,12 +217,18 @@ function MealForm({ existing, preset, close }) {
       <input className="input" placeholder={t('Search food…')} value={q} onChange={e => setQ(e.target.value)} /></div>
 
     {q.trim() && <div style={{ margin: '10px 0' }}>
-      {hits.map(f => <button key={f.id} className="lrow tap" onClick={() => add(f)}>
-        <span className="lrow-m">
-          <span className="lrow-t">{f.n}</span>
-          <span className="lrow-s">{fmtNum(f.per100.carb ?? 0)} g {t('Carbs')} · {fmtNum(f.per100.kcal ?? 0)} kcal {t('per 100 g')}</span>
-        </span>
-      </button>)}
+      {hits.map(f => {
+        const d = defaultAmount(st, f, last)
+        return <button key={f.id} className="lrow tap" onClick={() => add(f)}>
+          <span className="lrow-m">
+            <span className="lrow-t">{f.n}</span>
+            <span className="lrow-s">
+              {!d.unit.base && <>{fmtNum(d.q)} {unitName(d.unit)} · </>}
+              {fmtNum(f.per100.carb ?? 0)} g {t('Carbs')} · {fmtNum(f.per100.kcal ?? 0)} kcal {t('per 100 g')}
+            </span>
+          </span>
+        </button>
+      })}
       {!hits.length && <div className="dim small" style={{ padding: '10px 2px' }}>
         {hasFoodDb() ? t('No match') : t('The food database is not built yet — add it as your own food below.')}
       </div>}
@@ -281,8 +408,10 @@ function MealDetail({ meal, close }) {
     {(meal.items || []).map((it, i) => {
       const f = foodOf(st, it.fid)
       const one = totalsOf([it], foods)
+      const u = unitById(st, f, it.u || 'g')
       return <div key={i} className="row between" style={{ padding: '8px 0', borderTop: '1px solid var(--sep)' }}>
-        <span className="grow">{f ? f.n : t('Unknown food')}<span className="dim small"> · {it.g} g</span></span>
+        <span className="grow">{f ? f.n : t('Unknown food')}
+          <span className="dim small"> · {amountLabel(it, unitName(u))}</span></span>
         <span className="small dim">{fmtNum(one.carb)} g</span>
       </div>
     })}

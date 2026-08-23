@@ -857,4 +857,29 @@ export default {
   'Self-host openGym': 'Kör openGym själv',
   'Passkey sign-in, sync across your devices, your own data.': 'Inloggning med passkey, synk mellan dina enheter, dina egna data.',
   'Close': 'Stäng',
+
+  // --- portions and amounts ---
+  // The measure abbreviations. Swedish msk/tsk are the same words the recipe uses, so these
+  // are translations rather than conversions — the millilitres behind them do not change.
+  'g': 'g',
+  'dl': 'dl',
+  'tbsp': 'msk',
+  'tsp': 'tsk',
+  'ml': 'krm',
+  'pcs': 'st',
+  'slice': 'skiva',
+  'portion': 'portion',
+  'piece': 'bit',
+  'Grams': 'Gram',
+  'Amount in': 'Mängd i',
+  'Weigh': 'Väg',
+  'Weigh a portion': 'Väg en portion',
+  'Weigh it once': 'Väg en gång',
+  'Put one on the scale and type what it says. From then on openGym counts yours, not an average — and you never weigh it again.': 'Lägg en på vågen och skriv vad den säger. Sedan räknar openGym med din, inte ett medelvärde — och du behöver aldrig väga den igen.',
+  'Give it a name and a weight in grams.': 'Ge den ett namn och en vikt i gram.',
+  '1 {0} is {1} g from now on': '1 {0} är {1} g från och med nu',
+  'an average, tap Weigh to use yours': 'ett medelvärde, tryck Väg för att använda din',
+  'a rough average — worth weighing': 'ett grovt medelvärde — värt att väga',
+  'counted as water': 'räknas som vatten',
+  'varies with how you pack it': 'varierar med hur hårt du packar',
 }

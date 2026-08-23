@@ -67,7 +67,16 @@ export const hasMeals = (st, iso) => mealsOn(st, iso).length > 0
  */
 export function scaleItems(items, factor) {
   const f = Number(factor) || 1
-  return (items || []).map(it => ({ fid: it.fid, g: Math.max(1, Math.round((Number(it.g) || 0) * f)) }))
+  return (items || []).map(it => {
+    const out = { fid: it.fid, g: Math.max(1, Math.round((Number(it.g) || 0) * f)) }
+    // Grams stay authoritative, but half a two-egg breakfast should read "1 st", not
+    // "58 g" — the count is what the person recognises.
+    if (it.u && it.u !== 'g' && Number(it.q) > 0) {
+      out.u = it.u
+      out.q = Math.round(Number(it.q) * f * 100) / 100
+    }
+    return out
+  })
 }
 
 /** A fresh meal entry, ready to store. */

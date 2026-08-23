@@ -45,11 +45,11 @@ export default function Food() {
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 8 }}>
-        <button className="btn ghost" style={{ padding: 6 }} onClick={() => setDay(shift(day, -1))} aria-label={t('Prev')}>
+        <button className="btn ghost icon" onClick={() => setDay(shift(day, -1))} aria-label={t('Prev')}>
           <Icon name="chevronLeft" />
         </button>
         <span className="dim small">{isToday ? t('Today') : day}</span>
-        <button className="btn ghost" style={{ padding: 6 }} disabled={isToday}
+        <button className="btn ghost icon" disabled={isToday}
           onClick={() => setDay(shift(day, 1))} aria-label={t('Next')}>
           <Icon name="chevronRight" />
         </button>
@@ -128,7 +128,7 @@ export default function Food() {
       <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Saved meals')}</h2>
       {(S.myMeals || []).map(m => <div key={m.id} className="row between" style={{ padding: '9px 0', borderTop: '1px solid var(--sep)' }}>
         <span className="grow" style={{ minWidth: 0 }}>{m.n}</span>
-        <button className="btn ghost" style={{ padding: 6, flex: 'none' }} onClick={() => deleteMyMeal(m)} aria-label={t('Remove')}>
+        <button className="btn ghost icon" onClick={() => deleteMyMeal(m)} aria-label={t('Remove')}>
           <Icon name="trash" />
         </button>
       </div>)}
