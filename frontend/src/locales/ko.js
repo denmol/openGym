@@ -635,4 +635,5 @@ export default {
   '{0} {1} over': '{0} {1} 초과',
   '{0} {1} over the maximum': '상한을 {0} {1} 초과',
   '{0} {1} to go': '{0} {1} 부족',
+  'Daily target for {0}. Suggested: {1} {2}': '{0}의 하루 목표. 제안: {1} {2}',
 }

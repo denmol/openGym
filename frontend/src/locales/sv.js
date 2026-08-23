@@ -1230,4 +1230,5 @@ export default {
   '{0} {1} over': '{0} {1} över',
   '{0} {1} over the maximum': '{0} {1} över taket',
   '{0} {1} to go': '{0} {1} kvar att nå',
+  'Daily target for {0}. Suggested: {1} {2}': 'Dagligt mål för {0}. Förslag: {1} {2}',
 }

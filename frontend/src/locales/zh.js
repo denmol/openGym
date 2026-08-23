@@ -635,4 +635,5 @@ export default {
   '{0} {1} over': '超出 {0} {1}',
   '{0} {1} over the maximum': '超过上限 {0} {1}',
   '{0} {1} to go': '还差 {0} {1}',
+  'Daily target for {0}. Suggested: {1} {2}': '{0} 的每日目标。建议：{1} {2}',
 }
