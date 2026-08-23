@@ -8,20 +8,23 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { todayISO, isoOf, fmtNum } from '../lib/format.js'
-import { foodMap, hasFoodDb, FOODS_SOURCE, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from '../lib/foods.js'
+import { foodMap, hasFoodDb, FOODS_SOURCE } from '../lib/foods.js'
 import { mealsOn, dayTotals, mealTotals, nutrientTotal, MEAL_NAME } from '../lib/nutrition.js'
 import { coachProfileOf } from '../lib/coach-profile.js'
 import { lastBW } from '../lib/history.js'
 import {
-  NUTRITION_SAFETY_KEYS, cleanNutritionProfile, dailyNutritionReferences, formatNutritionPlanningValue,
-  formatNutritionReference, nutritionAiGate, nutritionPlanningValues, nutritionReferenceState,
-  nutritionSafetyToday, safetyReviewCurrent, weightKgOf
+  cleanNutritionProfile, nutritionAiGate, nutritionReferenceState,
+  nutritionSafetyToday, weightKgOf
 } from '../lib/nutrition-goals.js'
+import {
+  HEADLINE_NUTRIENTS, PROGRESS_NUTRIENTS, nutritionDayPlan, nutritionDayRows
+} from '../lib/nutrition-plan.js'
 import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
 import { mealSheet, quickLogSheet, mealDetailSheet, ownFoodSheet, deleteMyMeal, Macros } from '../food-sheets.jsx'
-import { nutritionAssistSheet, nutritionGoalsSheet } from '../nutrition-sheets.jsx'
+import { nutritionAssistSheet, nutritionGoalInfoSheet, nutritionGoalsSheet } from '../nutrition-sheets.jsx'
 import { glucoseSheet, doseSheet, entrySheet, Reading } from '../glucose-sheets.jsx'
 import { Button } from '../components/ui.jsx'
+import DayGoals, { GoalRow } from '../components/DayGoals.jsx'
 import Icon from '../components/Icon.jsx'
 
 const shift = (iso, days) => {
@@ -35,53 +38,48 @@ const foodValue = (food, key) => {
   return value == null || String(value).trim() === '' ? '—' : fmtNum(value)
 }
 
-function NutrientDetails({ totals, goals, referenceState, planning }) {
-  const incomplete = NUTRIENTS.some(key => nutrientTotal(totals, key) == null)
+// One missing field at a time, named, with the button that fixes it. The screen used to
+// show two paragraphs listing everything the estimate could possibly need, because a bare
+// null was all it had to go on — which meant nobody could tell whether the thing standing
+// in the way was their age or a weight logged before units were stored.
+const BLOCKED_TEXT = {
+  goal_missing: 'Choose a nutrition goal to get daily values to follow.',
+  age_missing: 'Add your age in Nutrition goals to calculate daily values.',
+  age_not_adult: 'Daily values for under-18s belong with a care team, so Dagsnav does not estimate them.',
+  sex_missing: 'Choose the sex the resting-energy equation should use.',
+  height_missing: 'Add your height in Nutrition goals to calculate daily values.',
+  weight_missing: 'Log a body weight to calculate daily values.',
+  weight_unit_unknown: 'Your last weight was logged without a unit. Enter it again in Nutrition goals.',
+  safety_unanswered: 'Answer the two health questions in Nutrition goals to show daily values.',
+  safety_expired: 'Confirm your health answers again — the last review is over 90 days old.',
+  clinical_review: 'Daily values are paused because your health answers need professional adaptation.',
+  estimate_unavailable: 'Add age, sex, height and a logged weight to calculate daily values.'
+}
+
+function BlockedNote({ blocked }) {
+  const text = BLOCKED_TEXT[blocked.reason]
+  if (!text) return null
+  return <div className="dblocked" role="note">
+    <Icon name={blocked.fix === 'clinician' ? 'shield' : 'target'} />
+    <div>
+      {t(text)}
+      {blocked.fix !== 'clinician' && <div style={{ marginTop: 8 }}>
+        <Button size="sm" variant="tinted" onClick={nutritionGoalsSheet}>{t('Open nutrition goals')}</Button>
+      </div>}
+    </div>
+  </div>
+}
+
+function NutrientDetails({ rows, onInfo }) {
+  const incomplete = rows.some(row => row.complete === false)
   return <details className="nutrient-details">
     <summary>
       <span>{t('All nutrients')}</span>
       {incomplete && <span className="nutrient-incomplete">{t('Incomplete')}</span>}
     </summary>
-    <dl>
-      {NUTRIENTS.map(key => {
-        const value = nutrientTotal(totals, key)
-        const target = goals.targets[key]
-        const paused = referenceState.pausedTargets.includes(key)
-        const references = dailyNutritionReferences(referenceState, key)
-        const calculated = !paused && planning && (key === 'kcal'
-          ? planning.goalKcal || planning.maintenanceKcal
-          : planning.grams?.[key])
-        return <div key={key} className={value == null ? 'incomplete' : ''}>
-          <dt>{t(NUTRIENT_NAME[key])}</dt>
-          <dd>
-            {value == null ? <><span>—</span><small>{t('Some logged foods are missing this value.')}</small></>
-              : <span>{fmtNum(value)} {NUTRIENT_UNIT[key]}</span>}
-            {target != null && <small className={paused ? 'paused-target' : ''}>
-              {paused
-                ? t('Own target: Paused — needs review')
-                : t('Own target: {0} {1}', fmtNum(target), NUTRIENT_UNIT[key])}
-            </small>}
-            {calculated && <small>
-              {t(key === 'kcal'
-                ? planning.goalKcal && planning.goalBasis === 'loss_deficit'
-                  ? 'Weight-loss planning interval · NNR 2023 Henry + PAL · AHA/ACC 2026: {0}'
-                  : planning.goalKcal && planning.goalBasis === 'muscle_surplus'
-                    ? 'Muscle-gain planning interval · NNR 2023 Henry + PAL · Helms et al. 2023: {0}'
-                    : 'Estimated maintenance energy · NNR 2023 Henry + PAL: {0}'
-                : planning.macroBasisKcal.source === 'own_target'
-                  ? 'NNR range from your own energy target: {0}'
-                  : 'Calculated NNR range: {0}',
-              formatNutritionPlanningValue(calculated, dateLocale(), t(key === 'kcal' ? 'kcal/day' : 'g/day')))}
-            </small>}
-            {references.map(reference => <small key={reference.id}>
-              {t(reference.kind === 'example' ? 'Source example: {0}' : 'Reference: {0}',
-                formatNutritionReference(reference, dateLocale(), t(reference.unit)))}
-              {' · '}<a href={reference.sourceUrl} target="_blank" rel="noopener">{t(reference.source)}</a>
-            </small>)}
-          </dd>
-        </div>
-      })}
-    </dl>
+    <div className="dgoals" style={{ padding: '4px 0 12px' }}>
+      {rows.map(row => <GoalRow key={row.key} row={row} compact onInfo={onInfo} />)}
+    </div>
   </details>
 }
 
@@ -95,14 +93,22 @@ export default function Food() {
   const goals = cleanNutritionProfile(S.nutritionGoals)
   const person = coachProfileOf(S)
   const safetyToday = nutritionSafetyToday()
-  const planning = nutritionPlanningValues(goals, {
+  const bw = lastBW(S)
+  const plan = nutritionDayPlan(goals, {
     sex: person.sex, age: person.age, heightCm: person.heightCm,
-    weightKg: weightKgOf(lastBW(S)), today: safetyToday
+    weightKg: weightKgOf(bw), weightLogged: !!bw, today: safetyToday
   })
   const referenceState = nutritionReferenceState(goals, { age: person.age, today: safetyToday })
-  const visiblePlanning = planning
-  const planningSafetyReady = NUTRITION_SAFETY_KEYS.every(key => typeof goals.safety[key] === 'boolean') &&
-    safetyReviewCurrent(goals.safetyReviewedAt, safetyToday)
+  // Carbohydrate leads for anyone counting it; energy leads for everyone else. Same rows,
+  // and the one being counted is the one at the top.
+  const headline = dia
+    ? ['carb', ...HEADLINE_NUTRIENTS.filter(key => key !== 'carb')]
+    : HEADLINE_NUTRIENTS
+  const rows = nutritionDayRows(goals, plan, totals, headline)
+  const restRows = nutritionDayRows(goals, plan, totals,
+    PROGRESS_NUTRIENTS.filter(key => !headline.includes(key)))
+  const tracked = rows.some(row => row.goal != null)
+  const openInfo = row => nutritionGoalInfoSheet(row, goals, plan, referenceState)
   const localNotes = nutritionAiGate(goals, {
     age: person.age, today: safetyToday, diabetes: dia
   })
@@ -132,29 +138,25 @@ export default function Food() {
           <Icon name="chevronRight" />
         </button>
       </div>
-      <Macros totals={totals} big />
-      {goals.goal && !planningSafetyReady && <div className="nmedical" role="note">
+      {tracked ? <DayGoals rows={rows} onInfo={openInfo} /> : <Macros totals={totals} big />}
+      {plan.blocked && <BlockedNote blocked={plan.blocked} />}
+      {plan.reviewRequired && <div className="nmedical" role="note">
         <Icon name="shield" /><div>
-          {t('Confirm the safety answers in Nutrition goals to show calculated kcal and gram ranges.')}
+          {t('Your own targets stay paused until you confirm that you have reviewed them.')}
           <div style={{ marginTop: 8 }}><Button size="sm" variant="tinted" onClick={nutritionGoalsSheet}>
             {t('Open nutrition goals')}
           </Button></div>
         </div>
       </div>}
-      {goals.goal && planningSafetyReady && !planning && referenceState.pausedTargets.length === 0 &&
-        <div className="nmedical" role="note"><Icon name="info" /><div>
-          {t('Complete age, sex, height and a unit-tagged weight in Nutrition goals to show calculated kcal and gram ranges.')}
-          <div style={{ marginTop: 8 }}><Button size="sm" variant="tinted" onClick={nutritionGoalsSheet}>
-            {t('Open nutrition goals')}
-          </Button></div>
-        </div></div>}
-      {referenceState.notices.map(notice => <div key={notice.code} className="nmedical"
-        role={notice.severity === 'alert' ? 'alert' : 'note'}>
-        <Icon name={notice.severity === 'alert' ? 'info' : 'shield'} />
-        <div>{t(notice.message)}</div>
-      </div>)}
-      {meals.length > 0 && <NutrientDetails totals={totals} goals={goals}
-        referenceState={referenceState} planning={visiblePlanning} />}
+      {!plan.blocked && plan.energy.belowMicronutrientWatch && <div className="dnote">
+        {t('This plan is below 1,500 kcal/day, where the source identifies a high risk of inadequate micronutrient intake.')}
+      </div>}
+      {referenceState.notices.filter(notice => notice.code !== 'targets:review').map(notice =>
+        <div key={notice.code} className="nmedical" role={notice.severity === 'alert' ? 'alert' : 'note'}>
+          <Icon name={notice.severity === 'alert' ? 'info' : 'shield'} />
+          <div>{t(notice.message)}</div>
+        </div>)}
+      {restRows.length > 0 && <NutrientDetails rows={restRows} onInfo={openInfo} />}
       {meals.length > 0 && goals.goal && <div style={{ marginTop: 10 }}>
         <Button size="sm" variant="tinted" icon={localNotes ? 'shield' : 'sparkles'} onClick={() => nutritionAssistSheet(day, totals)}>
           {t(localNotes ? 'Care-team notes' : 'Explain with AI')}
