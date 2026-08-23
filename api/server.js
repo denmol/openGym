@@ -9,7 +9,9 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse
 } from '@simplewebauthn/server';
 import webpush from 'web-push';
-import { cleanNutritionContext, nutritionAnswer, nutritionFactCodes } from './nutrition-context.js';
+import {
+  decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
+} from './nutrition-context.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -580,49 +582,24 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
 
     const body = await readBody(req);
-    const context = cleanNutritionContext(body.context);
-    if (!context) return json(res, 400, { error: 'bad nutrition context' });
-
-    // A stale or hand-written client cannot hide a saved health flag from the consent view.
-    const stored = readState(user.id) || {};
-    const storedMedical = {
-      diabetes: stored.health?.on === true,
-      condition: stored.nutritionGoals?.condition === true,
-      medication: stored.nutritionGoals?.medication === true,
-      under18: Number(stored.coachProfile?.age) > 0 && Number(stored.coachProfile.age) < 18
-    };
-    if (Object.entries(storedMedical).some(([key, value]) => value && !context.medical[key])) {
-      return json(res, 409, { error: 'health context changed' });
-    }
-    const review = Object.values(context.medical).some(Boolean);
-
-    // Health flags never leave this server. This care-team note is fixed text, not AI text.
-    if (review) {
-      const sv = context.language === 'sv';
-      const answer = {
-        status: 'clinician_review',
-        summary: sv
-          ? 'Dagsnav använder inte AI för personliga kostmål när en hälsomarkering är aktiv. Dina sparade mål har inte ändrats.'
-          : 'Dagsnav does not use AI for personal nutrition targets when a health flag is active. Your saved targets have not changed.',
-        observations: [context.incomplete.length
-          ? (sv ? 'En eller flera näringsuppgifter saknas i dagens logg.' : 'One or more nutrient values are missing from the day log.')
-          : (sv ? 'Dagens registrerade näringsvärden kan tas med till vårdteamet.' : 'The logged nutrient values can be taken to your care team.')],
-        questions: sv
-          ? ['Vilka energi- och näringsmål är lämpliga för mig?', 'Hur vill ni att jag följer upp vikt, matlogg och behandling tillsammans?']
-          : ['Which energy and nutrient targets are appropriate for me?', 'How should I track weight, food logs and treatment together?']
-      };
-      return json(res, 200, { answer, local: true, usage: null, ...aiQuota(user.id) });
-    }
+    const today = new Date().toISOString().slice(0, 10);
+    const decision = decideNutritionAssist(body.context, readState(user.id), today);
+    if (decision.mode === 'invalid') return json(res, 400, { error: 'bad nutrition context' });
+    const context = decision.context;
+    if (decision.mode === 'local') return json(res, 200, {
+      answer: nutritionReviewAnswer(context), local: true, usage: null, ...aiQuota(user.id)
+    });
 
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
 
-    const facts = nutritionFactCodes(context);
+    const payload = nutritionAiPayload(context);
+    const facts = payload.facts;
     const messages = [
       {
         role: 'system',
         content: 'Select one to five supplied fact codes that are most useful to highlight. Prefer the selected goal, missing data and user-entered targets. You can only return codes from the supplied list. Return the required JSON object only.'
       },
-      { role: 'user', content: JSON.stringify({ language: context.language, facts }) }
+      { role: 'user', content: JSON.stringify(payload) }
     ];
 
     try {

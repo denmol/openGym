@@ -3,6 +3,30 @@
 
 const GOALS = new Set(['maintain', 'lose', 'muscle', 'health']);
 const KEYS = ['kcal', 'carb', 'sugar', 'prot', 'fat', 'sat', 'fib', 'salt'];
+const STORED_SAFETY_KEYS = [
+  'kidneyOrProteinRestriction', 'fluidOrSodiumRestriction',
+  'pregnancyOrBreastfeeding', 'eatingDisorder', 'severeGI',
+  'malnutritionRisk', 'otherClinicalNutrition', 'hypoglycemiaRiskMedication'
+];
+
+const isoDay = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  const stamp = Date.UTC(year, month - 1, day);
+  return new Date(stamp).toISOString().slice(0, 10) === value ? stamp / 86400000 : null;
+};
+
+const currentReview = (reviewedAt, today) => {
+  const reviewed = isoDay(reviewedAt);
+  const current = isoDay(today);
+  return reviewed != null && current != null && current >= reviewed && current - reviewed <= 90;
+};
+
+const adult = value => {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return false;
+  const age = Number(value);
+  return Number.isInteger(age) && age >= 18 && age <= 100;
+};
 
 const cleanNumber = (value, max) => {
   if ((typeof value !== 'number' && typeof value !== 'string') ||
@@ -50,9 +74,26 @@ export function cleanNutritionContext(raw) {
       diabetes: medical.diabetes === true,
       condition: medical.condition === true,
       medication: medical.medication === true,
-      under18: medical.under18 === true || (age != null && age < 18)
+      under18: medical.under18 === true || (age != null && age < 18),
+      nutritionSafety: medical.nutritionSafety === true
     }
   };
+}
+
+function storedNutritionNeedsLocal(state, today) {
+  const goals = state?.nutritionGoals;
+  if (!goals || typeof goals !== 'object' || !adult(state?.coachProfile?.age)) return true;
+  return state?.health?.on !== false || goals.condition !== false || goals.medication !== false ||
+    goals.incretinUse !== 'none' || goals.weightPhase !== null ||
+    !STORED_SAFETY_KEYS.every(key => goals.safety?.[key] === false) ||
+    !currentReview(goals.safetyReviewedAt, today) || goals.targetReviewRequired !== false;
+}
+
+export function decideNutritionAssist(rawContext, storedState, today) {
+  const context = cleanNutritionContext(rawContext);
+  if (!context) return { mode: 'invalid', context: null };
+  const clientLocal = Object.values(context.medical).some(Boolean);
+  return { mode: clientLocal || storedNutritionNeedsLocal(storedState, today) ? 'local' : 'ai', context };
 }
 
 /** The only facts the model may select. No number, demographic or medical value crosses. */
@@ -61,6 +102,27 @@ export function nutritionFactCodes(context) {
   for (const key of KEYS) facts.push(`${Object.hasOwn(context.day, key) ? 'known' : 'missing'}:${key}`);
   for (const key of KEYS) if (Object.hasOwn(context.targets, key)) facts.push(`target:${key}`);
   return facts;
+}
+
+export const nutritionAiPayload = context => ({
+  language: context.language,
+  facts: nutritionFactCodes(context)
+});
+
+export function nutritionReviewAnswer(context) {
+  const sv = context.language === 'sv';
+  return {
+    status: 'clinician_review',
+    summary: sv
+      ? 'Dagsnav använder inte AI för personliga kostmål när en hälsomarkering eller en ej aktuell säkerhetskontroll finns. Dina sparade mål har inte ändrats.'
+      : 'Dagsnav does not use AI for personal nutrition targets when a health flag or an unconfirmed safety review exists. Your saved targets have not changed.',
+    observations: [context.incomplete.length
+      ? (sv ? 'En eller flera näringsuppgifter saknas i dagens logg.' : 'One or more nutrient values are missing from the day log.')
+      : (sv ? 'Dagens registrerade näringsvärden kan tas med till vårdteamet.' : 'The logged nutrient values can be taken to your care team.')],
+    questions: sv
+      ? ['Vilka energi- och näringsmål är lämpliga för mig?', 'Hur vill ni att jag följer upp vikt, matlogg och behandling tillsammans?']
+      : ['Which energy and nutrient targets are appropriate for me?', 'How should I track weight, food logs and treatment together?']
+  };
 }
 
 const NAMES = {
