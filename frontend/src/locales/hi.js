@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{1} मिनट में {0} bpm',
   '{0} km': '{0} किमी',
   '{0} sessions': '{0} सत्र',
+  // --- steps ---
+  'Days of steps': 'कदमों वाले दिन',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'एक से अधिक डिवाइस ने कदम दर्ज किए। हर घंटे सबसे अधिक गिनने वाला डिवाइस लिया जाता है, ताकि कोई सैर दो बार न गिने और वह घंटा भी न छूटे जब सिर्फ़ एक डिवाइस साथ था।',
+  'No steps in this period.': 'इस अवधि में कोई कदम नहीं।',
+  'Steps': 'कदम',
+  'average over {0} days recorded': '{0} दर्ज दिनों का औसत',
+  'best day · {0}': 'सर्वश्रेष्ठ दिन · {0}',
+  'per day': 'प्रति दिन',
+  'steps/day': 'कदम/दिन',
+  '{0} days imported': '{0} दिन आयात किए',
+  '{0} days of steps imported': 'कदमों के {0} दिन आयात किए',
+  '{0} days recorded': '{0} दिन दर्ज',
 }

@@ -666,4 +666,16 @@ export default {
   '{0} bpm across {1} min': '{0} bpm über {1} min',
   '{0} km': '{0} km',
   '{0} sessions': '{0} Einheiten',
+  // --- steps ---
+  'Days of steps': 'Tage mit Schritten',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Mehr als ein Gerät hat Schritte erfasst. Jede Stunde nimmt das Gerät mit den meisten Schritten, damit ein Spaziergang nie doppelt zählt und eine Stunde, die nur ein Gerät begleitet hat, nie verloren geht.',
+  'No steps in this period.': 'Keine Schritte in diesem Zeitraum.',
+  'Steps': 'Schritte',
+  'average over {0} days recorded': 'Durchschnitt über {0} erfasste Tage',
+  'best day · {0}': 'bester Tag · {0}',
+  'per day': 'pro Tag',
+  'steps/day': 'Schritte/Tag',
+  '{0} days imported': '{0} Tage importiert',
+  '{0} days of steps imported': '{0} Tage mit Schritten importiert',
+  '{0} days recorded': '{0} erfasste Tage',
 }

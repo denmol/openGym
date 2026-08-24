@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{1} dakikada {0} bpm',
   '{0} km': '{0} km',
   '{0} sessions': '{0} antrenman',
+  // --- steps ---
+  'Days of steps': 'Adım kaydı olan günler',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Adımları birden fazla cihaz kaydetti. Her saat en çok sayan cihazı alır; böylece bir yürüyüş iki kez sayılmaz ve yanınızda tek cihaz olduğu bir saat kaybolmaz.',
+  'No steps in this period.': 'Bu dönemde adım yok.',
+  'Steps': 'Adım',
+  'average over {0} days recorded': '{0} kayıtlı günün ortalaması',
+  'best day · {0}': 'en iyi gün · {0}',
+  'per day': 'günlük',
+  'steps/day': 'adım/gün',
+  '{0} days imported': '{0} gün içe aktarıldı',
+  '{0} days of steps imported': '{0} günlük adım içe aktarıldı',
+  '{0} days recorded': '{0} kayıtlı gün',
 }

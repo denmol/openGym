@@ -38,7 +38,11 @@ export const DEF = {
   // Glucose readings, always stored in mmol/L whatever the profile displays, and insulin
   // doses in units. Both carry src: 'import' when they came out of a file, which is what
   // makes an import undoable without touching what was typed by hand.
-  glucose: [], doses: []
+  glucose: [], doses: [],
+  // One step count per day, from a watch export (lib/import-csv.js). Steps by the hour are
+  // a different feature: a quarter of a million records to render a daily average would be
+  // a poor trade, so only the day's figure is kept, with the source it was reconciled from.
+  steps: []
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -51,7 +55,7 @@ function loadState() {
 }
 
 const hasData = st => !!(st && (
-  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses']
+  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses', 'steps']
     .some(key => (st[key] || []).length) ||
   st.coachProfile || st.health || st.nutritionGoals || st.targetW != null || st.active
 ))

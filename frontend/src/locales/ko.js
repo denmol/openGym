@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{1}분 동안 {0} bpm',
   '{0} km': '{0} km',
   '{0} sessions': '{0}회 세션',
+  // --- steps ---
+  'Days of steps': '걸음 수 기록일',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': '두 대 이상의 기기가 걸음 수를 기록했습니다. 매시간 가장 많이 센 기기를 사용하므로 산책이 두 번 세어지지 않고, 한 기기만 지녔던 시간도 누락되지 않습니다.',
+  'No steps in this period.': '이 기간에 걸음 수가 없습니다.',
+  'Steps': '걸음 수',
+  'average over {0} days recorded': '기록된 {0}일 평균',
+  'best day · {0}': '최고 기록일 · {0}',
+  'per day': '하루',
+  'steps/day': '걸음/일',
+  '{0} days imported': '{0}일 가져옴',
+  '{0} days of steps imported': '걸음 수 {0}일치를 가져옴',
+  '{0} days recorded': '{0}일 기록',
 }
