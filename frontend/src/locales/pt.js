@@ -661,4 +661,14 @@ export default {
   '{0} days imported': '{0} dias importados',
   '{0} days of steps imported': '{0} dias de passos importados',
   '{0} days recorded': '{0} dias registados',
+  // --- sleep ---
+  'Nights of sleep': 'Noites com sono',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': 'Mais do que um dispositivo registou o sono. O tempo sobreposto é contado uma vez, não somado.',
+  'No sleep data in this period.': 'Sem dados de sono neste período.',
+  'Sleep': 'Sono',
+  'average over {0} nights recorded': 'média em {0} noites registadas',
+  'best night · {0}': 'melhor noite · {0}',
+  'per night': 'por noite',
+  'h/night': 'h/noite',
+  '{0} nights of sleep imported': '{0} noites de sono importadas',
 }

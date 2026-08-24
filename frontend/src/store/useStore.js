@@ -42,7 +42,10 @@ export const DEF = {
   // One step count per day, from a watch export (lib/import-csv.js). Steps by the hour are
   // a different feature: a quarter of a million records to render a daily average would be
   // a poor trade, so only the day's figure is kept, with the source it was reconciled from.
-  steps: []
+  steps: [],
+  // One asleep-minutes figure per night, from a watch export (lib/import-csv.js). A night is
+  // attributed to the evening it began, not the morning it ended.
+  sleep: []
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -55,7 +58,7 @@ function loadState() {
 }
 
 const hasData = st => !!(st && (
-  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses', 'steps']
+  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses', 'steps', 'sleep']
     .some(key => (st[key] || []).length) ||
   st.coachProfile || st.health || st.nutritionGoals || st.targetW != null || st.active
 ))

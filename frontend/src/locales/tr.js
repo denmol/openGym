@@ -661,4 +661,14 @@ export default {
   '{0} days imported': '{0} gün içe aktarıldı',
   '{0} days of steps imported': '{0} günlük adım içe aktarıldı',
   '{0} days recorded': '{0} kayıtlı gün',
+  // --- sleep ---
+  'Nights of sleep': 'Uyku kaydı olan geceler',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': 'Uykuyu birden fazla cihaz kaydetti. Çakışan süre bir kez sayılır, toplanmaz.',
+  'No sleep data in this period.': 'Bu dönemde uyku verisi yok.',
+  'Sleep': 'Uyku',
+  'average over {0} nights recorded': '{0} kayıtlı gecenin ortalaması',
+  'best night · {0}': 'en iyi gece · {0}',
+  'per night': 'gecelik',
+  'h/night': 'sa/gece',
+  '{0} nights of sleep imported': '{0} gecelik uyku içe aktarıldı',
 }

@@ -29,6 +29,24 @@ have been in the repository taken back out.
   single pass, and the confirmation screen counts each of them before anything is written.
 - Translated into all 13 UI languages.
 
+### Sleep, from the same export
+
+- 😴 **Nightly sleep duration imports from an Apple Health export.** Only time actually asleep
+  counts — time in bed before drifting off and time spent awake in the night are read and left
+  out. A night is attributed to the evening it began: a bedtime just before midnight and a
+  wake-up just after both land under the same date, rather than splitting across two.
+- **Overlapping sources are unioned, not summed.** A phone, a watch and a sleep app can all log
+  the same night, and unlike steps this is a duration — adding two overlapping recordings
+  together overstates the night directly rather than merely doubling a count. Every asleep
+  interval, from any source, is merged into non-overlapping spans first, and the spans are what
+  gets added up. The source that covered the most of the night is kept beside the total, so a
+  surprising figure can be traced rather than argued with.
+- 📊 **A Sleep card in Stats**: nightly average, best night, and a week-by-week chart, all in
+  hours and minutes. The average is over nights *recorded*, not nights in the window, for the
+  same reason the Steps card already works that way.
+- 📦 **Joins the single-pass Health import** alongside workouts, steps and weigh-ins.
+- Translated into all 13 UI languages.
+
 ### Cardio, in the units it was measured in
 
 Cardio was already a logging mode — 29 exercises, its own two-stepper row — but it could only

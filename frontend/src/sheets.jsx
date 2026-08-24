@@ -143,12 +143,15 @@ function ImportSummary({ parsed, close }) {
   const rows = {
     workouts: parsed.kind === 'workouts' || parsed.kind === 'health' ? parsed.workouts || [] : [],
     steps: parsed.kind === 'steps' || parsed.kind === 'health' ? parsed.steps || [] : [],
+    sleep: parsed.kind === 'sleep' || parsed.kind === 'health' ? parsed.sleep || [] : [],
     bodyweight: parsed.kind === 'bodyweight' || parsed.kind === 'health' ? parsed.bodyweight || [] : []
   }
   const isBW = parsed.kind === 'bodyweight'
   const newIn = (list, existing) => list.filter(r => !existing.some(x => x.d === r.d)).length
+  const total = rows.workouts.length + rows.steps.length + rows.sleep.length + rows.bodyweight.length
   const fresh = newIn(rows.workouts, st.workouts) + newIn(rows.steps, st.steps || [])
-    + newIn(rows.bodyweight, st.bodyweight)
+    + newIn(rows.sleep, st.sleep || []) + newIn(rows.bodyweight, st.bodyweight)
+  const have = total - fresh
 
   const doImport = () => {
     let res
@@ -158,10 +161,16 @@ function ImportSummary({ parsed, close }) {
       ? t('{0} days imported', res.added)
       : parsed.kind === 'steps'
         ? t('{0} days of steps imported', res.added)
-        : isBW
-          ? t('{0} weigh-ins imported', res.added)
-          : t('{0} workouts imported', res.added))
+        : parsed.kind === 'sleep'
+          ? t('{0} nights of sleep imported', res.added)
+          : isBW
+            ? t('{0} weigh-ins imported', res.added)
+            : t('{0} workouts imported', res.added))
   }
+  // A sleep session and a steps day are reconciled differently — intervals are unioned,
+  // hours are taken by their largest source — so each keeps its own note when more than one
+  // device contributed.
+  const sleepDedup = parsed.kind === 'sleep' ? parsed.deduplicated : parsed.sleepDeduplicated
 
   return <>
     <h3>{parsed.source ? t('Import from {0}', parsed.source) : t('Import history')}</h3>
@@ -172,6 +181,7 @@ function ImportSummary({ parsed, close }) {
     <div className="tiles" style={{ textAlign: 'left' }}>
       {rows.workouts.length > 0 && <div className="tile"><div className="l">{t('Workouts')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.workouts.length}</div></div>}
       {rows.steps.length > 0 && <div className="tile"><div className="l">{t('Days of steps')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.steps.length}</div></div>}
+      {rows.sleep.length > 0 && <div className="tile"><div className="l">{t('Nights of sleep')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.sleep.length}</div></div>}
       {rows.bodyweight.length > 0 && <div className="tile"><div className="l">{t('Weigh-ins')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.bodyweight.length}</div></div>}
       <div className="tile"><div className="l">{t('New')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fresh}</div></div>
       {rows.workouts.length > 0 && parsed.sets > 0 && <>
@@ -180,8 +190,11 @@ function ImportSummary({ parsed, close }) {
         <div className="tile"><div className="l">{t('Added as your own')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.created}</div></div>
       </>}
     </div>
-    {parsed.deduplicated && <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
+    {parsed.kind !== 'sleep' && parsed.deduplicated && <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
       {t('More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.')}
+    </div>}
+    {sleepDedup && <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
+      {t('More than one device recorded sleep. Overlapping time is counted once, not added together.')}
     </div>}
 
     {parsed.mixedUnits ? <div className="small" style={{ color: 'var(--yellow)', marginBottom: 10 }}>
@@ -228,7 +241,7 @@ export function importFromApp(file, onDone) {
     catch (e) { toast(t('Could not read that file')); return }
     if (parsed.error === 'empty') { toast(t('That file is empty')); return }
     if (parsed.error) { toast(t("That file's columns aren't recognised — see the docs for supported apps.")); return }
-    const anything = (parsed.workouts || []).length + (parsed.steps || []).length + (parsed.bodyweight || []).length
+    const anything = (parsed.workouts || []).length + (parsed.steps || []).length + (parsed.sleep || []).length + (parsed.bodyweight || []).length
     if (!anything) { toast(t('Nothing to import from that file')); return }
     ui().openSheet(close => <ImportSummary parsed={parsed} close={close} />)
     onDone && onDone()

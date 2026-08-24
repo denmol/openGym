@@ -728,6 +728,92 @@ export function parseSteps(text, { source = '' } = {}) {
 }
 
 /**
+ * Nightly sleep from an Apple Health export.
+ *
+ * A `HKCategoryTypeIdentifierSleepAnalysis` record is an interval, not a point value, and
+ * three kinds of it are written: InBed, Awake, and several Asleep* values (Core/Deep/REM on
+ * a watch, or the plain Asleep an app writes without stages). Only the Asleep* intervals are
+ * kept — InBed overstates a night by however long it took to fall asleep, and Awake is not
+ * sleep at all.
+ *
+ * A night is attributed by shifting its start back twelve hours before taking the date: a
+ * 23:40 bedtime and a 07:10 wake-up both land on the evening's date, so the night reads under
+ * the day it began rather than the day it ended.
+ *
+ * THE OVERLAP PROBLEM
+ *
+ * A phone, a watch and a third-party sleep app can all log the same night, and unlike steps
+ * this is a duration, not a count — summing overlapping intervals overstates it directly. The
+ * fix is a plain interval union: every Asleep* interval for a night, from any source, is
+ * merged into non-overlapping spans and the spans are summed. Two sources both covering
+ * 23:00–07:00 union to eight hours, not sixteen; two that only partly overlap union to their
+ * combined span, not their combined length. The source whose own raw intervals covered the
+ * most of the night is kept beside the total, the same trace-a-surprising-night purpose the
+ * steps importer's per-day source serves.
+ */
+export function parseSleep(text) {
+  const s = String(text)
+  if (!s.includes('HKCategoryTypeIdentifierSleepAnalysis')) return { error: 'unrecognised' }
+
+  const localMs = w => (w ? new Date(w.d + 'T00:00:00').getTime() + (w.t || 0) : null)
+  const nightOf = ms => {
+    const dt = new Date(ms - 12 * 3600000)
+    return `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}`
+  }
+
+  const byNight = new Map()          // night -> [{ start, end, src }]
+  const re = /<Record[^>]*type="HKCategoryTypeIdentifierSleepAnalysis"[^>]*\/?>/g
+  let m
+  while ((m = re.exec(s))) {
+    const tag = m[0]
+    const val = /value="([^"]*)"/.exec(tag)
+    if (!val || !/Asleep/.test(val[1])) continue
+    const st = /startDate="([^"]+)"/.exec(tag)
+    const en = /endDate="([^"]+)"/.exec(tag)
+    if (!st || !en) continue
+    const start = localMs(parseWhen(st[1]))
+    const end = localMs(parseWhen(en[1]))
+    if (!start || !end || end <= start) continue
+    const src = (/sourceName="([^"]*)"/.exec(tag) || [, 'Apple Health'])[1]
+    const night = nightOf(start)
+    let list = byNight.get(night)
+    if (!list) byNight.set(night, list = [])
+    list.push({ start, end, src })
+  }
+
+  if (!byNight.size) return { error: 'unrecognised' }
+  const sources = new Set()
+  let overlapped = false
+  const dates = [...byNight.keys()].sort()
+  const sleep = dates.map(d => {
+    const list = byNight.get(d).sort((a, b) => a.start - b.start)
+    const bySrc = new Map()
+    for (const r of list) { sources.add(r.src); bySrc.set(r.src, (bySrc.get(r.src) || 0) + (r.end - r.start)) }
+    if (bySrc.size > 1) overlapped = true
+
+    let min = 0, curStart = null, curEnd = null
+    for (const r of list) {
+      if (curStart === null) { curStart = r.start; curEnd = r.end; continue }
+      if (r.start <= curEnd) curEnd = Math.max(curEnd, r.end)
+      else { min += curEnd - curStart; curStart = r.start; curEnd = r.end }
+    }
+    if (curStart !== null) min += curEnd - curStart
+
+    let src = '', best = 0
+    for (const [name, ms] of bySrc) if (ms > best) { best = ms; src = name }
+    return { d, min: Math.round(min / 60000), src }
+  }).filter(row => row.min > 0)
+
+  if (!sleep.length) return { error: 'unrecognised' }
+  return {
+    kind: 'sleep', source: 'Apple Health',
+    sleep, sources: [...sources],
+    deduplicated: overlapped || sources.size > 1,
+    from: sleep[0].d, to: sleep[sleep.length - 1].d
+  }
+}
+
+/**
  * The parts of one Health export, as a single import.
  *
  * Each part keeps the shape its own reader produced, so the merge and the preview can go on
@@ -737,7 +823,7 @@ export function parseSteps(text, { source = '' } = {}) {
  */
 function combineHealth(parts) {
   const of = kind => parts.find(p => p.kind === kind) || null
-  const workouts = of('workouts'), steps = of('steps'), weights = of('bodyweight')
+  const workouts = of('workouts'), steps = of('steps'), sleepPart = of('sleep'), weights = of('bodyweight')
   const dates = parts.flatMap(p => [p.from, p.to]).filter(Boolean).sort()
   return {
     kind: 'health', source: 'Apple Health',
@@ -750,6 +836,9 @@ function combineHealth(parts) {
     steps: steps ? steps.steps : [],
     stepSources: steps ? steps.sources : [],
     deduplicated: steps ? steps.deduplicated : false,
+    sleep: sleepPart ? sleepPart.sleep : [],
+    sleepSources: sleepPart ? sleepPart.sources : [],
+    sleepDeduplicated: sleepPart ? sleepPart.deduplicated : false,
     bodyweight: weights ? weights.bodyweight : [],
     fileUnit: weights ? weights.fileUnit : '',
     mixedUnits: weights ? weights.mixedUnits : false,
@@ -762,11 +851,11 @@ function combineHealth(parts) {
 /** Sniff the file and parse it as whatever it is. */
 export function parseImport(text, opts) {
   const s = String(text)
-  // One Health export holds workouts, steps and weights together. Picking one and silently
-  // leaving the rest would mean feeding the same few hundred megabytes in three times, so
-  // everything that parses is taken in a single pass.
-  if (s.includes('HKQuantityTypeIdentifier') || s.includes('<Workout ')) {
-    const parts = [parseHealthWorkouts(s), parseSteps(s), parseBodyweight(s, opts)].filter(p => !p.error)
+  // One Health export holds workouts, steps, sleep and weights together. Picking one and
+  // silently leaving the rest would mean feeding the same few hundred megabytes in more than
+  // once, so everything that parses is taken in a single pass.
+  if (s.includes('HKQuantityTypeIdentifier') || s.includes('HKCategoryTypeIdentifier') || s.includes('<Workout ')) {
+    const parts = [parseHealthWorkouts(s), parseSteps(s), parseSleep(s), parseBodyweight(s, opts)].filter(p => !p.error)
     if (parts.length === 1) return parts[0]
     if (parts.length > 1) return combineHealth(parts)
   }
@@ -797,6 +886,13 @@ function mergeSteps(S, rows) {
   return fresh.length
 }
 
+function mergeSleep(S, rows) {
+  const have = new Set((S.sleep || []).map(x => x.d))
+  const fresh = rows.filter(x => !have.has(x.d)).map(x => ({ ...x, src: 'import' }))
+  S.sleep = [...(S.sleep || []), ...fresh].sort((a, b) => (a.d < b.d ? -1 : 1))
+  return fresh.length
+}
+
 function mergeWorkouts(S, parsed) {
   const have = new Set(S.workouts.map(w => w.d))
   const fresh = parsed.workouts.filter(w => !have.has(w.d))
@@ -816,13 +912,18 @@ export function mergeImport(S, parsed) {
     const added = {
       workouts: mergeWorkouts(S, parsed),
       steps: mergeSteps(S, parsed.steps),
+      sleep: mergeSleep(S, parsed.sleep),
       bodyweight: mergeBodyweight(S, parsed.bodyweight)
     }
-    return { ...added, added: added.workouts + added.steps + added.bodyweight }
+    return { ...added, added: added.workouts + added.steps + added.sleep + added.bodyweight }
   }
   if (parsed.kind === 'steps') {
     const n = mergeSteps(S, parsed.steps)
     return { added: n, skipped: parsed.steps.length - n }
+  }
+  if (parsed.kind === 'sleep') {
+    const n = mergeSleep(S, parsed.sleep)
+    return { added: n, skipped: parsed.sleep.length - n }
   }
   if (parsed.kind === 'bodyweight') {
     const n = mergeBodyweight(S, parsed.bodyweight)

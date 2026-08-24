@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeImport, parseBodyweight, parseImport, parseSteps } from './import-csv.js'
+import { mergeImport, parseBodyweight, parseImport, parseSleep, parseSteps } from './import-csv.js'
 
 describe('Apple Health body-weight units', () => {
   it('converts each record from its own unit instead of applying the last unit to every row', () => {
@@ -165,29 +165,82 @@ describe('parseSteps', () => {
   })
 })
 
+describe('parseSleep', () => {
+  const wrap = inner => `<?xml version="1.0"?><HealthData>${inner}</HealthData>`
+  const rec = (src, value, start, end) =>
+    `<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="${src}" value="HKCategoryValueSleepAnalysis${value}" startDate="${start}" endDate="${end}"/>`
+
+  it('reads a night that crosses midnight as one night', () => {
+    const p = parseSleep(wrap(rec('Apple Watch', 'AsleepCore', '2026-08-23 23:00:00 +0200', '2026-08-24 07:00:00 +0200')))
+    expect(p).toMatchObject({ kind: 'sleep', source: 'Apple Health' })
+    expect(p.sleep).toEqual([{ d: '2026-08-23', min: 480, src: 'Apple Watch' }])
+  })
+
+  it('counts only the asleep segments, not time in bed or awake', () => {
+    const p = parseSleep(wrap(
+      rec('Apple Watch', 'InBed', '2026-08-23 22:30:00 +0200', '2026-08-24 07:30:00 +0200') +
+      rec('Apple Watch', 'AsleepCore', '2026-08-23 23:00:00 +0200', '2026-08-24 02:00:00 +0200') +
+      rec('Apple Watch', 'Awake', '2026-08-24 02:00:00 +0200', '2026-08-24 02:20:00 +0200') +
+      rec('Apple Watch', 'AsleepCore', '2026-08-24 02:20:00 +0200', '2026-08-24 07:00:00 +0200')))
+    // 3h + 4h40m = 7h40m, not the 9h InBed spans
+    expect(p.sleep).toEqual([{ d: '2026-08-23', min: 460, src: 'Apple Watch' }])
+  })
+
+  it('does not double-count time two sources both recorded', () => {
+    // The naive sum is 15h; the sources fully overlap, so the true total is the watch's 8h.
+    const p = parseSleep(wrap(
+      rec('Apple Watch', 'AsleepCore', '2026-08-23 23:00:00 +0200', '2026-08-24 07:00:00 +0200') +
+      rec('Sleep App', 'AsleepUnspecified', '2026-08-23 23:30:00 +0200', '2026-08-24 06:30:00 +0200')))
+    expect(p.sleep).toEqual([{ d: '2026-08-23', min: 480, src: 'Apple Watch' }])
+    expect(p.deduplicated).toBe(true)
+  })
+
+  it('unions a partial overlap instead of summing it, and credits the source that covered more', () => {
+    // 23:00-03:00 (4h) and 02:00-07:00 (5h) overlap for an hour; the true span is 23:00-07:00 (8h).
+    const p = parseSleep(wrap(
+      rec('iPhone', 'AsleepCore', '2026-08-23 23:00:00 +0200', '2026-08-24 03:00:00 +0200') +
+      rec('Apple Watch', 'AsleepCore', '2026-08-24 02:00:00 +0200', '2026-08-24 07:00:00 +0200')))
+    expect(p.sleep).toEqual([{ d: '2026-08-23', min: 480, src: 'Apple Watch' }])
+  })
+
+  it('says nothing about reconciliation when only one source recorded', () => {
+    const p = parseSleep(wrap(rec('Apple Watch', 'AsleepCore', '2026-08-23 23:00:00 +0200', '2026-08-24 07:00:00 +0200')))
+    expect(p.deduplicated).toBe(false)
+  })
+
+  it('does not claim a file with no sleep records', () => {
+    expect(parseSleep(wrap(rec('Apple Watch', 'Awake', '2026-08-23 23:00:00 +0200', '2026-08-24 07:00:00 +0200'))).error).toBe('unrecognised')
+    expect(parseSleep('Date,Hours\n2026-08-20,7\n').error).toBe('unrecognised')
+  })
+})
+
 describe('one Apple Health export, one import', () => {
   const full = `<?xml version="1.0"?><HealthData>
     <Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" value="80" startDate="2026-08-19T08:00:00Z"/>
     <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-08-20 08:00:00 +0200" value="9100"/>
+    <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" value="HKCategoryValueSleepAnalysisAsleepCore"
+      startDate="2026-08-20 23:00:00 +0200" endDate="2026-08-21 07:00:00 +0200"/>
     <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" durationUnit="min"
       totalDistance="5" totalDistanceUnit="km" startDate="2026-08-21 07:00:00 +0200"/>
   </HealthData>`
 
-  it('takes workouts, steps and weights in one pass', () => {
+  it('takes workouts, steps, sleep and weights in one pass', () => {
     const p = parseImport(full, { unit: 'kg' })
     expect(p.kind).toBe('health')
     expect(p.workouts).toHaveLength(1)
     expect(p.steps).toHaveLength(1)
+    expect(p.sleep).toHaveLength(1)
     expect(p.bodyweight).toHaveLength(1)
     expect([p.from, p.to]).toEqual(['2026-08-19', '2026-08-21'])
   })
 
-  it('merges all three, and adds only days the profile lacks', () => {
+  it('merges all four, and adds only days the profile lacks', () => {
     const p = parseImport(full, { unit: 'kg' })
-    const S = { workouts: [], bodyweight: [], steps: [], customEx: [], exWeights: {} }
-    expect(mergeImport(S, p)).toMatchObject({ workouts: 1, steps: 1, bodyweight: 1, added: 3 })
-    expect(mergeImport(S, p)).toMatchObject({ workouts: 0, steps: 0, bodyweight: 0, added: 0 })
+    const S = { workouts: [], bodyweight: [], steps: [], sleep: [], customEx: [], exWeights: {} }
+    expect(mergeImport(S, p)).toMatchObject({ workouts: 1, steps: 1, sleep: 1, bodyweight: 1, added: 4 })
+    expect(mergeImport(S, p)).toMatchObject({ workouts: 0, steps: 0, sleep: 0, bodyweight: 0, added: 0 })
     expect(S.steps).toEqual([{ d: '2026-08-20', n: 9100, src: 'import' }])
+    expect(S.sleep).toEqual([{ d: '2026-08-20', min: 480, src: 'import' }])
   })
 
   it('stays a single-kind import when the file only holds one of them', () => {

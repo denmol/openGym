@@ -661,4 +661,14 @@ export default {
   '{0} days imported': 'Импортировано дней: {0}',
   '{0} days of steps imported': 'Импортировано дней с шагами: {0}',
   '{0} days recorded': 'записанных дней: {0}',
+  // --- sleep ---
+  'Nights of sleep': 'Ночей со сном',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': 'Сон записало несколько устройств. Пересекающееся время учитывается один раз, а не суммируется.',
+  'No sleep data in this period.': 'За этот период данных о сне нет.',
+  'Sleep': 'Сон',
+  'average over {0} nights recorded': 'среднее за {0} записанных ночей',
+  'best night · {0}': 'лучшая ночь · {0}',
+  'per night': 'за ночь',
+  'h/night': 'ч/ночь',
+  '{0} nights of sleep imported': 'Импортировано ночей со сном: {0}',
 }

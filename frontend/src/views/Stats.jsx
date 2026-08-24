@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { EXIDX } from '../lib/exercises.js'
 import { lastBW, streakWeeks, setLabel, modeOf, effortOf, weightIn } from '../lib/history.js'
-import { fmtNum, fmtDate, fmtVol, todayISO, weekKey } from '../lib/format.js'
+import { fmtNum, fmtDate, fmtVol, fmtDur, todayISO, weekKey } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { bwSheet, goalSheet, calendarSheet, workoutDetailSheet, WorkoutRow, bwDeltaColor } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
@@ -15,6 +15,7 @@ import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { formatKm } from '../lib/cardio.js'
 import { cardioSummary, cardioWeeks, hasCardio, paceLabel } from '../lib/cardio-stats.js'
 import { hasSteps, stepSummary, stepWeeks } from '../lib/steps.js'
+import { hasSleep, sleepSummary, sleepWeeks } from '../lib/sleep.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -95,6 +96,38 @@ function StepsCard({ S }) {
       {pts.length > 1 && <>
         <h4 className="sec" style={{ marginTop: 12 }}>{t('Week by week')}</h4>
         <div className="chart"><LineChart points={pts} h={140} unit={t('steps/day')} color="var(--purple)" /></div>
+      </>}
+    </>}
+  </div>
+}
+
+// Sleep comes from a watch export, so the card exists only once one has been imported.
+function SleepCard({ S }) {
+  const [win, setWin] = useState(90)
+  const sum = sleepSummary(S, win)
+  const weeks = sleepWeeks(S, win)
+  const pts = weeks.map(w => ({ t: w.t, y: Math.round(w.avg / 60 * 10) / 10, note: t('{0} nights recorded', w.days) }))
+
+  return <div className="card">
+    <h2>{t('Sleep')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('per night')}</span></h2>
+    <Segmented className="seg-range" value={win} onChange={setWin}
+      options={[{ value: 30, label: '30d' }, { value: 90, label: '90d' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
+    {sum.days === 0 ? <div className="muted small">{t('No sleep data in this period.')}</div> : <>
+      <div className="row between" style={{ alignItems: 'flex-end', gap: 12 }}>
+        <div>
+          <div className="stat-v">{fmtDur(sum.avg * 60000)}</div>
+          <div className="small dim">{t('average over {0} nights recorded', sum.days)}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="stat-v">{fmtDur(sum.best * 60000)}</div>
+          <div className="small dim">{t('best night · {0}', fmtDate(sum.bestDay, true))}</div>
+        </div>
+      </div>
+      {/* Nights without a record are absent rather than zero — a watch off the wrist is not
+          a night without sleep, and averaging it in would describe the device. */}
+      {pts.length > 1 && <>
+        <h4 className="sec" style={{ marginTop: 12 }}>{t('Week by week')}</h4>
+        <div className="chart"><LineChart points={pts} h={140} unit={t('h/night')} color="var(--teal)" /></div>
       </>}
     </>}
   </div>
@@ -220,6 +253,7 @@ export default function Stats() {
   const anyEffort = hasEffort(S)
   const anyCardio = hasCardio(S)
   const anySteps = hasSteps(S)
+  const anySleep = hasSleep(S)
   const kind = displayScale(S)
   const hd = scaleName(kind)
 
@@ -298,6 +332,7 @@ export default function Stats() {
     {anyEffort && <EffortCard S={S} />}
     {anyCardio && <CardioCard S={S} />}
     {anySteps && <StepsCard S={S} />}
+    {anySleep && <SleepCard S={S} />}
 
     <div className="cols">
       <div className="card">

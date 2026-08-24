@@ -661,4 +661,14 @@ export default {
   '{0} days imported': '已导入 {0} 天',
   '{0} days of steps imported': '已导入 {0} 天的步数',
   '{0} days recorded': '记录了 {0} 天',
+  // --- sleep ---
+  'Nights of sleep': '有睡眠记录的夜晚',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': '有多台设备记录了睡眠。重叠的时间只计算一次，不会累加。',
+  'No sleep data in this period.': '此期间没有睡眠数据。',
+  'Sleep': '睡眠',
+  'average over {0} nights recorded': '{0} 晚记录的平均值',
+  'best night · {0}': '最佳一晚 · {0}',
+  'per night': '每晚',
+  'h/night': '小时/晚',
+  '{0} nights of sleep imported': '已导入 {0} 晚的睡眠',
 }
