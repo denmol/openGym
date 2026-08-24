@@ -651,7 +651,7 @@ export default {
   '{0} sessions': '{0} सत्र',
   // --- steps ---
   'Days of steps': 'कदमों वाले दिन',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'एक से अधिक डिवाइस ने कदम दर्ज किए। हर दिन के लिए सबसे अधिक गिनने वाला डिवाइस लिया जाता है, उन्हें जोड़ा नहीं जाता — Health ऐप भी यही दिखाता है।',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'एक से अधिक डिवाइस ने कदम दर्ज किए। हर घंटे सबसे अधिक गिनने वाला डिवाइस लिया जाता है, ताकि कोई सैर दो बार न गिने और वह घंटा भी न छूटे जब सिर्फ़ एक डिवाइस साथ था।',
   'No steps in this period.': 'इस अवधि में कोई कदम नहीं।',
   'Steps': 'कदम',
   'average over {0} days recorded': '{0} दर्ज दिनों का औसत',

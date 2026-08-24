@@ -651,7 +651,7 @@ export default {
   '{0} sessions': '{0} antrenman',
   // --- steps ---
   'Days of steps': 'Adım kaydı olan günler',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Adımları birden fazla cihaz kaydetti. Her gün, toplama yerine en çok sayan cihazı alır — Sağlık uygulamasının kendisi de böyle gösterir.',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Adımları birden fazla cihaz kaydetti. Her saat en çok sayan cihazı alır; böylece bir yürüyüş iki kez sayılmaz ve yanınızda tek cihaz olduğu bir saat kaybolmaz.',
   'No steps in this period.': 'Bu dönemde adım yok.',
   'Steps': 'Adım',
   'average over {0} days recorded': '{0} kayıtlı günün ortalaması',

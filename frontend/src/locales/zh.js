@@ -651,7 +651,7 @@ export default {
   '{0} sessions': '{0} 次训练',
   // --- steps ---
   'Days of steps': '有步数的天数',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': '有多台设备记录了步数。每天取计数最多的那台，而不是把它们相加——「健康」App 本身也是这样显示的。',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': '有多台设备记录了步数。每小时取计数最多的那台，因此一次散步不会被算两次，只有一台设备在身边的那个小时也不会丢失。',
   'No steps in this period.': '此期间没有步数。',
   'Steps': '步数',
   'average over {0} days recorded': '{0} 天记录的平均值',

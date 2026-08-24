@@ -1246,7 +1246,7 @@ export default {
   '{0} sessions': '{0} pass',
   // --- steps ---
   'Days of steps': 'Dagar med steg',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Fler än en enhet har registrerat steg. Varje dag tar den enhet som räknat flest, i stället för att lägga ihop dem — vilket är vad Hälsa själv visar.',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Fler än en enhet har registrerat steg. Varje timme tar den enhet som räknat flest, så en promenad räknas aldrig dubbelt och en timme bara en enhet var med på går aldrig förlorad.',
   'No steps in this period.': 'Inga steg under perioden.',
   'Steps': 'Steg',
   'average over {0} days recorded': 'snitt över {0} registrerade dagar',

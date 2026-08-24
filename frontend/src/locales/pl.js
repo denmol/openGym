@@ -651,7 +651,7 @@ export default {
   '{0} sessions': '{0} sesji',
   // --- steps ---
   'Days of steps': 'Dni z krokami',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Kroki zapisało więcej niż jedno urządzenie. Każdy dzień bierze urządzenie, które naliczyło najwięcej, zamiast je sumować — tak samo pokazuje to aplikacja Zdrowie.',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Kroki zapisało więcej niż jedno urządzenie. Każda godzina bierze urządzenie, które naliczyło najwięcej, więc spacer nigdy nie liczy się podwójnie, a godzina z jednym urządzeniem nigdy nie ginie.',
   'No steps in this period.': 'Brak kroków w tym okresie.',
   'Steps': 'Kroki',
   'average over {0} days recorded': 'średnia z {0} zapisanych dni',

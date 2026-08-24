@@ -651,7 +651,7 @@ export default {
   '{0} sessions': '{0} тренировок',
   // --- steps ---
   'Days of steps': 'Дней с шагами',
-  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Шаги записало несколько устройств. За каждый день берётся устройство, насчитавшее больше всего, а не их сумма — именно так показывает и само «Здоровье».',
+  'More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.': 'Шаги записало несколько устройств. За каждый час берётся устройство, насчитавшее больше всего: прогулка не учитывается дважды, а час с одним устройством не теряется.',
   'No steps in this period.': 'За этот период шагов нет.',
   'Steps': 'Шаги',
   'average over {0} days recorded': 'среднее за {0} записанных дней',

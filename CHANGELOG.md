@@ -12,10 +12,13 @@ have been in the repository taken back out.
 - 👟 **Daily step counts import from an Apple Health export or a steps CSV**, Garmin Connect's
   included. One figure per day is kept: steps by the hour would be a quarter of a million
   records to render a daily average, which is a poor trade.
-- **The phone and the watch are not added together.** Both count the same walk, and Health's
-  export contains both sets of records — summing them reports roughly twice the steps anybody
-  took. Each day takes the device that counted the most instead, which is what Health itself
-  shows, and the import says so when more than one device contributed.
+- **The phone and the watch are not added together — and neither is discarded.** Both count
+  the same walk, and Health's export contains both sets of records, so summing them reports
+  roughly twice the steps anybody took. The reconciliation runs hour by hour: each device is
+  counted for the hours it was the one carrying, and the larger figure wins the hours both
+  were. A shift worked with the phone alone and an evening walk with the watch on both land,
+  which a day-level rule would not manage — it would hand the day to one device and take the
+  other's hours down with it. The import says when more than one device contributed.
 - 📊 **A Steps card in Stats**: daily average, best day, and a week-by-week average. The
   average is over days *recorded*, not days in the window — a watch left on the charger is not
   a day spent sitting still, and counting it as zero would describe the device rather than

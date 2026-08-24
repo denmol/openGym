@@ -634,22 +634,34 @@ export function parseHealthWorkouts(text) {
  * An iPhone in a pocket and a watch on the wrist both count the same walk, and Health's
  * export contains both sets of records. The Health app reconciles them before it draws a
  * number; the raw file does not, so adding everything up reports roughly twice the steps
- * anybody took. Records are therefore totalled per source per day and the largest of those
- * totals is taken — the watch on a day it was worn, the phone on a day it was not. It is an
- * approximation of what Health itself shows, and the source that won is stored beside the
- * figure so a surprising day can be traced back rather than argued with.
+ * anybody took.
+ *
+ * The reconciliation is done per hour, not per day. Taking the day's largest source would be
+ * simpler and wrong for the ordinary case of a watch worn some of the time: a shift worked
+ * with the phone alone would win the day outright and take the evening's walk — which only
+ * the watch saw — down with it. Hour by hour, each device is counted where it was the one
+ * carrying, and the larger figure wins where both were. A walk is never counted twice, and
+ * an hour only one device saw is never lost.
+ *
+ * It remains an approximation. Health de-duplicates by the exact interval, so an hour split
+ * between two devices is under-counted here by whichever part the loser recorded. The error
+ * is bounded by an hour of walking and always downward, which is the direction to be wrong
+ * in. The source that contributed most is stored beside the day so a surprising figure can
+ * be traced rather than argued with.
  *
  * One number per day is all this keeps. Steps by the hour are a different feature, and
  * storing a quarter of a million records to render a daily average would be a poor trade.
  */
 export function parseSteps(text, { source = '' } = {}) {
   const s = String(text)
-  const byDay = new Map()          // iso -> Map(sourceName -> steps)
-  const add = (d, src, n) => {
+  const byDay = new Map()          // iso -> Map(hour -> Map(sourceName -> steps))
+  const add = (d, hour, src, n) => {
     if (!(n > 0)) return
     let day = byDay.get(d)
     if (!day) byDay.set(d, day = new Map())
-    day.set(src, (day.get(src) || 0) + n)
+    let slot = day.get(hour)
+    if (!slot) day.set(hour, slot = new Map())
+    slot.set(src, (slot.get(src) || 0) + n)
   }
 
   if (s.includes('HKQuantityTypeIdentifierStepCount')) {
@@ -663,7 +675,9 @@ export function parseSteps(text, { source = '' } = {}) {
       const when = parseWhen(dt[1])
       if (!when) continue
       const src = (/sourceName="([^"]*)"/.exec(tag) || [, 'Apple Health'])[1]
-      add(when.d, src, parseFloat(val[1]))
+      // Health writes local time with an offset; the hour as printed is the hour lived.
+      const hour = Number((/[T ](\d{2}):/.exec(dt[1]) || [, -1])[1])
+      add(when.d, hour, src, parseFloat(val[1]))
     }
   } else {
     const rows = parseCSV(s)
@@ -675,19 +689,31 @@ export function parseSteps(text, { source = '' } = {}) {
       const when = parseWhen(String(rows[i][dCol] ?? ''))
       // Garmin writes thousands separators into its reports: "12,431" is one day, not two.
       const n = num(String(rows[i][map.steps] ?? '').replace(/[\s,](?=\d{3}\b)/g, ''))
-      if (when && n > 0) add(when.d, source || 'CSV', n)
+      // A steps CSV is already one row per day, so there is nothing to reconcile.
+      if (when && n > 0) add(when.d, 0, source || 'CSV', n)
     }
   }
 
   if (!byDay.size) return { error: 'unrecognised' }
   const sources = new Set()
+  let overlapped = false
   const dates = [...byDay.keys()].sort()
   const steps = dates.map(d => {
     const day = byDay.get(d)
-    let best = '', n = 0
-    for (const [src, total] of day) if (total > n) { n = total; best = src }
-    sources.add(best)
-    return { d, n: Math.round(n), src: best }
+    let total = 0
+    const perSource = new Map()
+    for (const slot of day.values()) {
+      if (slot.size > 1) overlapped = true
+      let best = '', n = 0
+      for (const [src, hourly] of slot) if (hourly > n) { n = hourly; best = src }
+      total += n
+      perSource.set(best, (perSource.get(best) || 0) + n)
+    }
+    // The day is attributed to whichever device won the most steps across its hours.
+    let src = '', won = 0
+    for (const [name, n] of perSource) if (n > won) { won = n; src = name }
+    sources.add(src)
+    return { d, n: Math.round(total), src }
   }).filter(row => row.n > 0)
   if (!steps.length) return { error: 'unrecognised' }
 
@@ -696,7 +722,7 @@ export function parseSteps(text, { source = '' } = {}) {
     steps, sources: [...sources],
     // Only worth saying when more than one device contributed; on a single-source file the
     // reconciliation did nothing and mentioning it would only raise a question.
-    deduplicated: sources.size > 1 || [...byDay.values()].some(day => day.size > 1),
+    deduplicated: overlapped || sources.size > 1,
     from: steps[0].d, to: steps[steps.length - 1].d
   }
 }

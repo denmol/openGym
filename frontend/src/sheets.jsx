@@ -181,7 +181,7 @@ function ImportSummary({ parsed, close }) {
       </>}
     </div>
     {parsed.deduplicated && <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
-      {t('More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.')}
+      {t('More than one device recorded steps. Each hour takes the device that counted the most, so a walk is never counted twice and an hour only one device carried is never lost.')}
     </div>}
 
     {parsed.mixedUnits ? <div className="small" style={{ color: 'var(--yellow)', marginBottom: 10 }}>

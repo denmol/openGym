@@ -111,6 +111,28 @@ describe('parseSteps', () => {
     expect(p.deduplicated).toBe(true)
   })
 
+  it('keeps the hours only one device saw, and does not double the hours both saw', () => {
+    // A shift worked with the phone alone, then an evening walk with the watch on. Taking
+    // the day's largest source would hand the day to the phone and lose the walk; adding
+    // them up would count the 17:00 hour twice.
+    const p = parseImport(wrap(
+      rec('iPhone', '2026-08-20 09:00:00 +0200', 3000) +
+      rec('iPhone', '2026-08-20 13:00:00 +0200', 2500) +
+      rec('iPhone', '2026-08-20 17:00:00 +0200', 1800) +
+      rec('Apple Watch', '2026-08-20 17:00:00 +0200', 2000) +
+      rec('Apple Watch', '2026-08-20 19:00:00 +0200', 4000)))
+    // 3000 + 2500 + max(1800, 2000) + 4000
+    expect(p.steps).toEqual([{ d: '2026-08-20', n: 11500, src: 'Apple Watch' }])
+    expect(p.deduplicated).toBe(true)
+  })
+
+  it('attributes the day to whichever device won the most of its hours', () => {
+    const p = parseImport(wrap(
+      rec('iPhone', '2026-08-20 09:00:00 +0200', 9000) +
+      rec('Apple Watch', '2026-08-20 19:00:00 +0200', 1000)))
+    expect(p.steps[0]).toMatchObject({ n: 10000, src: 'iPhone' })
+  })
+
   it('picks the winning source per day, not once for the whole file', () => {
     const p = parseImport(wrap(rec('iPhone', '2026-08-20 08:00:00 +0200', 5000)
       + rec('Apple Watch', '2026-08-20 08:00:00 +0200', 7000)
