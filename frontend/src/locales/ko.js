@@ -661,4 +661,14 @@ export default {
   '{0} days imported': '{0}일 가져옴',
   '{0} days of steps imported': '걸음 수 {0}일치를 가져옴',
   '{0} days recorded': '{0}일 기록',
+  // --- sleep ---
+  'Nights of sleep': '수면 기록 밤',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': '두 대 이상의 기기가 수면을 기록했습니다. 겹치는 시간은 한 번만 계산되고 합산되지 않습니다.',
+  'No sleep data in this period.': '이 기간에 수면 데이터가 없습니다.',
+  'Sleep': '수면',
+  'average over {0} nights recorded': '기록된 {0}일 밤 평균',
+  'best night · {0}': '최고 기록일 밤 · {0}',
+  'per night': '하루 밤',
+  'h/night': '시간/밤',
+  '{0} nights of sleep imported': '수면 {0}일치를 가져옴',
 }

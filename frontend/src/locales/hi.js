@@ -661,4 +661,14 @@ export default {
   '{0} days imported': '{0} दिन आयात किए',
   '{0} days of steps imported': 'कदमों के {0} दिन आयात किए',
   '{0} days recorded': '{0} दिन दर्ज',
+  // --- sleep ---
+  'Nights of sleep': 'नींद वाली रातें',
+  'More than one device recorded sleep. Overlapping time is counted once, not added together.': 'एक से अधिक डिवाइस ने नींद दर्ज की। ओवरलैप होने वाला समय एक बार गिना जाता है, जोड़ा नहीं जाता।',
+  'No sleep data in this period.': 'इस अवधि में नींद का डेटा नहीं है।',
+  'Sleep': 'नींद',
+  'average over {0} nights recorded': '{0} दर्ज रातों का औसत',
+  'best night · {0}': 'सर्वश्रेष्ठ रात · {0}',
+  'per night': 'प्रति रात',
+  'h/night': 'घं/रात',
+  '{0} nights of sleep imported': 'नींद की {0} रातें आयात कीं',
 }
