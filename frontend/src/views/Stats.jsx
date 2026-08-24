@@ -14,6 +14,7 @@ import { loadOfWorkouts, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { formatKm } from '../lib/cardio.js'
 import { cardioSummary, cardioWeeks, hasCardio, paceLabel } from '../lib/cardio-stats.js'
+import { hasSteps, stepSummary, stepWeeks } from '../lib/steps.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
@@ -62,6 +63,38 @@ function CardioCard({ S }) {
       {pts.length > 1 && <>
         <h4 className="sec" style={{ marginTop: 12 }}>{t('Week by week')}</h4>
         <div className="chart"><LineChart points={pts} h={140} unit="min" color="var(--blue)" /></div>
+      </>}
+    </>}
+  </div>
+}
+
+// Steps come from a watch export, so the card exists only once one has been imported.
+function StepsCard({ S }) {
+  const [win, setWin] = useState(90)
+  const sum = stepSummary(S, win)
+  const weeks = stepWeeks(S, win)
+  const pts = weeks.map(w => ({ t: w.t, y: w.avg, note: t('{0} days recorded', w.days) }))
+
+  return <div className="card">
+    <h2>{t('Steps')} <span className="dim" style={{ textTransform: 'none', letterSpacing: 0 }}>· {t('per day')}</span></h2>
+    <Segmented className="seg-range" value={win} onChange={setWin}
+      options={[{ value: 30, label: '30d' }, { value: 90, label: '90d' }, { value: 365, label: '1Y' }, { value: 0, label: t('All') }]} />
+    {sum.days === 0 ? <div className="muted small">{t('No steps in this period.')}</div> : <>
+      <div className="row between" style={{ alignItems: 'flex-end', gap: 12 }}>
+        <div>
+          <div className="stat-v">{fmtNum(sum.avg)}</div>
+          <div className="small dim">{t('average over {0} days recorded', sum.days)}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="stat-v">{fmtNum(sum.best)}</div>
+          <div className="small dim">{t('best day · {0}', fmtDate(sum.bestDay, true))}</div>
+        </div>
+      </div>
+      {/* Days without a record are absent rather than zero — a watch on the charger is not
+          a day spent sitting still, and averaging it in would describe the device. */}
+      {pts.length > 1 && <>
+        <h4 className="sec" style={{ marginTop: 12 }}>{t('Week by week')}</h4>
+        <div className="chart"><LineChart points={pts} h={140} unit={t('steps/day')} color="var(--purple)" /></div>
       </>}
     </>}
   </div>
@@ -186,6 +219,7 @@ export default function Stats() {
   const now = Date.now()
   const anyEffort = hasEffort(S)
   const anyCardio = hasCardio(S)
+  const anySteps = hasSteps(S)
   const kind = displayScale(S)
   const hd = scaleName(kind)
 
@@ -263,6 +297,7 @@ export default function Stats() {
     {S.workouts.length > 0 && <MuscleBalance S={S} />}
     {anyEffort && <EffortCard S={S} />}
     {anyCardio && <CardioCard S={S} />}
+    {anySteps && <StepsCard S={S} />}
 
     <div className="cols">
       <div className="card">

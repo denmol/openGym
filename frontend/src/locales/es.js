@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{0} ppm durante {1} min',
   '{0} km': '{0} km',
   '{0} sessions': '{0} sesiones',
+  // --- steps ---
+  'Days of steps': 'Días con pasos',
+  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Más de un dispositivo registró pasos. Cada día toma el dispositivo que contó más, en lugar de sumarlos, que es lo que muestra la propia app Salud.',
+  'No steps in this period.': 'Sin pasos en este periodo.',
+  'Steps': 'Pasos',
+  'average over {0} days recorded': 'media de {0} días registrados',
+  'best day · {0}': 'mejor día · {0}',
+  'per day': 'al día',
+  'steps/day': 'pasos/día',
+  '{0} days imported': '{0} días importados',
+  '{0} days of steps imported': '{0} días de pasos importados',
+  '{0} days recorded': '{0} días registrados',
 }

@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{1} 分钟内平均 {0} bpm',
   '{0} km': '{0} 公里',
   '{0} sessions': '{0} 次训练',
+  // --- steps ---
+  'Days of steps': '有步数的天数',
+  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': '有多台设备记录了步数。每天取计数最多的那台，而不是把它们相加——「健康」App 本身也是这样显示的。',
+  'No steps in this period.': '此期间没有步数。',
+  'Steps': '步数',
+  'average over {0} days recorded': '{0} 天记录的平均值',
+  'best day · {0}': '最佳一天 · {0}',
+  'per day': '每天',
+  'steps/day': '步/天',
+  '{0} days imported': '已导入 {0} 天',
+  '{0} days of steps imported': '已导入 {0} 天的步数',
+  '{0} days recorded': '记录了 {0} 天',
 }

@@ -138,19 +138,29 @@ export function bwSheet(opts = {}) {
 // are all on screen before the confirm button.
 function ImportSummary({ parsed, close }) {
   const st = useStore(s => s.S)
+  // A Health export brings workouts, steps and weights at once; every other file brings one
+  // of them. Counting per kind keeps both cases on the same code path.
+  const rows = {
+    workouts: parsed.kind === 'workouts' || parsed.kind === 'health' ? parsed.workouts || [] : [],
+    steps: parsed.kind === 'steps' || parsed.kind === 'health' ? parsed.steps || [] : [],
+    bodyweight: parsed.kind === 'bodyweight' || parsed.kind === 'health' ? parsed.bodyweight || [] : []
+  }
   const isBW = parsed.kind === 'bodyweight'
-  const have = isBW
-    ? parsed.bodyweight.filter(b => st.bodyweight.some(x => x.d === b.d)).length
-    : parsed.workouts.filter(w => st.workouts.some(x => x.d === w.d)).length
-  const fresh = (isBW ? parsed.bodyweight.length : parsed.workouts.length) - have
+  const newIn = (list, existing) => list.filter(r => !existing.some(x => x.d === r.d)).length
+  const fresh = newIn(rows.workouts, st.workouts) + newIn(rows.steps, st.steps || [])
+    + newIn(rows.bodyweight, st.bodyweight)
 
   const doImport = () => {
     let res
     update(s => { res = mergeImport(s, parsed) })
     close()
-    toast(isBW
-      ? t('{0} weigh-ins imported', res.added)
-      : t('{0} workouts imported', res.added))
+    toast(parsed.kind === 'health'
+      ? t('{0} days imported', res.added)
+      : parsed.kind === 'steps'
+        ? t('{0} days of steps imported', res.added)
+        : isBW
+          ? t('{0} weigh-ins imported', res.added)
+          : t('{0} workouts imported', res.added))
   }
 
   return <>
@@ -160,16 +170,19 @@ function ImportSummary({ parsed, close }) {
     </div>
 
     <div className="tiles" style={{ textAlign: 'left' }}>
-      {isBW ? <>
-        <div className="tile"><div className="l">{t('Weigh-ins')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.bodyweight.length}</div></div>
-        <div className="tile"><div className="l">{t('New')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fresh}</div></div>
-      </> : <>
-        <div className="tile"><div className="l">{t('Workouts')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.workouts.length}</div></div>
+      {rows.workouts.length > 0 && <div className="tile"><div className="l">{t('Workouts')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.workouts.length}</div></div>}
+      {rows.steps.length > 0 && <div className="tile"><div className="l">{t('Days of steps')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.steps.length}</div></div>}
+      {rows.bodyweight.length > 0 && <div className="tile"><div className="l">{t('Weigh-ins')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{rows.bodyweight.length}</div></div>}
+      <div className="tile"><div className="l">{t('New')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fresh}</div></div>
+      {rows.workouts.length > 0 && parsed.sets > 0 && <>
         <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.sets}</div></div>
         <div className="tile"><div className="l">{t('Exercises matched')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.matched}</div></div>
         <div className="tile"><div className="l">{t('Added as your own')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{parsed.created}</div></div>
       </>}
     </div>
+    {parsed.deduplicated && <div className="small dim" style={{ marginTop: 10, lineHeight: 1.45 }}>
+      {t('More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.')}
+    </div>}
 
     {parsed.mixedUnits ? <div className="small" style={{ color: 'var(--yellow)', marginBottom: 10 }}>
       {t('The file mixes kg and lb — each set is converted to {0}.', st.unit)}
@@ -215,9 +228,8 @@ export function importFromApp(file, onDone) {
     catch (e) { toast(t('Could not read that file')); return }
     if (parsed.error === 'empty') { toast(t('That file is empty')); return }
     if (parsed.error) { toast(t("That file's columns aren't recognised — see the docs for supported apps.")); return }
-    if (parsed.kind === 'bodyweight' ? !parsed.bodyweight.length : !parsed.workouts.length) {
-      toast(t('Nothing to import from that file')); return
-    }
+    const anything = (parsed.workouts || []).length + (parsed.steps || []).length + (parsed.bodyweight || []).length
+    if (!anything) { toast(t('Nothing to import from that file')); return }
     ui().openSheet(close => <ImportSummary parsed={parsed} close={close} />)
     onDone && onDone()
   }

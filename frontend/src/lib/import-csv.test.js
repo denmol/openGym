@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBodyweight, parseImport } from './import-csv.js'
+import { mergeImport, parseBodyweight, parseImport, parseSteps } from './import-csv.js'
 
 describe('Apple Health body-weight units', () => {
   it('converts each record from its own unit instead of applying the last unit to every row', () => {
@@ -81,11 +81,96 @@ describe('parseHealthWorkouts', () => {
     expect(p.kind).toBe('bodyweight')
   })
 
-  it('prefers the workouts when an export carries both', () => {
+  it('takes both when an export carries workouts and weights', () => {
     const p = parseImport(wrap(`<Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" value="80" startDate="2026-08-22T08:00:00Z" />
       <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" durationUnit="min"
       totalDistance="5" totalDistanceUnit="km" startDate="2026-08-22 07:00:00 +0200"/>`))
-    expect(p.kind).toBe('workouts')
-    expect(p.source).toBe('Apple Health')
+    expect(p.kind).toBe('health')
+    expect(p.workouts).toHaveLength(1)
+    expect(p.bodyweight).toHaveLength(1)
+  })
+})
+
+describe('parseSteps', () => {
+  const wrap = inner => `<?xml version="1.0"?><HealthData>${inner}</HealthData>`
+  const rec = (src, date, value) =>
+    `<Record type="HKQuantityTypeIdentifierStepCount" sourceName="${src}" unit="count" startDate="${date}" value="${value}"/>`
+
+  it('adds up the records a day is made of', () => {
+    const p = parseImport(wrap(rec('iPhone', '2026-08-20 08:00:00 +0200', 1200)
+      + rec('iPhone', '2026-08-20 12:00:00 +0200', 3300)))
+    expect(p).toMatchObject({ kind: 'steps', source: 'Apple Health' })
+    expect(p.steps).toEqual([{ d: '2026-08-20', n: 4500, src: 'iPhone' }])
+  })
+
+  it('does not double-count a day the phone and the watch both recorded', () => {
+    // The naive sum is 12 000; Health shows the watch's 7 000.
+    const p = parseImport(wrap(rec('iPhone', '2026-08-20 08:00:00 +0200', 5000)
+      + rec('Apple Watch', '2026-08-20 08:00:00 +0200', 7000)))
+    expect(p.steps).toEqual([{ d: '2026-08-20', n: 7000, src: 'Apple Watch' }])
+    expect(p.deduplicated).toBe(true)
+  })
+
+  it('picks the winning source per day, not once for the whole file', () => {
+    const p = parseImport(wrap(rec('iPhone', '2026-08-20 08:00:00 +0200', 5000)
+      + rec('Apple Watch', '2026-08-20 08:00:00 +0200', 7000)
+      + rec('iPhone', '2026-08-21 08:00:00 +0200', 9000)))
+    expect(p.steps).toEqual([
+      { d: '2026-08-20', n: 7000, src: 'Apple Watch' },
+      { d: '2026-08-21', n: 9000, src: 'iPhone' }
+    ])
+  })
+
+  it('says nothing about reconciliation when only one device recorded', () => {
+    expect(parseImport(wrap(rec('Apple Watch', '2026-08-20 08:00:00 +0200', 7000))).deduplicated).toBe(false)
+  })
+
+  it('reads a steps CSV, thousands separators included', () => {
+    const p = parseSteps('Date,Actual,Goal\n2026-08-20,"12,431",10000\n2026-08-21,8200,10000\n')
+    expect(p.steps).toEqual([
+      { d: '2026-08-20', n: 12431, src: 'CSV' },
+      { d: '2026-08-21', n: 8200, src: 'CSV' }
+    ])
+  })
+
+  it('does not claim a CSV that has no steps column', () => {
+    expect(parseSteps('Date,Weight\n2026-08-20,80\n').error).toBe('unrecognised')
+    expect(parseSteps('').error).toBe('empty')
+  })
+
+  it('skips a day that adds up to nothing', () => {
+    expect(parseImport(wrap(rec('iPhone', '2026-08-20 08:00:00 +0200', 0))).kind).not.toBe('steps')
+  })
+})
+
+describe('one Apple Health export, one import', () => {
+  const full = `<?xml version="1.0"?><HealthData>
+    <Record type="HKQuantityTypeIdentifierBodyMass" unit="kg" value="80" startDate="2026-08-19T08:00:00Z"/>
+    <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-08-20 08:00:00 +0200" value="9100"/>
+    <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" durationUnit="min"
+      totalDistance="5" totalDistanceUnit="km" startDate="2026-08-21 07:00:00 +0200"/>
+  </HealthData>`
+
+  it('takes workouts, steps and weights in one pass', () => {
+    const p = parseImport(full, { unit: 'kg' })
+    expect(p.kind).toBe('health')
+    expect(p.workouts).toHaveLength(1)
+    expect(p.steps).toHaveLength(1)
+    expect(p.bodyweight).toHaveLength(1)
+    expect([p.from, p.to]).toEqual(['2026-08-19', '2026-08-21'])
+  })
+
+  it('merges all three, and adds only days the profile lacks', () => {
+    const p = parseImport(full, { unit: 'kg' })
+    const S = { workouts: [], bodyweight: [], steps: [], customEx: [], exWeights: {} }
+    expect(mergeImport(S, p)).toMatchObject({ workouts: 1, steps: 1, bodyweight: 1, added: 3 })
+    expect(mergeImport(S, p)).toMatchObject({ workouts: 0, steps: 0, bodyweight: 0, added: 0 })
+    expect(S.steps).toEqual([{ d: '2026-08-20', n: 9100, src: 'import' }])
+  })
+
+  it('stays a single-kind import when the file only holds one of them', () => {
+    expect(parseImport(`<HealthData><Record type="HKQuantityTypeIdentifierStepCount"
+      sourceName="Apple Watch" unit="count" startDate="2026-08-20 08:00:00 +0200" value="9100"/></HealthData>`).kind)
+      .toBe('steps')
   })
 })

@@ -7,6 +7,25 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### Steps, from whichever watch you wear
+
+- 👟 **Daily step counts import from an Apple Health export or a steps CSV**, Garmin Connect's
+  included. One figure per day is kept: steps by the hour would be a quarter of a million
+  records to render a daily average, which is a poor trade.
+- **The phone and the watch are not added together.** Both count the same walk, and Health's
+  export contains both sets of records — summing them reports roughly twice the steps anybody
+  took. Each day takes the device that counted the most instead, which is what Health itself
+  shows, and the import says so when more than one device contributed.
+- 📊 **A Steps card in Stats**: daily average, best day, and a week-by-week average. The
+  average is over days *recorded*, not days in the window — a watch left on the charger is not
+  a day spent sitting still, and counting it as zero would describe the device rather than
+  the person. The number of days it rests on is always beside it.
+- 📦 **One Apple Health export, one import.** The file holds workouts, steps and weigh-ins
+  together; the importer used to take whichever it noticed first and silently leave the rest,
+  so the same few hundred megabytes had to be fed in more than once. All three now land in a
+  single pass, and the confirmation screen counts each of them before anything is written.
+- Translated into all 13 UI languages.
+
 ### Cardio, in the units it was measured in
 
 Cardio was already a logging mode — 29 exercises, its own two-stepper row — but it could only

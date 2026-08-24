@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{0} уд/мин за {1} мин',
   '{0} km': '{0} км',
   '{0} sessions': '{0} тренировок',
+  // --- steps ---
+  'Days of steps': 'Дней с шагами',
+  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Шаги записало несколько устройств. За каждый день берётся устройство, насчитавшее больше всего, а не их сумма — именно так показывает и само «Здоровье».',
+  'No steps in this period.': 'За этот период шагов нет.',
+  'Steps': 'Шаги',
+  'average over {0} days recorded': 'среднее за {0} записанных дней',
+  'best day · {0}': 'лучший день · {0}',
+  'per day': 'в день',
+  'steps/day': 'шагов/день',
+  '{0} days imported': 'Импортировано дней: {0}',
+  '{0} days of steps imported': 'Импортировано дней с шагами: {0}',
+  '{0} days recorded': 'записанных дней: {0}',
 }

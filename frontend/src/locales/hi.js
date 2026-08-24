@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{1} मिनट में {0} bpm',
   '{0} km': '{0} किमी',
   '{0} sessions': '{0} सत्र',
+  // --- steps ---
+  'Days of steps': 'कदमों वाले दिन',
+  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'एक से अधिक डिवाइस ने कदम दर्ज किए। हर दिन के लिए सबसे अधिक गिनने वाला डिवाइस लिया जाता है, उन्हें जोड़ा नहीं जाता — Health ऐप भी यही दिखाता है।',
+  'No steps in this period.': 'इस अवधि में कोई कदम नहीं।',
+  'Steps': 'कदम',
+  'average over {0} days recorded': '{0} दर्ज दिनों का औसत',
+  'best day · {0}': 'सर्वश्रेष्ठ दिन · {0}',
+  'per day': 'प्रति दिन',
+  'steps/day': 'कदम/दिन',
+  '{0} days imported': '{0} दिन आयात किए',
+  '{0} days of steps imported': 'कदमों के {0} दिन आयात किए',
+  '{0} days recorded': '{0} दिन दर्ज',
 }

@@ -649,4 +649,16 @@ export default {
   '{0} bpm across {1} min': '{0} bpm sur {1} min',
   '{0} km': '{0} km',
   '{0} sessions': '{0} séances',
+  // --- steps ---
+  'Days of steps': 'Jours avec des pas',
+  'More than one device recorded steps. Each day takes the device that counted the most, rather than adding them together, which is what Health itself shows.': 'Plusieurs appareils ont enregistré des pas. Chaque jour retient l’appareil qui en a compté le plus, plutôt que de les additionner — c’est ce qu’affiche Santé elle-même.',
+  'No steps in this period.': 'Aucun pas sur cette période.',
+  'Steps': 'Pas',
+  'average over {0} days recorded': 'moyenne sur {0} jours enregistrés',
+  'best day · {0}': 'meilleur jour · {0}',
+  'per day': 'par jour',
+  'steps/day': 'pas/jour',
+  '{0} days imported': '{0} jours importés',
+  '{0} days of steps imported': '{0} jours de pas importés',
+  '{0} days recorded': '{0} jours enregistrés',
 }
