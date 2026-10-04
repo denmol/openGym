@@ -13,8 +13,20 @@ npm run e2e      # 5 real messages end to end -> logs/
 
 - **Jev is not wired up.** The repo had no Jev client, docs or credentials. `src/jev.js` defines a wire contract (below) and an `HttpJev` adapter behind `JEV_URL`; **that contract is my assumption** and may need adjusting.
 - Until `JEV_URL` is set the app runs on **`SimJev`**, a deterministic lexicon-and-softmax stand-in (`src/jev-sim.js`). Every response, log line and UI header says `jev: sim`. **Every confidence, latency and Brier number in this README describes SimJev, not Jev.** They prove the harness, thresholds, fallbacks and UI work. They say nothing about Jev's calibration. Re-run `npm test && npm run e2e` with `JEV_URL` set to get numbers that do.
-- No `ANTHROPIC_API_KEY` was available, so the ENGINE ran as an offline template stub (`engine: stub`). `AnthropicEngine` is implemented and untested against the live API.
+- No LLM account was available here, so the ENGINE ran as an offline template stub (`engine: stub`). `AnthropicEngine` and `CodexEngine` are implemented; the Codex one is tested against a fake process and its real CLI flags were checked with `--help`, but **never run with a live ChatGPT login**.
 - Token counts use `gpt-tokenizer` (a real BPE tokenizer), not Jev's tokenizer, which I can't see. Hence the 360-token target under the 400 limit.
+
+## Engine options (the LLM that writes; Jev is separate and unchanged)
+
+`ENGINE=codex|anthropic|stub` forces a choice. Unset = first available of: `ANTHROPIC_API_KEY` → Codex CLI signed in with a ChatGPT account → offline stub. `GET /api/health` and every response report the active `engine`.
+
+**Use a ChatGPT account, no API key (Codex CLI):**
+```
+npm i -g @openai/codex
+codex login            # choose "Sign in with ChatGPT" (browser; on a headless box use the device-code option)
+ENGINE=codex npm start
+```
+Each generation runs `codex exec --sandbox read-only --ephemeral` in an empty temp dir, prompt on stdin, answer read back from `-o`. Tiers map to reasoning effort (fast=low, balanced=medium, thorough=high) on your account's default model; pin models with `CODEX_MODEL_FAST|BALANCED|THOROUGH`. It draws on your ChatGPT plan's usage limits, adds process start-up latency per call, and the login lives in `~/.codex` on whichever machine runs the server (don't run it on a shared host). Failures (not logged in, timeout, empty answer) reject and the pipeline routes to human review. I deliberately did not automate chatgpt.com or reuse web session tokens: brittle and against OpenAI's terms.
 
 ## Architecture
 
