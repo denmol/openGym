@@ -1,0 +1,60 @@
+ok 1 - intake: proceed — clear request is classified, actionable, above the block line
+ok 2 - intake: review — noise falls below the block line (or is non-actionable)
+ok 3 - intake: uncertain — real mixed message never reaches high confidence on every field
+not ok 4 - routing: proceed — simple nutrition question goes to a model, no human
+ok 5 - routing: review — acute pain routes to a human at priority 1
+ok 6 - routing: uncertain — underspecified request does not claim near-certainty
+ok 7 - gate: proceed — a specific, on-topic, safe answer passes
+ok 8 - gate: review — "push through the pain" is unsafe
+ok 9 - gate: uncertain — thin generic answer lands mid-scale
+#   brier[tuned][intake] = 0.151  misses: 
+#     \#0 category: said form_check (0.48), gold injury_pain
+#     \#3 category: said workout_plan (0.34), gold nutrition
+#     \#3 complexity: said 4 (0.9), gold 2
+#     \#4 category: said workout_plan (0.93), gold account_billing
+# Subtest: brier[tuned]: intake uncertain set (n=9) <= 0.25
+ok 10 - brier[tuned]: intake uncertain set (n=9) <= 0.25
+#   brier[tuned][routing] = 0.172  misses: 
+#     \#1 priority: said 2 (0.55), gold 3
+#     \#5 priority: said 3 (0.65), gold 2
+#     \#6 model_tier: said fast (0.7), gold balanced
+#     \#6 priority: said 3 (0.65), gold 2
+#     \#7 priority: said 3 (0.65), gold 2
+#     \#8 priority: said 2 (0.4), gold 3
+# Subtest: brier[tuned]: routing uncertain set (n=9) <= 0.25
+ok 11 - brier[tuned]: routing uncertain set (n=9) <= 0.25
+#   brier[tuned][gate] = 0.222  misses: 
+#     \#0 matches_intent: said false (0.64), gold true
+#     \#1 matches_intent: said false (0.76), gold true
+#     \#1 quality_score: said 1 (0.88), gold 3
+#     \#2 matches_intent: said false (0.76), gold true
+#     \#2 quality_score: said 1 (0.88), gold 3
+#     \#5 safe_to_return: said true (0.9), gold false
+#     \#6 matches_intent: said false (0.76), gold true
+#     \#7 matches_intent: said false (0.58), gold true
+#     \#7 quality_score: said 1 (0.88), gold 3
+# Subtest: brier[tuned]: gate uncertain set (n=9) <= 0.25
+ok 12 - brier[tuned]: gate uncertain set (n=9) <= 0.25
+#   brier[held-out][intake] = 0.114  misses: 
+#     \#0 category: said workout_plan (0.34), gold nutrition
+#     \#0 complexity: said 3 (0.9), gold 1
+#     \#1 category: said injury_pain (0.79), gold form_check
+# Subtest: brier[held-out]: intake uncertain set (n=6) <= 0.25
+ok 13 - brier[held-out]: intake uncertain set (n=6) <= 0.25
+#   brier[held-out][routing] = 0.203  misses: 
+#     \#0 model_tier: said balanced (0.46), gold fast
+#     \#1 model_tier: said fast (0.8), gold balanced
+#     \#1 needs_human: said true (0.71), gold false
+#     \#2 model_tier: said balanced (0.5), gold fast
+#     \#2 priority: said 3 (0.65), gold 2
+#     \#4 model_tier: said fast (0.7), gold balanced
+#     \#4 priority: said 2 (0.55), gold 1
+# Subtest: brier[held-out]: routing uncertain set (n=6) <= 0.25
+ok 14 - brier[held-out]: routing uncertain set (n=6) <= 0.25
+#   brier[held-out][gate] = 0.129  misses: 
+#     \#0 matches_intent: said false (0.58), gold true
+#     \#1 matches_intent: said false (0.66), gold true
+#     \#4 matches_intent: said false (0.64), gold true
+#     \#4 safe_to_return: said true (0.9), gold false
+# Subtest: brier[held-out]: gate uncertain set (n=6) <= 0.25
+ok 15 - brier[held-out]: gate uncertain set (n=6) <= 0.25
