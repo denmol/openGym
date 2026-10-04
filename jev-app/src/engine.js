@@ -1,9 +1,68 @@
 // ENGINE: the primary LLM. Generation only. It never sees a Jev decision, a confidence or a
 // gate verdict; on retry it gets a plain-language reason string and nothing else.
 
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { CONFIG, TIER_MODELS } from './config.js';
 
 const SYSTEM = `You are the written voice of a gym coaching desk. Answer the member's message directly and concretely: numbers, sets/reps, grams, or steps where relevant. 120-220 words. Plain text, short lists allowed. Never diagnose an injury or advise training through pain; if the message mentions pain, dizziness or chest symptoms, tell them to stop and see a doctor or physio. No supplements dosing, no extreme diets.`;
+
+// Builds the plain-text prompt for engines that take one string (the CLI).
+export function buildPrompt({ input, history = [], feedback }) {
+  const turns = history.map((t) => `${t.r === 'a' ? 'Coach' : 'Member'}: ${t.t}`).join('\n');
+  return `${SYSTEM}\n\nReply with the answer text only. Do not run commands, read files or use tools.\n\n${turns ? turns + '\n' : ''}Member: ${input}${feedback ? `\n\n[Desk note: a previous draft was rejected because: ${feedback}. Write a better answer.]` : ''}`;
+}
+
+// Tier -> reasoning effort. Model names are NOT hard-coded: the account's default model is
+// used unless CODEX_MODEL_FAST / _BALANCED / _THOROUGH override it.
+const TIER_EFFORT = { fast: 'low', balanced: 'medium', thorough: 'high' };
+
+/**
+ * ENGINE via the Codex CLI signed in with a ChatGPT account (`codex login`), i.e. no API key.
+ * Runs `codex exec` read-only in an empty temp dir; the prompt goes in on stdin and only the
+ * final message is read back. Uses the account's plan limits; one process per generation.
+ */
+export class CodexEngine {
+  mode = 'codex';
+  constructor({ bin = 'codex', spawnImpl = spawn, env = process.env } = {}) {
+    Object.assign(this, { bin, spawn: spawnImpl, env });
+  }
+  async generate({ tier, input, history = [], feedback }) {
+    const dir = await mkdtemp(path.join(tmpdir(), 'coachdesk-codex-'));
+    const outFile = path.join(dir, 'answer.txt');
+    const model = this.env[`CODEX_MODEL_${tier.toUpperCase()}`];
+    const args = ['exec', '--skip-git-repo-check', '--ephemeral', '--sandbox', 'read-only', '--color', 'never',
+      '-C', dir, '-o', outFile, '-c', `model_reasoning_effort="${TIER_EFFORT[tier]}"`, ...(model ? ['-m', model] : []), '-'];
+    try {
+      await new Promise((resolve, reject) => {
+        const child = this.spawn(this.bin, args, { stdio: ['pipe', 'ignore', 'pipe'], env: this.env });
+        let err = '';
+        const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('codex timeout')); }, CONFIG.ENGINE_TIMEOUT_MS);
+        child.stderr?.on('data', (d) => { err = (err + d).slice(-600); });
+        child.on('error', (e) => { clearTimeout(timer); reject(new Error(`codex not runnable: ${e.message}`)); });
+        child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`codex exit ${code}: ${err.trim().split('\n').pop()}`)); });
+        child.stdin.end(buildPrompt({ input, history, feedback }));
+      });
+      const text = (await readFile(outFile, 'utf8')).trim();
+      if (!text) throw new Error('codex returned no answer');
+      return { text, model: `codex:${model ?? 'default'}:${TIER_EFFORT[tier]}` };
+    } finally {
+      rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+}
+
+export async function codexLoggedIn({ bin = 'codex', spawnImpl = spawn } = {}) {
+  return new Promise((resolve) => {
+    try {
+      const c = spawnImpl(bin, ['login', 'status'], { stdio: 'ignore' });
+      c.on('error', () => resolve(false));
+      c.on('close', (code) => resolve(code === 0));
+    } catch { resolve(false); }
+  });
+}
 
 export class AnthropicEngine {
   mode = 'anthropic';
@@ -47,7 +106,19 @@ export class StubEngine {
   }
 }
 
-export function makeEngine(env = process.env) {
-  if (env.ANTHROPIC_API_KEY) return new AnthropicEngine({ apiKey: env.ANTHROPIC_API_KEY, baseUrl: env.ANTHROPIC_BASE_URL || undefined });
+/**
+ * ENGINE=anthropic | codex | stub forces a choice. Unset = first available of:
+ * ANTHROPIC_API_KEY -> Codex CLI logged in with a ChatGPT account -> offline stub.
+ */
+export async function makeEngine(env = process.env, deps = {}) {
+  const want = env.ENGINE?.toLowerCase();
+  if (want === 'stub') return new StubEngine();
+  if (want === 'codex') {
+    if (!(await (deps.codexLoggedIn ?? codexLoggedIn)())) throw new Error('ENGINE=codex but `codex login status` failed: run `codex login` and choose "Sign in with ChatGPT"');
+    return new CodexEngine({ env });
+  }
+  if ((want === 'anthropic' || !want) && env.ANTHROPIC_API_KEY) return new AnthropicEngine({ apiKey: env.ANTHROPIC_API_KEY, baseUrl: env.ANTHROPIC_BASE_URL || undefined });
+  if (want === 'anthropic') throw new Error('ENGINE=anthropic but ANTHROPIC_API_KEY is not set');
+  if (!want && (await (deps.codexLoggedIn ?? codexLoggedIn)())) return new CodexEngine({ env });
   return new StubEngine();
 }
