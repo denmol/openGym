@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach Desk</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#626b78; --line:#dde1e7;
+    --green:#16794a; --green-bg:#e3f5ec; --amber:#8a5a00; --amber-bg:#fff1d1; --red:#b3261e; --red-bg:#fde7e5; --accent:#2457d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#101215; --card:#181b20; --ink:#eceef2; --muted:#98a1ae; --line:#2b3038;
+      --green:#5fd39a; --green-bg:#12301f; --amber:#f2c14e; --amber-bg:#352a0c; --red:#ff8a80; --red-bg:#3a1714; --accent:#7aa2ff; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,sans-serif }
+  main { max-width:880px; margin:0 auto; padding:20px 16px 48px }
+  h1 { font-size:20px; margin:0 0 2px } .sub { color:var(--muted); margin:0 0 16px }
+  .src { font-size:12px; padding:2px 8px; border-radius:99px; background:var(--amber-bg); color:var(--amber); margin-left:6px }
+  form { display:flex; gap:8px; margin-bottom:8px }
+  textarea { flex:1; min-height:64px; padding:10px; font:inherit; color:inherit; background:var(--card); border:1px solid var(--line); border-radius:8px; resize:vertical }
+  button { font:inherit; padding:0 18px; border-radius:8px; border:0; background:var(--accent); color:#fff; cursor:pointer }
+  button:disabled { opacity:.5; cursor:wait }
+  .presets { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px }
+  .presets button { background:var(--card); color:var(--ink); border:1px solid var(--line); padding:4px 10px; font-size:13px }
+  .pipeline { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px }
+  @media (max-width:720px) { .pipeline { grid-template-columns:1fr } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px }
+  .card h2 { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; display:flex; justify-content:space-between }
+  .pending { color:var(--muted); font-style:italic }
+  .row { display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-top:1px solid var(--line); font-size:14px }
+  .row:first-of-type { border-top:0 } .row b { font-weight:600 } .row span:first-child { color:var(--muted) }
+  .conf { display:flex; align-items:center; gap:8px; margin:6px 0 2px }
+  .badge { font-weight:700; font-variant-numeric:tabular-nums; padding:2px 8px; border-radius:6px }
+  .green { background:var(--green-bg); color:var(--green) } .amber { background:var(--amber-bg); color:var(--amber) } .red { background:var(--red-bg); color:var(--red) }
+  .bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden } .bar i { display:block; height:100%; background:currentColor }
+  .ms { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums }
+  .flag { margin-top:6px; padding:4px 8px; border-radius:6px; background:var(--red-bg); color:var(--red); font-size:12px; font-weight:600 }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
+  .chip { background:var(--card); border:1px solid var(--line); border-radius:99px; padding:3px 10px; font-size:13px }
+  .result { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden }
+  .gatebar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px }
+  .status { padding:2px 10px; border-radius:6px; font-weight:700; font-size:13px }
+  .out { padding:12px; white-space:pre-wrap; margin:0 }
+  .trail { margin:12px 0 0; padding-left:18px; color:var(--muted); font-size:13px }
+  .hidden { display:none }
+</style>
+</head>
+<body>
+<main>
+  <h1>Coach Desk <span id="src" class="src hidden"></span></h1>
+  <p class="sub">Every decision below is made by Jev (REFLEX); the LLM (ENGINE) only writes.</p>
+
+  <form id="f">
+    <textarea id="q" placeholder="Ask your coach…" maxlength="1000"></textarea>
+    <button id="go">Ask</button>
+  </form>
+  <div class="presets" id="presets"></div>
+
+  <div class="pipeline">
+    <section class="card" id="c-intake"></section>
+    <section class="card" id="c-routing"></section>
+    <section class="card" id="c-gate"></section>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div id="result"></div>
+  <ol class="trail" id="trail"></ol>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const TITLES = { intake: '1 · Intake', routing: '2 · Routing', gate: '3 · Output gate' };
+const PRESETS = [
+  'Build me a 4 day upper/lower split, I only have dumbbells, 45 min sessions, goal hypertrophy',
+  'How much protein should I eat to cut at 82 kg?',
+  "My lower back rounds at the bottom of my deadlift, is my form ok?",
+  'Sharp pain in my shoulder since bench yesterday, I can\'t lift my arm',
+  'ok so what do you think',
+];
+const band = (c) => (c > 0.8 ? 'green' : c >= 0.6 ? 'amber' : 'red');   // spec: green >0.80, amber 0.60–0.80, red <0.60
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let history = [];
+let lastRouting = null;
+
+PRESETS.forEach((p) => {
+  const b = document.createElement('button'); b.type = 'button'; b.textContent = p.length > 44 ? p.slice(0, 42) + '…' : p;
+  b.onclick = () => { $('q').value = p; }; $('presets').append(b);
+});
+
+function reset() {
+  for (const k of Object.keys(TITLES)) $('c-' + k).innerHTML = `<h2>${TITLES[k]}</h2><div class="pending">waiting…</div>`;
+  $('meta').innerHTML = ''; $('result').innerHTML = ''; $('trail').innerHTML = '';
+}
+
+function card(name, d, note) {
+  const rows = Object.entries(d.answer).map(([k, v]) => {
+    const fc = d.field_confidence[k];
+    return `<div class="row"><span>${k}</span><b>${esc(v)}${fc != null ? ` <span class="ms">(${fc.toFixed(2)})</span>` : ''}</b></div>`;
+  }).join('');
+  const b = band(d.confidence);
+  const flag = d.confidence < 0.6 ? `<div class="flag">⚑ REVIEW FLAG — ${d.unavailable ? 'Jev unavailable (failed closed)' : 'confidence below 0.60'}</div>` : '';
+  $('c-' + name).innerHTML = `<h2>${TITLES[name]}<span class="ms">${d.latency_ms == null ? '—' : d.latency_ms + ' ms'}</span></h2>
+    <div class="conf"><span class="badge ${b}">${d.confidence.toFixed(2)}</span><span class="bar ${b}"><i style="width:${Math.round(d.confidence * 100)}%"></i></span></div>
+    ${rows}${note ? `<div class="ms" style="margin-top:6px">${esc(note)}</div>` : ''}${flag}`;
+}
+
+const chip = (t) => `<span class="chip">${t}</span>`;
+
+function final(r) {
+  const g = r.decisions.gate;
+  const label = { ok: ['green', 'Returned'], needs_clarification: ['amber', 'Needs clarification'], human_review: ['red', 'Human review'] }[r.status];
+  const gateLine = g
+    ? `Gate: <span class="badge ${band(g.confidence)}">${g.confidence.toFixed(2)}</span> quality <b>${g.answer.quality_score}/5</b> · safe <b>${g.answer.safe_to_return}</b> · intent <b>${g.answer.matches_intent}</b> · ${g.latency_ms ?? '—'} ms${r.gate_attempts.length > 1 ? ` · attempt ${r.gate_attempts.length}` : ''}`
+    : 'Gate: not run — no output was generated for this request';
+  const body = r.output ?? r.message ?? '';
+  $('result').innerHTML = `<div class="result"><div class="gatebar"><span class="status ${label[0]}">${label[1]}</span><span>${gateLine}</span></div><p class="out">${esc(body)}</p></div>`;
+  const m = [];
+  if (r.model_tier) m.push(chip(`tier <b>${r.model_tier}</b>${r.model ? ' · ' + esc(r.model) : ''}`));
+  if (r.priority) m.push(chip(`queue priority <b>${r.priority}</b>`));
+  if (g) m.push(chip(`output quality <b>${g.answer.quality_score}/5</b>`));
+  m.push(chip(`state <b>${r.state.tokens}</b> tokens`));
+  m.push(chip(`jev: ${r.jev_source} · engine: ${r.engine_mode}`));
+  $('meta').innerHTML = m.join('');
+  $('trail').innerHTML = r.trail.map((t) => `<li>${esc(t)}</li>`).join('');
+  if (r.status === 'ok') history = [...history, { role: 'user', text: r.state.snapshot.input }, { role: 'assistant', text: r.output }].slice(-6);
+  if (r.jev_source === 'sim') { $('src').textContent = 'Jev: local stand-in'; $('src').classList.remove('hidden'); }
+}
+
+$('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const input = $('q').value.trim(); if (!input) return;
+  $('go').disabled = true; reset();
+  try {
+    const res = await fetch('/api/ask/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input, history }) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i; while ((i = buf.indexOf('\n')) >= 0) {
+        const ev = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+        if (ev.type === 'intake' || ev.type === 'routing') { if (ev.type === 'routing') lastRouting = ev.decision; card(ev.type, ev.decision); }
+        else if (ev.type === 'routing_applied') {
+          const a = ev.applied;
+          const note = [a.model_tier !== lastRouting.answer.model_tier && `applied tier → ${a.model_tier} (low confidence, forced)`, a.needs_human && `sent to human: ${a.human_reason}`].filter(Boolean).join(' · ');
+          if (note) card('routing', lastRouting, note);
+        }
+        else if (ev.type === 'llm_start') $('c-gate').innerHTML = `<h2>${TITLES.gate}</h2><div class="pending">engine writing (${ev.tier})…</div>`;
+        else if (ev.type === 'gate') card('gate', ev.decision, ev.decision.attempt ? 'attempt ' + (ev.decision.attempt + 1) : '');
+        else if (ev.type === 'final') {
+          if (!ev.result.decisions.gate) $('c-gate').innerHTML = `<h2>${TITLES.gate}</h2><div class="pending">not run — nothing to verify</div>`;
+          final(ev.result);
+        }
+      }
+    }
+  } catch (err) {
+    $('result').innerHTML = `<div class="result"><p class="out">Request failed: ${esc(err.message)}</p></div>`;
+  } finally { $('go').disabled = false; }
+};
+reset();
+</script>
+</body>
+</html>

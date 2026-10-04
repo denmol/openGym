@@ -1,0 +1,44 @@
+#   intake uncertain -> {"category":"form_check","is_actionable":true,"complexity":1} { category: 0.48, is_actionable: 0.97, complexity: 0.95 }
+#   routing uncertain -> {"model_tier":"fast","needs_human":false,"priority":3} { model_tier: 0.95, needs_human: 0.86, priority: 0.82 }
+#   gate uncertain -> {"matches_intent":false,"safe_to_return":true,"quality_score":1} { matches_intent: 0.9, safe_to_return: 0.9, quality_score: 0.92 }
+#   brier[intake] = 0.219  misses: 
+# Subtest: brier: intake uncertain set (n=9) <= 0.25
+ok 10 - brier: intake uncertain set (n=9) <= 0.25
+#   brier[routing] = 0.314  misses: 
+# Subtest: brier: routing uncertain set (n=9) <= 0.25
+not ok 11 - brier: routing uncertain set (n=9) <= 0.25
+#   brier[gate] = 0.288  misses: 
+# Subtest: brier: gate uncertain set (n=9) <= 0.25
+not ok 12 - brier: gate uncertain set (n=9) <= 0.25
+#     \#0 category: said form_check (0.48), gold injury_pain
+#     \#2 category: said other (0.64), gold workout_plan
+#     \#2 is_actionable: said false (0.73), gold true
+#     \#3 category: said workout_plan (0.34), gold nutrition
+#     \#3 complexity: said 4 (0.9), gold 2
+#     \#4 category: said workout_plan (0.72), gold account_billing
+#     \#6 category: said other (0.64), gold injury_pain
+#     \#6 is_actionable: said false (0.73), gold true
+#     \#7 category: said other (0.64), gold workout_plan
+#     \#7 is_actionable: said false (0.73), gold true
+#     \#8 category: said form_check (0.46), gold workout_plan
+#     \#0 model_tier: said fast (0.95), gold balanced
+#     \#1 priority: said 2 (0.62), gold 3
+#     \#2 model_tier: said fast (0.95), gold balanced
+#     \#4 needs_human: said false (0.88), gold true
+#     \#5 model_tier: said fast (0.68), gold balanced
+#     \#5 priority: said 3 (0.82), gold 2
+#     \#6 model_tier: said fast (0.95), gold balanced
+#     \#6 needs_human: said false (0.82), gold true
+#     \#6 priority: said 3 (0.82), gold 2
+#     \#7 priority: said 3 (0.82), gold 2
+#     \#8 priority: said 2 (0.4), gold 3
+#     \#0 matches_intent: said false (0.75), gold true
+#     \#1 matches_intent: said false (0.9), gold true
+#     \#1 quality_score: said 1 (0.92), gold 3
+#     \#2 matches_intent: said false (0.9), gold true
+#     \#2 quality_score: said 1 (0.92), gold 3
+#     \#5 safe_to_return: said true (0.9), gold false
+#     \#6 matches_intent: said false (0.9), gold true
+#     \#7 matches_intent: said false (0.58), gold true
+#     \#7 quality_score: said 1 (0.92), gold 3
+#     \#8 quality_score: said 2 (0.85), gold 4
