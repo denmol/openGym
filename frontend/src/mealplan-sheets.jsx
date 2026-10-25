@@ -99,13 +99,13 @@ function DayCard({ S, day, i, targets, foods }) {
         {!s.missing && <div className="dim small">{fmtNum(Math.round(s.t.kcal))} kcal · {fmtNum(Math.round(s.t.prot))} g {t('Protein')}</div>}
       </div>
       {s.missing ? null : s.logged
-        ? <Icon name="checkCircle" style={{ color: 'var(--green)', fontSize: 22, flex: 'none' }} />
+        ? <Icon name="checkCircle" style={{ color: 'var(--green-t)', fontSize: 22, flex: 'none' }} />
         : <button className="iconbtn" aria-label={t('Log this meal')} onClick={() => log(si)}><Icon name="plus" /></button>}
     </div>)}
     <div className="small dim" style={{ marginTop: 6, lineHeight: 1.4 }}>
       {t('{0} kcal against a target of {1}', fmtNum(Math.round(r.totals.kcal)), fmtNum(Math.round(targets.kcal)))}
       {' · '}{t('{0} g protein', fmtNum(Math.round(r.totals.prot)))}
-      {r.complete && dev > CLOSE_PCT && <span style={{ color: 'var(--yellow)' }}> · {t('off by {0}%', Math.round(dev))}</span>}
+      {r.complete && dev > CLOSE_PCT && <span style={{ color: 'var(--yellow-t)' }}> · {t('off by {0}%', Math.round(dev))}</span>}
     </div>
   </div>
 }
@@ -164,7 +164,7 @@ function MealPlan({ close }) {
           {' '}{t('{0} different meals.', summary.distinctMeals)}
           {summary.proteinDays != null && ' ' + t('Protein reaches your target on {0} days.', summary.proteinDays)}
         </div>
-        {caveats.map(c => <div key={c} className="small" style={{ color: 'var(--yellow)', marginTop: 6, lineHeight: 1.4 }}>{t(CAVEAT[c])}</div>)}
+        {caveats.map(c => <div key={c} className="small" style={{ color: 'var(--yellow-t)', marginTop: 6, lineHeight: 1.4 }}>{t(CAVEAT[c])}</div>)}
       </div>
       {plan.days.map((d, i) => <DayCard key={d.d} S={S} day={d} i={i} targets={gate.targets} foods={foods} />)}
       <div className="row" style={{ gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
@@ -204,7 +204,7 @@ export function MealPlanCard() {
         {s.missing ? <span className="dim">{t('A meal that has been deleted')}</span> : <>{s.name}{s.scale !== 1 && <span className="dim"> ×{fmtNum(s.scale)}</span>}</>}
       </span>
       {s.missing ? null : s.logged
-        ? <Icon name="checkCircle" style={{ color: 'var(--green)', fontSize: 22, flex: 'none' }} />
+        ? <Icon name="checkCircle" style={{ color: 'var(--green-t)', fontSize: 22, flex: 'none' }} />
         : <button className="iconbtn" aria-label={t('Log this meal')} onClick={() => log(si)}><Icon name="plus" /></button>}
     </div>)}
     {!plan && <div className="dim small" style={{ marginTop: 6, lineHeight: 1.4 }}>{t('Build a week from your saved meals, close to your daily targets.')}</div>}

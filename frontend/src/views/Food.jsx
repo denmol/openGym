@@ -126,7 +126,7 @@ export default function Food() {
       <h1>{t('Food')}</h1>
       <div className="sub">{new Date(day + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div>
     </div><button className="iconbtn" onClick={nutritionGoalsSheet} aria-label={t('Nutrition goals')}
-      style={goals.goal ? { color: 'var(--acc)' } : undefined}><Icon name="target" /></button></div>
+      style={goals.goal ? { color: 'var(--acc-t)' } : undefined}><Icon name="target" /></button></div>
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 8 }}>

@@ -331,11 +331,11 @@ function ProblemList({ res, onUse, onRetry }) {
       {errors.length ? t('This plan needs a fix') : t('Worth a look')}
     </h4>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-      {errors.map((p, i) => <div key={'e' + i} className="small row" style={{ gap: 7, alignItems: 'flex-start', color: 'var(--red)' }}>
+      {errors.map((p, i) => <div key={'e' + i} className="small row" style={{ gap: 7, alignItems: 'flex-start', color: 'var(--red-t)' }}>
         <Icon name="xmark" style={{ fontSize: 13, marginTop: 2, flex: 'none' }} />
         <span style={{ lineHeight: 1.4 }}>{say(p)}</span>
       </div>)}
-      {warnings.map((p, i) => <div key={'w' + i} className="small row" style={{ gap: 7, alignItems: 'flex-start', color: 'var(--yellow)' }}>
+      {warnings.map((p, i) => <div key={'w' + i} className="small row" style={{ gap: 7, alignItems: 'flex-start', color: 'var(--yellow-t)' }}>
         <Icon name="info" style={{ fontSize: 13, marginTop: 2, flex: 'none' }} />
         <span style={{ lineHeight: 1.4 }}>{say(p)}</span>
       </div>)}
@@ -386,7 +386,7 @@ function CoachApply({ bundle, close }) {
     <div className="dim small" style={{ marginBottom: 14, lineHeight: 1.4 }}>
       {t('No weights yet — the first session of each exercise is where you find them, and the app remembers from there.')}
     </div>
-    {bundle.dropped > 0 && <div className="small" style={{ color: 'var(--yellow)', marginBottom: 14, lineHeight: 1.4 }}>
+    {bundle.dropped > 0 && <div className="small" style={{ color: 'var(--yellow-t)', marginBottom: 14, lineHeight: 1.4 }}>
       {t(bundle.dropped === 1
         ? '{0} exercise in the file isn’t in your library and was left out.'
         : '{0} exercises in the file aren’t in your library and were left out.', bundle.dropped)}

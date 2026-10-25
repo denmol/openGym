@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useUI } from '../store/useUI.js'
+import { sheetIsTall } from '../lib/chrome.js'
 
 // One bottom sheet (or centered dialog) with swipe-to-dismiss.
 function Sheet({ sheet }) {
@@ -42,6 +43,18 @@ function Sheet({ sheet }) {
     if (!el) return
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [])
+
+  // Tall enough to fill most of the screen: stop floating and anchor to the edges, opaque.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => el.classList.toggle('tall', sheetIsTall(el.scrollHeight, window.innerHeight))
+    update()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    if (ro) Array.from(el.children).forEach(c => ro.observe(c))
+    window.addEventListener('resize', update)
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', update) }
   }, [])
 
   const close = () => closeSheet(sheet.id)

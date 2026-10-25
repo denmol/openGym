@@ -7,6 +7,35 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### A look that follows iOS 26
+
+- 🪟 **Liquid Glass, as far as a web app can follow it.** The tab bar is now a floating glass capsule
+  that folds to icons while you scroll down and opens on the first scroll up; partial sheets float
+  inset from the screen edges with rounded corners and, once they fill most of the screen, anchor
+  to the edges on an opaque background; buttons, segmented controls and tags are capsules; the
+  round header buttons are glass. Content stays opaque: glass is only for the layer that floats
+  over it. A soft blur-and-fade replaces the hard edge where content slides under the status bar
+  and the tab bar. Based on Apple's WWDC25 session 323.
+- 🎚️ **Glass: Frosted or Clear** (Settings → Appearance). Frosted, the default, diffuses more and
+  is easier to read; Clear lets more of the page through. The system wins over both:
+  `prefers-contrast: more` and `prefers-reduced-transparency` switch glass off, and a browser
+  without backdrop blur gets an almost opaque panel instead of a see-through one.
+- ♿ **Contrast measured, and fixed.** Several text colours failed WCAG AA (4.5:1): secondary text
+  in light mode was 3.3:1, tertiary text 1.7–2.6:1, and the accent as text on white 2.2:1 (yellow
+  1.5:1). Text now uses text-safe tokens (`--label-t`, `--acc-t`, `--green-t` …) and the
+  stylesheet is tested against AA for every theme × accent. Light-mode yellow text is a dark
+  olive as a result; that is the price of 4.5:1 on white.
+- 👆 **44-point targets.** Header buttons grew from 36 to 44 px; dense controls (segments, switches,
+  accent swatches, the help button) keep their size but are tappable at 44 px, checked by probing
+  taps on the real screens. Inline text links in sentences are exempt. Pinch-zoom is allowed again
+  (the viewport used to forbid it), and the week arrows' screen-reader labels are translated.
+- Not done, on purpose or because the web can't: real refraction and lensing (Safari has no
+  backdrop-filter shaders), SF Symbols and Dynamic Type, haptics. The `prefers-reduced-transparency`
+  rule follows the standard but could not be exercised in the test browser. iOS 27's refinements
+  (less default transparency, a system transparency slider) are known here only from press
+  coverage, not from Apple's documentation, so the Frosted default follows the direction rather
+  than a specification.
+
 ### A meal plan from the meals you already eat
 
 - 🍽️ **Meal plan** (Food screen): a week built from your **saved meals**, each day in portion sizes
