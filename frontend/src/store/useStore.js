@@ -22,6 +22,9 @@ export const DEF = {
   coachProfile: null,
   // The plan the coach replaced, kept for a week so an AI-generated week is reversible.
   coachUndo: null,
+  // Plan changes the trainer made (lib/trainer.js), kept so each can be undone exactly:
+  // { at, actions: [{ type, routineId, exId, from, to, ... }] }.
+  trainerUndo: null,
   // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates
   // ("my breakfast") and myFoods are the user's own entries — the same relationship
   // customEx has with the exercise catalogue.

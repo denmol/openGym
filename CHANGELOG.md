@@ -7,6 +7,43 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### A trainer that reads your log
+
+- 🧠 **Your trainer** (Home card, and in Settings) reads the last four weeks of your own training
+  and says what it found: muscles getting too few weekly sets for your goal, a muscle trained once
+  a week, a lift that has levelled off or is falling, several lifts falling together with harder
+  sets or short sleep (a lighter week is worth considering), a long block with no lighter week,
+  fewer sessions than planned, sets that all end far from failure, and — for an adult who set
+  fat loss as the goal — weight falling faster than the research supports.
+- **Rules, not a model, do the arithmetic.** Every number comes from the log by fixed, tested
+  rules. Under four finished workouts it says it doesn't have enough yet rather than guessing.
+  Warm-up sets are left out, and a supporting muscle counts 0.4 of a set.
+- 📚 **Every finding says how firm its basis is, and cites the study.** *Study finding*
+  (restates a paper), *Common practice* (what lifters report doing — the cited survey does not
+  show that it works) or *Rule of thumb* (this app's own threshold). Seven sources, each looked
+  up in PubMed; the sheet shows what each found and what it can't show, with DOI and PubMed links.
+  The abs are judged by the same range but labelled as an extrapolation and never urgent, because
+  the volume meta-analysis is on limb muscles.
+- 🔧 **It can change the plan, a little, and you can undo it.** Where a muscle is short on sets and
+  a routine already trains it, one tap adds the sets (never more than six on an exercise, never
+  over an edit made since). Undo restores only what it changed. A lighter week is advice, not a
+  switch.
+- ✍️ **Optional written check-in and questions** — with an AI key on the server, a model rewords
+  the findings. It cannot add figures: the server rejects any answer containing a number the
+  findings don't hold (a percentage must match a percentage), a citation the findings don't back,
+  or anything link-shaped, retries once, and otherwise the app shows its own fixed text.
+  The record that is sent is shown first ("What gets sent"): findings only — no workouts,
+  weights, notes or profile text. A minor, an account with Health mode on, or a medical word in the
+  profile or the question never reaches the model; the server decides this from the stored
+  profile, not from what the browser claims.
+- 🔥 **Warm-up sets.** Tap a set's number in a workout to mark it as a warm-up (it turns into an
+  orange **W**; tap again to undo). A warm-up stays in the log but is not work: it no longer
+  counts toward muscle volume, tonnage, estimated 1RM, effort ratings or "last time", and a light
+  set under the target reps can no longer read as a missed session and hold your weight back.
+  Hevy warm-ups are marked automatically on import instead of being taken as working sets.
+  (The app had no warm-up sets before this; a Hevy import used to add them as ordinary sets.)
+- Swedish translation included; other languages fall back to English for the new text.
+
 ### Steps, from whichever watch you wear
 
 - 👟 **Daily step counts import from an Apple Health export or a steps CSV**, Garmin Connect's

@@ -12,6 +12,7 @@ import webpush from 'web-push';
 import {
   decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
 } from './nutrition-context.js';
+import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, TRAINER_SYSTEM } from './trainer.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -611,6 +612,47 @@ const routes = {
       const answer = nutritionAnswer(selected?.highlights, context);
       if (!answer) return json(res, 502, { error: 'model returned an invalid explanation' });
       json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
+    } catch (e) {
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
+
+  // The trainer's analysis is done in the browser, from the user's own log, by fixed rules.
+  // This only asks a model to put words around those findings — and throws the answer away
+  // if it contains a number or a reference the findings did not supply (see trainer.js).
+  'POST /api/trainer': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+
+    const body = await readBody(req);
+    const decision = decideTrainer(body.context, readState(user.id));
+    if (decision.mode === 'invalid') return json(res, 400, { error: 'bad trainer context' });
+    if (decision.mode === 'local') return json(res, 200, { local: true, reasons: decision.reasons, ...aiQuota(user.id) });
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+
+    const context = decision.context;
+    const messages = [
+      { role: 'system', content: TRAINER_SYSTEM },
+      { role: 'user', content: JSON.stringify(trainerPayload(context)) }
+    ];
+    const schema = trainerSchema(context);
+    try {
+      let problems = [];
+      // One retry, told exactly what was wrong. A second failure is a failure: the browser
+      // shows the fixed text, which is always correct if less friendly.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+        const data = await askOpenAI(messages, 'dagsnav_trainer', schema, 3000);
+        const text = data?.choices?.[0]?.message?.content || '';
+        let answer;
+        try { answer = JSON.parse(text); } catch { problems = ['not json']; answer = null; }
+        if (answer) problems = trainerProblems(answer, context);
+        if (!problems.length) return json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
+        messages.push({ role: 'assistant', content: text });
+        messages.push({ role: 'user', content: 'Rejected: ' + problems.join('; ') + '. Rewrite using only numbers and citations from the findings.' });
+      }
+      console.error('trainer: rejected twice:', problems.join('; '));
+      json(res, 502, { error: 'the model\'s answer did not match the findings', fallback: true, ...aiQuota(user.id) });
     } catch (e) {
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }

@@ -12,6 +12,7 @@ import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
+import { trainerSheet } from '../trainer-sheets.jsx'
 import { coachProfileOf, isCoachReady } from '../lib/coach-profile.js'
 import { healthSheet, healthSummary, importGlucoseSheet, undoImport, hasImported } from '../glucose-sheets.jsx'
 import { diabetesOn } from '../lib/diabetes.js'
@@ -129,7 +130,11 @@ export default function Settings() {
     {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
 
     {/* ---------- AI coach ---------- */}
-    <Section title={t('AI coach')} footer={t('Your answers stay on this device. Nothing is sent anywhere unless you paste the prompt into a chat yourself.')}>
+    <Section title={t('AI coach')} footer={t('Your answers stay on this device. Nothing is sent anywhere unless you paste the prompt into a chat yourself. The trainer works out its findings on this device and, only if the server has an AI key and you ask for a written check-in, sends just those findings.')}>
+      <Row icon="chartLine" iconTint="var(--acc)" accessory="chevron"
+        title={t('Your trainer')}
+        subtitle={t('What your log says, and the studies behind it')}
+        onClick={trainerSheet} />
       <Row icon="sparkles" iconTint="var(--acc)" accessory="chevron"
         title={isCoachReady(coachProfileOf(S)) ? t('Training profile') : t('Set up my training profile')}
         subtitle={isCoachReady(coachProfileOf(S)) ? t('Age, goal, equipment and limitations') : null}

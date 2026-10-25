@@ -102,7 +102,9 @@ function deloadTo(cur, step) {
 export function readSession(entry, fallback) {
   const target = (entry && entry.target) || fallback || {}
   const mode = modeOf({ ...target, id: entry && entry.id })
-  const sets = (entry && entry.sets) || []
+  // Warm-ups are not part of the prescription: a light set under the target reps would read
+  // as a miss and hold the weight back.
+  const sets = ((entry && entry.sets) || []).filter(s => !s.warm)
   const planned = target.sets || sets.length
   const enough = sets.length >= planned
 
@@ -133,7 +135,7 @@ export function sessionsFor(S, exId, fallback) {
   const out = []
   ;(S.workouts || []).forEach(w => {
     const entry = w.entries.find(e => e.id === exId)
-    if (entry && entry.sets.some(s => s.done)) out.push({ d: w.d, ...readSession(entry, fallback) })
+    if (entry && entry.sets.some(s => s.done && !s.warm)) out.push({ d: w.d, ...readSession(entry, fallback) })
   })
   return out
 }

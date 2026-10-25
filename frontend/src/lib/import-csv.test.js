@@ -249,3 +249,23 @@ describe('one Apple Health export, one import', () => {
       .toBe('steps')
   })
 })
+
+describe('warm-up sets', () => {
+  const csv = [
+    'title,start_time,end_time,exercise_title,set_index,set_type,weight_kg,reps,rpe',
+    'Push,"2026-08-20 18:00:00","2026-08-20 19:00:00",Bench Press (Barbell),0,warmup,20,10,',
+    'Push,"2026-08-20 18:00:00","2026-08-20 19:00:00",Bench Press (Barbell),1,normal,60,8,8',
+    'Push,"2026-08-20 18:00:00","2026-08-20 19:00:00",Bench Press (Barbell),2,normal,60,8,9'
+  ].join('\n')
+
+  it('keeps a Hevy warm-up in the log, marked so it is not counted as work', () => {
+    const p = parseImport(csv)
+    expect(p.source).toBe('Hevy')
+    expect(p.warmups).toBe(1)
+    const sets = p.workouts[0].entries[0].sets
+    expect(sets).toHaveLength(3)
+    expect(sets[0]).toMatchObject({ w: 20, r: 10, warm: true })
+    expect(sets[1].warm).toBeUndefined()
+    expect(sets[2].warm).toBeUndefined()
+  })
+})
