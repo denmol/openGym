@@ -25,6 +25,8 @@ export const DEF = {
   // Plan changes the trainer made (lib/trainer.js), kept so each can be undone exactly:
   // { at, actions: [{ type, routineId, exId, from, to, ... }] }.
   trainerUndo: null,
+  // The week of meals (lib/mealplan.js): references to saved meals, never copies.
+  mealPlan: null,
   // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates
   // ("my breakfast") and myFoods are the user's own entries — the same relationship
   // customEx has with the exercise catalogue.

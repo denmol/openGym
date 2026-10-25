@@ -7,6 +7,30 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### A meal plan from the meals you already eat
+
+- 🍽️ **Meal plan** (Food screen): a week built from your **saved meals**, each day in portion sizes
+  (×0.5 to ×2) that land near your daily targets. Energy is held to the day's target and protein
+  and fibre to their floors; saturated fat and salt only count against it when over. On a sample
+  set of nine meals, every day landed within about 4% of the energy target.
+- **No model, no key, no invented numbers.** It is a search over your own foods and the targets
+  the Food screen already shows. A meal with a food that is missing energy, protein, carbohydrate
+  or fat values is left out and counted, because a total with a gap in it is a lower bound, not a
+  figure.
+- **Variety is a cost, not a rule.** The same meal is pushed away from the same slot for three
+  days and from repeating across the week; with few saved meals it repeats and says so. A week
+  also says plainly when your meals can't get close to your targets.
+- **One tap to log.** Today's planned meals sit on the Food screen; logging one writes the grams
+  actually planned, once. The plan stores references, so editing a saved meal updates the week.
+  A day can be shuffled until something on it has been logged. There is a shopping list in
+  grams for the week.
+- 🛑 **Who doesn't get one.** The same bar as the nutrition assistant: no schedule for a current
+  medical condition, medication, diabetes mode, a weight-loss drug, a flagged or unanswered safety
+  answer, an expired review, a paused target, or anyone under 18. The screen says why and points
+  at a dietitian or the care team. A schedule that fixes carbohydrate per meal is too close to
+  dosing to generate for those accounts.
+- Swedish translation included.
+
 ### A trainer that reads your log
 
 - 🧠 **Your trainer** (Home card, and in Settings) reads the last four weeks of your own training
