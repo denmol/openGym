@@ -64,6 +64,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   const cardio = mode === 'cardio'
   const timed = mode === 'time'
   const last = lastEntryFor(S, entry.id)
+  const usedWarm = S.active.entries.some(e => e.sets.some(s => s.warm)) || S.workouts.some(w => w.entries.some(e => e.sets.some(s => s.warm)))
   // The same number the "confirm your working weight" sheet calls your best, so the two
   // never disagree inside one session: heaviest logged set, or the working weight you kept.
   const best = cardio ? 0 : Math.max(bestWeightFor(S, entry.id), (S.exWeights[entry.id] || {}).w || 0)
@@ -138,7 +139,12 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
       {/* the header carries the same eff3 sizing as the rows, or the labels drift off their columns */}
       <div className={'sethead' + (col3 ? ' eff3' : '')}><span className="n-sp" /><span className="w-sp">{col1.hd}</span>{col2 && <span className="r-sp">{col2.hd}</span>}{col3 && <span className="eff-sp">{col3.hd}</span>}{timed && <span className="ck-sp" />}<span className="ck-sp" /></div>
       {entry.sets.map((s, i) => <div key={i} className={'setrow' + (s.done ? ' done' : '') + (col3 ? ' eff3' : '')}>
-        <div className="n">{i + 1}</div>
+        {/* Tapping the number marks a warm-up. Cardio has none, and a hold is timed, so the
+            toggle is for weighted sets only. */}
+        {cardio ? <div className="n">{i + 1}</div>
+          : <button className={'n' + (s.warm ? ' warm' : '')} aria-pressed={!!s.warm}
+            aria-label={s.warm ? t('Warm-up set. Tap to make it a working set') : t('Tap to mark as a warm-up set')}
+            onClick={() => onField(i, 'warm', s.warm ? null : true)}>{s.warm ? 'W' : i + 1}</button>}
         {cell(s, i, col1, 'w')}
         {col2 && cell(s, i, col2, 'r')}
         {col3 && cell(s, i, col3, 'eff')}
@@ -156,6 +162,8 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
           done.hr && `${done.hr} bpm`
         ].filter(Boolean).join(' · ')}
       </div>}
+      {/* said once: until a warm-up has been marked anywhere, then it gets out of the way */}
+      {!cardio && !usedWarm && <div className="dim small" style={{ marginTop: 6 }}>{t('Tap a set number to mark it as a warm-up. Warm-ups don’t count toward your stats or progression.')}</div>}
       <div style={{ height: 8 }} />
       <div className="row">
         <Button size="sm" icon="minus" disabled={entry.sets.length <= 1} onClick={onRemoveSet}>{t('Remove set')}</Button>

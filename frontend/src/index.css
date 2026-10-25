@@ -683,6 +683,8 @@ h4.sec{
   display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex:none;
   transition:background var(--fast),color var(--fast);
 }
+.setrow button.n{border:0;padding:0;cursor:pointer}
+.setrow .n.warm{background:color-mix(in srgb,var(--orange) 22%,transparent);color:var(--orange);font-weight:700}
 .setrow .stp.w{flex:1.4;min-width:0}
 .setrow .stp.r{flex:1;min-width:0}
 .setrow .stp.eff{flex:1.1;min-width:0}

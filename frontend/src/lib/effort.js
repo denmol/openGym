@@ -44,7 +44,7 @@ export const scaleName = kind => EFFORT[kind].hd
 function eachDoneSet(S, fn) {
   ;(S.workouts || []).forEach(w =>
     (w.entries || []).forEach(e =>
-      (e.sets || []).forEach(s => { if (s.done) fn(s, w, e) })))
+      (e.sets || []).forEach(s => { if (s.done && !s.warm) fn(s, w, e) })))
 }
 
 export const avgRir = sets => {

@@ -342,7 +342,8 @@ export function parseWorkoutCSV(text, { unit = 'kg' } = {}) {
       ? num(cell(r, 'distanceKm'))
       : toKm(cell(r, 'distance'), cell(r, 'distanceUnit'))
     if (!w && !reps && !mins && !km) { skipped++; continue }
-    if (/warm/i.test(cell(r, 'setType'))) warmups++
+    const isWarm = /warm/i.test(cell(r, 'setType'))
+    if (isWarm) warmups++
 
     const key = keyOf(name)
     let id = resolved.get(key)
@@ -369,6 +370,8 @@ export function parseWorkoutCSV(text, { unit = 'kg' } = {}) {
     const set = isCardio
       ? { min: mins || 0, ...(km > 0 ? { km: Math.round(km * 100) / 100 } : {}), done: true }
       : { w, r: reps || 0, done: true, u: rowUnit }
+    // A warm-up stays in the log but is marked, so the trainer's volume counts work sets only.
+    if (isWarm && !isCardio) set.warm = true
     if (isCardio) {
       const hr = num(cell(r, 'hr'))
       if (hr > 0) set.hr = Math.round(hr)

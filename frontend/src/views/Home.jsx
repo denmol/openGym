@@ -10,6 +10,7 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import { coachWizardSheet } from '../coach-sheets.jsx'
+import { trainerSheet, useTrainerHeadline } from '../trainer-sheets.jsx'
 import { foodMap } from '../lib/foods.js'
 import { dayTotals, hasMeals, nutrientTotal } from '../lib/nutrition.js'
 import { quickLogSheet, mealSheet } from '../food-sheets.jsx'
@@ -20,6 +21,7 @@ export default function Home() {
   const S = useStore(s => s.S)
   const user = useStore(s => s.user)
   const [weekOffset, setWeekOffset] = useState(0)
+  const trainer = useTrainerHeadline()
 
   const today = new Date()
   const routine = effectiveRoutine(S, todayISO())
@@ -119,6 +121,17 @@ export default function Home() {
         <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}
+
+    {trainer && <button className="card row between" style={{ width: '100%', textAlign: 'left', gap: 12 }} onClick={trainerSheet}>
+      <span className="row" style={{ gap: 10, minWidth: 0 }}>
+        <span className="lrow-i"><Icon name="sparkles" /></span>
+        <span style={{ minWidth: 0 }}>
+          <span className="dim small" style={{ display: 'block' }}>{t('Your trainer')}</span>
+          <span className="tt" style={{ fontSize: 16 }}>{trainer.text}</span>
+        </span>
+      </span>
+      <Icon name="chevronRight" className="dim" />
+    </button>}
 
     <div className="card">
       <div className="row between" style={{ marginBottom: 6 }}>

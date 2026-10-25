@@ -1,0 +1,272 @@
+// The AI trainer: findings from your own log, the studies behind them, and — when the server
+// has a key — a written check-in that is held to those findings.
+//
+// Order on the sheet is the order of trust. First what the log says (computed, fixed rules),
+// then what could be done about it, then the optional model voice, which is labelled as a
+// rewording of the first part and carries nothing the first part doesn't.
+
+import { useEffect, useMemo, useState } from 'react'
+import { useStore } from './store/useStore.js'
+import { useUI } from './store/useUI.js'
+import { t } from './lib/i18n.js'
+import { todayISO, fmtNum } from './lib/format.js'
+import { Button, TextField } from './components/ui.jsx'
+import Icon from './components/Icon.jsx'
+import { analyze, applyTrainerAction, revertTrainerAction, MAJOR, WINDOW_DAYS } from './lib/trainer.js'
+import { describe, headlineOf, BASIS_LABEL, BASIS_NOTE } from './lib/trainer-text.js'
+import { EVIDENCE, doiUrl, pubmedUrl } from './lib/trainer-evidence.js'
+import { trainerContext, trainerStatus, askTrainer, MAX_QUESTION } from './lib/trainer-ai.js'
+import { coachProfileOf, isCoachReady } from './lib/coach-profile.js'
+import { coachWizardSheet } from './coach-sheets.jsx'
+
+const update = (...a) => useStore.getState().update(...a)
+const ui = () => useUI.getState()
+
+const KIND = {
+  act: { icon: 'flag', color: 'var(--orange)' },
+  watch: { icon: 'info', color: 'var(--yellow)' },
+  good: { icon: 'checkCircle', color: 'var(--green)' },
+  info: { icon: 'lightbulb', color: 'var(--blue)' }
+}
+
+/* ------------------------------- sources ------------------------------- */
+
+function Source({ id }) {
+  const e = EVIDENCE[id]
+  if (!e) return null
+  return <div className="small" style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', lineHeight: 1.42 }}>
+    <div className="tt" style={{ fontSize: 13 }}>{e.cite}</div>
+    <div className="dim" style={{ marginBottom: 6 }}>{e.title}. <i>{e.journal}</i></div>
+    <div>{t(e.claim)}</div>
+    <div className="dim" style={{ marginTop: 4 }}>{t('Limits:')} {t(e.limit)}</div>
+    <div className="row" style={{ gap: 12, marginTop: 6 }}>
+      <a href={doiUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue)' }}>DOI</a>
+      <a href={pubmedUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue)' }}>PubMed</a>
+    </div>
+  </div>
+}
+
+function BasisTag({ basis }) {
+  return <span className="tag nocap" title={t(BASIS_NOTE[basis])}>{t(BASIS_LABEL[basis])}</span>
+}
+
+/* ------------------------------- one finding ------------------------------- */
+
+function Finding({ f, onApply }) {
+  const [open, setOpen] = useState(false)
+  const k = KIND[f.kind]
+  const { title, body } = describe(f)
+  const a = f.action
+  return <div className="card" style={{ borderLeft: '3px solid ' + k.color, marginBottom: 10 }}>
+    <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+      <Icon name={k.icon} style={{ color: k.color, fontSize: 18, marginTop: 2, flex: 'none' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tt" style={{ fontSize: 16, lineHeight: 1.25 }}>{title}</div>
+        <div className="muted small" style={{ marginTop: 5, lineHeight: 1.45 }}>{body}</div>
+        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <BasisTag basis={f.basis} />
+          {f.evidence.length > 0 && <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue)' }} onClick={() => setOpen(!open)}>
+            {open ? t('Hide sources') : t(f.evidence.length === 1 ? 'Source' : 'Sources')}
+          </button>}
+        </div>
+        {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          {f.evidence.map(id => <Source key={id} id={id} />)}
+          <div className="dim small">{t(BASIS_NOTE[f.basis])}</div>
+        </div>}
+        {a && <div style={{ marginTop: 10 }}>
+          <Button size="sm" variant="primary" icon="plus" onClick={onApply}>
+            {t('{0}: {1} → {2} sets', a.exercise, a.from, a.to)}
+          </Button>
+          <div className="dim small" style={{ marginTop: 5 }}>{t('In {0}. Changes your plan; you can undo it.', a.routine)}</div>
+        </div>}
+      </div>
+    </div>
+  </div>
+}
+
+/* ------------------------------- balance ------------------------------- */
+
+function Balance({ analysis }) {
+  const { range } = analysis
+  const rows = analysis.muscles.filter(m => MAJOR.includes(m.slug))
+  const top = Math.max(range.ceiling * 1.25, ...rows.map(m => m.weekly))
+  return <div className="card">
+    <h2>{t('Weekly sets per muscle')}</h2>
+    {rows.map(m => {
+      const color = m.weekly < range.floor ? 'var(--orange)' : m.weekly > range.ceiling ? 'var(--yellow)' : 'var(--green)'
+      return <div key={m.slug} className="row" style={{ gap: 10, marginBottom: 7 }}>
+        <div className="small" style={{ width: 86, flex: 'none' }}>{t(m.name)}</div>
+        <div style={{ flex: 1, height: 10, borderRadius: 5, background: 'var(--surface-2)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', left: (range.floor / top * 100) + '%', width: ((range.ceiling - range.floor) / top * 100) + '%', top: 0, bottom: 0, background: 'var(--label-4)' }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: Math.min(100, m.weekly / top * 100) + '%', background: color, borderRadius: 5 }} />
+        </div>
+        <div className="small" style={{ width: 34, textAlign: 'right', flex: 'none' }}>{fmtNum(m.weekly)}</div>
+      </div>
+    })}
+    <div className="dim small" style={{ marginTop: 8, lineHeight: 1.4 }}>
+      {t('The grey band is the range of {0}–{1} sets for your goal. A supporting muscle counts 0.4 of a set, warm-ups are left out.', range.floor, range.ceiling)}
+    </div>
+  </div>
+}
+
+/* ------------------------------- the model voice ------------------------------- */
+
+function Disclosure({ context }) {
+  const [open, setOpen] = useState(false)
+  return <div style={{ marginTop: 8 }}>
+    <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue)' }} onClick={() => setOpen(!open)}>
+      {open ? t('Hide what is sent') : t('What gets sent')}
+    </button>
+    {open && <>
+      <pre className="small" style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 10, margin: '6px 0 0', maxHeight: 220, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {JSON.stringify(context, null, 1)}
+      </pre>
+      <div className="dim small" style={{ marginTop: 4 }}>{t('Findings only. Your workouts, weights, notes and profile text are not included.')}</div>
+    </>}
+  </div>
+}
+
+function Voice({ S, analysis }) {
+  const [status, setStatus] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [res, setRes] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => { trainerStatus().then(setStatus) }, [])
+
+  const context = useMemo(() => trainerContext(S, analysis, question), [S, analysis, question])
+
+  if (!status) return null
+  if (!status.enabled) {
+    return <div className="dim small" style={{ lineHeight: 1.45, margin: '4px 2px 14px' }}>
+      {t('Everything above works without an AI model. To get it written as a short check-in you can ask questions of, the server needs an API key (see the self-hosting guide).')}
+    </div>
+  }
+
+  const ask = async q => {
+    setBusy(true); setErr(null); setRes(null)
+    try {
+      const out = await askTrainer(trainerContext(S, analysis, q))
+      setRes(out)
+    } catch (e) {
+      setErr(e.status === 429 ? t('Daily limit reached. The findings above are still current.')
+        : e.fallback ? t('The model’s answer didn’t match your numbers, so it was thrown away. The findings above are what stands.')
+          : e.message)
+    }
+    setBusy(false)
+  }
+
+  return <div className="card">
+    <h2>{t('Written check-in')}</h2>
+    <div className="muted small" style={{ lineHeight: 1.45, marginBottom: 10 }}>
+      {t('An AI model rewords the findings above. It can’t add numbers or studies: anything that doesn’t match is rejected.')}
+    </div>
+    <Button variant="primary" icon="sparkles" disabled={busy} onClick={() => ask('')}>
+      {busy ? t('Writing…') : t('Write my check-in')}
+    </Button>
+    <div className="row" style={{ gap: 8, marginTop: 10 }}>
+      <TextField style={{ flex: 1, minWidth: 0 }} value={question} maxLength={MAX_QUESTION}
+        placeholder={t('Or ask about your training…')} onChange={e => setQuestion(e.target.value)} />
+      <Button size="sm" disabled={busy || !question.trim()} onClick={() => ask(question)}>{t('Ask')}</Button>
+    </div>
+    <Disclosure context={context} />
+    {err && <div className="small" style={{ color: 'var(--red)', marginTop: 10, lineHeight: 1.4 }}>{err}</div>}
+    {res && res.local && <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>
+      {t('AI isn’t used for this profile (age, health mode, or a medical note). The findings above are the whole answer.')}
+    </div>}
+    {res && res.answer && res.answer.status === 'outside_scope' && <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>
+      {t('Your log can’t answer that. For pain, injury, illness, diet or supplements, ask a clinician or a registered dietitian.')}
+    </div>}
+    {res && res.answer && res.answer.status === 'ok' && <div style={{ marginTop: 12 }}>
+      <div className="tt" style={{ fontSize: 16, marginBottom: 6 }}>{res.answer.headline}</div>
+      {res.answer.paragraphs.map((p, i) => <div key={i} style={{ marginBottom: 10 }}>
+        <div className="small" style={{ lineHeight: 1.5 }}>{p.text}</div>
+        {p.cites.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+          {[...new Set(p.cites)].map(id => <Source key={id} id={id} />)}
+        </div>}
+      </div>)}
+    </div>}
+  </div>
+}
+
+/* ------------------------------- the sheet ------------------------------- */
+
+function Trainer({ close }) {
+  const S = useStore(s => s.S)
+  const analysis = useMemo(() => analyze(S), [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit])
+  const profile = coachProfileOf(S)
+  const [shown, setShown] = useState(5)
+  const fresh = S.trainerUndo && S.trainerUndo.at && (Date.now() - new Date(S.trainerUndo.at + 'T00:00:00').getTime()) / 86400000 <= 14
+  const undo = fresh && S.trainerUndo.actions && S.trainerUndo.actions.length ? S.trainerUndo : null
+
+  const apply = a => {
+    let ok = false
+    update(s => {
+      ok = applyTrainerAction(s, a)
+      if (ok) s.trainerUndo = { at: todayISO(), actions: [...((s.trainerUndo && s.trainerUndo.actions) || []), a] }
+    })
+    ui().toast(ok ? t('Plan updated') : t('Your plan changed since; open the trainer again'))
+  }
+  const revert = a => {
+    update(s => {
+      revertTrainerAction(s, a)
+      const left = ((s.trainerUndo && s.trainerUndo.actions) || []).filter(u => !(u.routineId === a.routineId && u.exId === a.exId && u.to === a.to))
+      s.trainerUndo = left.length ? { at: todayISO(), actions: left } : null
+    })
+    ui().toast(t('Plan restored'))
+  }
+  // Applying changes the plan, which re-runs the analysis and drops the finding that carried
+  // the button, so the undo lives in its own list.
+  const applied = undo ? undo.actions : []
+
+  const list = analysis.findings
+  return <>
+    <h3>{t('Your trainer')}</h3>
+    <div className="muted small" style={{ marginBottom: 14, lineHeight: 1.45 }}>
+      {analysis.ready
+        ? t('From your last {0} days of training. Every number comes from your log by fixed rules, not from a model, and each rule says how firm its basis is.', WINDOW_DAYS)
+        : t('Log a few workouts and your trainer will start. It won’t judge before there is something to judge.')}
+    </div>
+
+    {!isCoachReady(profile) || !profile.goal
+      ? <div className="card" style={{ marginBottom: 12 }}>
+        <div className="small" style={{ lineHeight: 1.45, marginBottom: 8 }}>{t('Tell it your goal and what equipment you have, and the ranges it judges against fit you.')}</div>
+        <Button size="sm" icon="person" onClick={() => { close(); coachWizardSheet() }}>{t('Set up my training profile')}</Button>
+      </div>
+      : null}
+
+    {applied.length > 0 && <div className="card" style={{ marginBottom: 10 }}>
+      <h2>{t('Changes the trainer made')}</h2>
+      {applied.map((a, i) => <div key={i} className="row between" style={{ gap: 10, marginBottom: 6 }}>
+        <div className="small">{a.exercise}: {a.from} → {a.to} {t('sets')}</div>
+        <Button size="sm" icon="reset" onClick={() => revert(a)}>{t('Undo')}</Button>
+      </div>)}
+    </div>}
+
+    {list.slice(0, shown).map((f, i) =>
+      <Finding key={f.code + (f.facts.muscle || f.facts.exercise || '') + i} f={f} onApply={() => apply(f.action)} />)}
+    {list.length > shown && <Button onClick={() => setShown(list.length)}>{t('Show {0} more', list.length - shown)}</Button>}
+    {analysis.ready && !list.some(f => f.kind === 'act' || f.kind === 'watch') && <div className="card">
+      <div className="tt">{headlineOf(analysis)}</div>
+    </div>}
+
+    {analysis.ready && <div style={{ marginTop: 10 }}><Balance analysis={analysis} /></div>}
+    <div style={{ marginTop: 10 }}><Voice S={S} analysis={analysis} /></div>
+
+    <div className="dim small" style={{ lineHeight: 1.45, margin: '4px 2px 6px' }}>
+      {t('General training information, not medical advice. If something hurts or you are unwell, see a clinician.')}
+    </div>
+  </>
+}
+
+export const trainerSheet = () => ui().openSheet(close => <Trainer close={close} />)
+
+/** One line for the Home card. */
+export function useTrainerHeadline() {
+  const S = useStore(s => s.S)
+  return useMemo(() => {
+    if (!S.workouts || !S.workouts.length) return null
+    const a = analyze(S)
+    return { text: headlineOf(a), kind: (a.findings.find(f => f.kind === 'act') || a.findings.find(f => f.kind === 'watch') || { kind: a.ready ? 'good' : 'info' }).kind }
+  }, [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit])
+}

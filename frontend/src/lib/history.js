@@ -145,7 +145,9 @@ export function lastEntryFor(S, exId) {
     // `target` is what the session prescribed; finished workouts carry it so labels and the
     // progression engine can read a session back the way it was logged. Older workouts have
     // none — modeOf() falls back to the body part for them, which is what they were.
-    if (en && en.sets.some(s => s.done)) return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done), target: en.target || null }
+    // A warm-up (s.warm) is not what "last time" means: it would pre-fill the first working set
+    // with the bar's weight.
+    if (en && en.sets.some(s => s.done && !s.warm)) return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done && !s.warm), target: en.target || null }
   }
   return null
 }
@@ -153,7 +155,7 @@ export function bestWeightFor(S, exId) {
   let best = 0
   S.workouts.forEach(w => w.entries.forEach(e => {
     if (e.id === exId) {
-      e.sets.forEach(s => { if (s.done && s.w > best) best = s.w })
+      e.sets.forEach(s => { if (s.done && !s.warm && s.w > best) best = s.w })
       if (e.topW && e.topW > best) best = e.topW
     }
   }))
@@ -219,7 +221,7 @@ export function workoutVolume(w) {
   let v = 0
   // No special case for unilateral work: a per-side set logs its total, so both sides are
   // already in the rep count that arrives here.
-  w.entries.forEach(e => e.sets.forEach(s => { if (s.done) v += (s.w || 0) * (s.r || 0) }))
+  w.entries.forEach(e => e.sets.forEach(s => { if (s.done && !s.warm) v += (s.w || 0) * (s.r || 0) }))
   return v
 }
 /**
