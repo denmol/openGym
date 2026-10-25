@@ -22,6 +22,7 @@ import {
 import { diabetesOn, healthOf, glucoseOn, dosesOn, doseTotals, timeInRange, TAG_NAME, DOSE_NAME } from '../lib/diabetes.js'
 import { mealSheet, quickLogSheet, mealDetailSheet, ownFoodSheet, deleteMyMeal, Macros } from '../food-sheets.jsx'
 import { nutritionAssistSheet, nutritionGoalInfoSheet, nutritionGoalsSheet } from '../nutrition-sheets.jsx'
+import { MealPlanCard } from '../mealplan-sheets.jsx'
 import { glucoseSheet, doseSheet, entrySheet, Reading } from '../glucose-sheets.jsx'
 import { Button } from '../components/ui.jsx'
 import DayGoals, { GoalRow } from '../components/DayGoals.jsx'
@@ -230,6 +231,8 @@ export default function Food() {
         {t('{0} units in total', fmtNum(dTot.total))}
       </div>
     </div>}
+
+    <MealPlanCard />
 
     {(S.myMeals || []).length > 0 && <div className="card">
       <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Saved meals')}</h2>
