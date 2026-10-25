@@ -1419,4 +1419,11 @@ export default {
   'With so few saved meals, things will repeat. A handful more makes a better week.': 'Med så få sparade måltider kommer saker att upprepas. Några fler ger en bättre vecka.',
   'Some saved meals were left out because a food in them is missing energy, protein, carbohydrate or fat values.': 'Några sparade måltider utelämnades eftersom ett livsmedel i dem saknar värden för energi, protein, kolhydrat eller fett.',
   'Your saved meals can’t get close to your targets on most days. Saving a few lighter or heavier ones helps.': 'Dina sparade måltider kommer inte nära dina mål de flesta dagar. Det hjälper att spara några lättare eller tyngre.',
+  // --- iOS 26 look ---
+  'Previous week': 'Föregående vecka',
+  'Next week': 'Nästa vecka',
+  'Glass': 'Glas',
+  'How see-through bars and sheets are': 'Hur genomskinliga fält och blad är',
+  'Frosted': 'Frostat',
+  'Clear': 'Klart',
 }

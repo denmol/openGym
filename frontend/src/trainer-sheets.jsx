@@ -23,10 +23,10 @@ const update = (...a) => useStore.getState().update(...a)
 const ui = () => useUI.getState()
 
 const KIND = {
-  act: { icon: 'flag', color: 'var(--orange)' },
-  watch: { icon: 'info', color: 'var(--yellow)' },
-  good: { icon: 'checkCircle', color: 'var(--green)' },
-  info: { icon: 'lightbulb', color: 'var(--blue)' }
+  act: { icon: 'flag', color: 'var(--orange-t)' },
+  watch: { icon: 'info', color: 'var(--yellow-t)' },
+  good: { icon: 'checkCircle', color: 'var(--green-t)' },
+  info: { icon: 'lightbulb', color: 'var(--blue-t)' }
 }
 
 /* ------------------------------- sources ------------------------------- */
@@ -40,8 +40,8 @@ function Source({ id }) {
     <div>{t(e.claim)}</div>
     <div className="dim" style={{ marginTop: 4 }}>{t('Limits:')} {t(e.limit)}</div>
     <div className="row" style={{ gap: 12, marginTop: 6 }}>
-      <a href={doiUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue)' }}>DOI</a>
-      <a href={pubmedUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue)' }}>PubMed</a>
+      <a href={doiUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue-t)' }}>DOI</a>
+      <a href={pubmedUrl(e)} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--blue-t)' }}>PubMed</a>
     </div>
   </div>
 }
@@ -65,7 +65,7 @@ function Finding({ f, onApply }) {
         <div className="muted small" style={{ marginTop: 5, lineHeight: 1.45 }}>{body}</div>
         <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <BasisTag basis={f.basis} />
-          {f.evidence.length > 0 && <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue)' }} onClick={() => setOpen(!open)}>
+          {f.evidence.length > 0 && <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue-t)' }} onClick={() => setOpen(!open)}>
             {open ? t('Hide sources') : t(f.evidence.length === 1 ? 'Source' : 'Sources')}
           </button>}
         </div>
@@ -114,7 +114,7 @@ function Balance({ analysis }) {
 function Disclosure({ context }) {
   const [open, setOpen] = useState(false)
   return <div style={{ marginTop: 8 }}>
-    <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue)' }} onClick={() => setOpen(!open)}>
+    <button className="small" style={{ background: 'none', border: 0, padding: 0, color: 'var(--blue-t)' }} onClick={() => setOpen(!open)}>
       {open ? t('Hide what is sent') : t('What gets sent')}
     </button>
     {open && <>
@@ -170,7 +170,7 @@ function Voice({ S, analysis }) {
       <Button size="sm" disabled={busy || !question.trim()} onClick={() => ask(question)}>{t('Ask')}</Button>
     </div>
     <Disclosure context={context} />
-    {err && <div className="small" style={{ color: 'var(--red)', marginTop: 10, lineHeight: 1.4 }}>{err}</div>}
+    {err && <div className="small" style={{ color: 'var(--red-t)', marginTop: 10, lineHeight: 1.4 }}>{err}</div>}
     {res && res.local && <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>
       {t('AI isn’t used for this profile (age, health mode, or a medical note). The findings above are the whole answer.')}
     </div>}

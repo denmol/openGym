@@ -27,7 +27,8 @@
 
   /* text */
   --label:     #ffffff;
-  --label-2:   rgba(235,235,245,.60);
+  --label-2:   rgba(235,235,245,.72);
+  --label-t:   rgba(235,235,245,.56);   /* tertiary TEXT: 4.6:1 on the worst surface; --label-3 stays for non-text */
   --label-3:   rgba(235,235,245,.32);
   --label-4:   rgba(235,235,245,.18);
 
@@ -49,7 +50,7 @@
   --acc-line: color-mix(in srgb, var(--acc) 38%, transparent);
 
   /* geometry */
-  --r-sm:8px; --r:12px; --r-lg:16px; --r-xl:22px; --r-card:14px;
+  --r-sm:10px; --r:14px; --r-lg:22px; --r-xl:34px; --r-card:22px;
   --pad:16px;
   --icon-stroke:1.7;
 
@@ -59,7 +60,27 @@
 
   --sab:env(safe-area-inset-bottom,0px);
   --sat:env(safe-area-inset-top,0px);
+
+  /* Text-safe accents. The system colours are fine as fills and as icons on dark, but several
+     fall under 4.5:1 as TEXT — on dark the blue/red/pink/purple on the nested surface, on light
+     most of them. -t is the colour to use whenever the colour is the text. */
+  --green-t:var(--green); --orange-t:var(--orange); --yellow-t:var(--yellow); --teal-t:var(--teal);
+  --blue-t:#3097ff; --red-t:#ff5d54; --pink-t:#ff5b7c; --purple-t:#c76ff4;
+  --acc-t:var(--green-t);
+
+  /* Materials (Liquid Glass). Glass is for the layer that floats over content — the tab bar,
+     sheets, dialogs, floating controls — never for the content itself. Two feels, chosen in
+     Settings: frosted (default; more diffusion, easier to read) and clear. The system's own
+     preferences win over both, below. */
+  --glass-base:28 28 30;          /* bars, dialogs */
+  --glass-sheet-base:14 14 16;    /* sheets: matches the grouped-list backdrop their cards sit on */
+  --glass-a:.80; --glass-sheet-a:.90;
+  --glass-blur:30px; --glass-sat:170%;
+  --glass-hi:rgba(255,255,255,.10);     /* specular edge along the top */
+  --glass-rim:rgba(255,255,255,.14);    /* hairline around the shape */
+  --glass-shadow:0 14px 34px -10px rgba(0,0,0,.6),0 2px 10px rgba(0,0,0,.28);
 }
+:root[data-glass="clear"]{--glass-a:.52;--glass-sheet-a:.70;--glass-blur:22px}
 
 :root[data-theme="light"] {
   --bg:        #f2f2f7;
@@ -69,7 +90,8 @@
   --surface-3: #e3e3e8;
 
   --label:     #000000;
-  --label-2:   rgba(60,60,67,.60);
+  --label-2:   rgba(60,60,67,.85);
+  --label-t:   rgba(60,60,67,.75);
   --label-3:   rgba(60,60,67,.30);
   --label-4:   rgba(60,60,67,.16);
 
@@ -81,7 +103,18 @@
   --purple:#af52de; --mint:#00c7be; --brown:#a2845e; --grey:#8e8e93;
   --acc-2:#248a3d;
   --on-acc:#ffffff;
+
+  --green-t:#1f7836; --blue-t:#0066d6; --orange-t:#995900; --purple-t:#9e2ed7;
+  --pink-t:#d50029; --red-t:#d30b00; --teal-t:#1f7281; --yellow-t:#7f6600;
+
+  --glass-base:255 255 255;
+  --glass-sheet-base:242 242 247;
+  --glass-a:.78; --glass-sheet-a:.90;
+  --glass-hi:rgba(255,255,255,.95);
+  --glass-rim:rgba(0,0,0,.09);
+  --glass-shadow:0 14px 34px -12px rgba(60,60,80,.34),0 2px 10px rgba(60,60,80,.12);
 }
+:root[data-theme="light"][data-glass="clear"]{--glass-a:.55;--glass-sheet-a:.72}
 
 /* accents — Apple's system colours, so a recolour never looks off-system */
 :root[data-accent="lime"]  { --acc:var(--green);  --acc-2:#248a3d; --on-acc:#000 }
@@ -92,6 +125,15 @@
 :root[data-accent="red"]   { --acc:var(--red);    --acc-2:#d70015; --on-acc:#fff }
 :root[data-accent="teal"]  { --acc:var(--teal);   --acc-2:#0071a4; --on-acc:#000 }
 :root[data-accent="gold"]  { --acc:var(--yellow); --acc-2:#b25000; --on-acc:#000 }
+/* the same accents as TEXT — see --acc-t above */
+:root[data-accent="lime"]  { --acc-t:var(--green-t) }
+:root[data-accent="sky"]   { --acc-t:var(--blue-t) }
+:root[data-accent="orange"]{ --acc-t:var(--orange-t) }
+:root[data-accent="violet"]{ --acc-t:var(--purple-t) }
+:root[data-accent="pink"]  { --acc-t:var(--pink-t) }
+:root[data-accent="red"]   { --acc-t:var(--red-t) }
+:root[data-accent="teal"]  { --acc-t:var(--teal-t) }
+:root[data-accent="gold"]  { --acc-t:var(--yellow-t) }
 /* Label colour on a filled accent button is picked per accent by measured contrast,
    not by taste. Button text is 17px/600, so the AA bar is 3:1 (large text). White on
    the light-theme green is 2.22:1 and on teal 2.57:1 — both fail, and green is the
@@ -104,6 +146,19 @@
 :root[data-theme="light"][data-accent="violet"],
 :root[data-theme="light"][data-accent="pink"],
 :root[data-theme="light"][data-accent="red"]   { --on-acc:#fff }
+
+/* The system's own accessibility settings win over the in-app choice. */
+@media (prefers-reduced-transparency: reduce){
+  :root,:root[data-glass]{--glass-a:1;--glass-sheet-a:1;--glass-blur:0px;--glass-sat:100%}
+}
+@media (prefers-contrast: more){
+  :root,:root[data-glass]{--glass-a:1;--glass-sheet-a:1;--glass-blur:0px;--glass-sat:100%;--glass-rim:var(--label-2)}
+}
+/* No backdrop blur in this browser: an almost-opaque panel is better than a see-through one
+   that nothing is blurring. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root,:root[data-glass]{--glass-a:.97;--glass-sheet-a:.98}
+}
 
 /* ---------------------------------------------------------------- reset -- */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -123,7 +178,7 @@ body{
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;letter-spacing:inherit}
 input,select,textarea{font:inherit;color:var(--label);letter-spacing:inherit}
 img{max-width:100%}
-a{color:var(--acc);text-decoration:none}
+a{color:var(--acc-t);text-decoration:none}
 :focus{outline:none}
 :focus-visible{outline:2.5px solid var(--acc);outline-offset:2px;border-radius:6px}
 button,.chip,.tile,.item,.wday,.cal-d,.swatch,.hm-c,.lrow,.seg button,.stp button,.sld
@@ -149,9 +204,9 @@ button,.chip,.tile,.item,.wday,.cal-d,.swatch,.hm-c,.lrow,.seg button,.stp butto
 .t-foot   {font-size:13px;line-height:1.38;font-weight:400;letter-spacing:-.001em}
 .t-cap    {font-size:12px;line-height:1.33;font-weight:400;letter-spacing:0}
 
-.muted{color:var(--label-2)} .dim{color:var(--label-3)}
+.muted{color:var(--label-2)} .dim{color:var(--label-t)}
 .small{font-size:13px;line-height:1.38}
-.accent{color:var(--acc)}
+.accent{color:var(--acc-t)}
 .capitalize{text-transform:capitalize}
 /* exercise names and body-part/equipment terms arrive lowercase from the dataset,
    so tags and chips capitalise by default. Anything that is a unit or a sentence opts
@@ -177,13 +232,15 @@ body.resting #app{padding-bottom:calc(250px + var(--sab))}
 .hdr .sub{color:var(--label-2);font-size:15px;letter-spacing:-.006em;margin-top:4px}
 
 .iconbtn{
-  width:36px;height:36px;border-radius:50%;flex:none;
-  background:var(--surface);color:var(--label);
+  width:44px;height:44px;border-radius:50%;flex:none;
+  background:rgb(var(--glass-base)/var(--glass-a));color:var(--label);
+  backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));
+  box-shadow:inset 0 0 0 var(--hair) var(--glass-rim),inset 0 1px 0 var(--glass-hi);
   display:flex;align-items:center;justify-content:center;font-size:18px;
   transition:background var(--fast),transform var(--fast);
 }
-.iconbtn:active{background:var(--surface-2);transform:scale(.92)}
-.iconbtn.on-ss{background:var(--acc-soft);color:var(--acc)}
+.iconbtn:active{transform:scale(.92)}
+.iconbtn.on-ss{background:var(--acc-soft);color:var(--acc-t)}
 
 h4.sec{
   font-size:13px;font-weight:400;letter-spacing:-.004em;color:var(--label-2);
@@ -211,13 +268,13 @@ h4.sec{
 .nutrient-details{margin-top:12px;border-top:var(--hair) solid var(--sep)}
 .nutrient-details summary{
   min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  cursor:pointer;color:var(--acc);font-size:14px;list-style:none;
+  cursor:pointer;color:var(--acc-t);font-size:14px;list-style:none;
 }
 .nutrient-details summary::-webkit-details-marker{display:none}
 .nutrient-details summary::after{content:'⌄';font-size:17px;color:var(--label-2);transition:transform var(--fast)}
 .nutrient-details[open] summary::after{transform:rotate(180deg)}
 .nutrient-incomplete{
-  margin-left:auto;color:var(--orange);font-size:11px;padding:3px 7px;border-radius:99px;
+  margin-left:auto;color:var(--orange-t);font-size:11px;padding:3px 7px;border-radius:99px;
   background:color-mix(in srgb,var(--orange) 13%,transparent);
 }
 .nutrient-details dl{margin:0}
@@ -227,8 +284,8 @@ h4.sec{
 }
 .nutrient-details dt{font-size:14px;color:var(--label-2)}
 .nutrient-details dd{margin:0;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
-.nutrient-details dd small{display:block;color:var(--label-3);font-size:11px;margin-top:2px;max-width:230px}
-.nutrient-details .incomplete dd>span,.nutrient-details .incomplete dd small{color:var(--orange)}
+.nutrient-details dd small{display:block;color:var(--label-t);font-size:11px;margin-top:2px;max-width:230px}
+.nutrient-details .incomplete dd>span,.nutrient-details .incomplete dd small{color:var(--orange-t)}
 
 /* --- the day against its goals (components/DayGoals.jsx) --- */
 .dgoals{display:grid;gap:13px}
@@ -241,10 +298,10 @@ h4.sec{
 .dgoal.over .dgoal-bar i{background:var(--orange)}
 .dgoal-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:5px}
 .dgoal-left{font-size:12px;color:var(--label-2);line-height:1.4}
-.dgoal.over .dgoal-left{color:var(--orange)}
-.dgoal-partial{color:var(--label-3)}
-.dgoal-paused{font-size:12px;color:var(--orange)}
-.dgoal-src{display:flex;align-items:center;gap:4px;flex:none;padding:0;min-height:22px;background:none;font-size:11px;color:var(--label-3)}
+.dgoal.over .dgoal-left{color:var(--orange-t)}
+.dgoal-partial{color:var(--label-t)}
+.dgoal-paused{font-size:12px;color:var(--orange-t)}
+.dgoal-src{display:flex;align-items:center;gap:4px;flex:none;padding:0;min-height:22px;background:none;font-size:11px;color:var(--label-t)}
 .dgoal-src .icn{font-size:14px}
 .dgoal.compact .dgoal-nums strong{font-size:15px;font-weight:600}
 .dgoal.compact .dgoal-bar{height:4px;margin-top:6px}
@@ -254,14 +311,14 @@ h4.sec{
 .nplan-row:first-child{border-top:0}
 .nplan-row strong{font-size:16px;font-weight:650;color:var(--label);font-variant-numeric:tabular-nums}
 .dblocked{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:12px;border-radius:var(--r);background:var(--surface);font-size:13px;line-height:1.45;color:var(--label-2)}
-.dblocked>.icn{font-size:19px;flex:none;margin-top:1px;color:var(--acc)}
-.dnote{margin-top:9px;font-size:12px;line-height:1.45;color:var(--label-3)}
+.dblocked>.icn{font-size:19px;flex:none;margin-top:1px;color:var(--acc-t)}
+.dnote{margin-top:9px;font-size:12px;line-height:1.45;color:var(--label-t)}
 .ngoal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ngoal{
   min-height:46px;padding:10px;border-radius:var(--r-sm);background:var(--surface);
   color:var(--label-2);font-size:15px;text-align:center;
 }
-.ngoal.on{background:var(--acc-soft);color:var(--acc);box-shadow:inset 0 0 0 1.5px var(--acc-line)}
+.ngoal.on{background:var(--acc-soft);color:var(--acc-t);box-shadow:inset 0 0 0 1.5px var(--acc-line)}
 .nprofile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .nprofile-grid label,.ntargets label{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .nprofile-grid label{align-items:stretch;flex-direction:column;color:var(--label-2);font-size:13px}
@@ -270,11 +327,11 @@ h4.sec{
 .nwith-unit i{font-style:normal;color:var(--label-2);font-size:13px;min-width:28px}
 .nsex{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .nsex button{min-height:44px;border-radius:var(--r-sm);background:var(--surface);color:var(--label-2)}
-.nsex button.on{background:var(--acc-soft);color:var(--acc)}
+.nsex button.on{background:var(--acc-soft);color:var(--acc-t)}
 .nbmr{display:flex;gap:12px;margin-top:12px;padding:13px;border-radius:var(--r);background:var(--surface)}
-.nbmr-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--acc-soft);color:var(--acc);flex:none}
+.nbmr-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--acc-soft);color:var(--acc-t);flex:none}
 .nbmr-value{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:2px 0 4px;font-variant-numeric:tabular-nums}
-.nmedical{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px;border-radius:var(--r);background:color-mix(in srgb,var(--orange) 12%,var(--surface));color:var(--orange);font-size:13px;line-height:1.45}
+.nmedical{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:12px;border-radius:var(--r);background:color-mix(in srgb,var(--orange) 12%,var(--surface));color:var(--orange-t);font-size:13px;line-height:1.45}
 .nmedical>.icn{font-size:19px;flex:none;margin-top:1px}
 .ntargets{margin-top:6px;border-radius:var(--r);background:var(--surface);padding:0 12px}
 .ntargets label{min-height:60px;align-items:stretch;flex-direction:column;border-top:var(--hair) solid var(--sep);font-size:14px;padding:8px 0}
@@ -283,9 +340,9 @@ h4.sec{
 .ntarget-name{line-height:1.35}
 .ntargets .nwith-unit{width:100%;flex:none}
 .ntargets .input{min-height:44px;padding:8px 10px}
-.ntarget-reference{display:block;color:var(--label-3);font-size:11px;line-height:1.4}
+.ntarget-reference{display:block;color:var(--label-t);font-size:11px;line-height:1.4}
 .ntarget-reference-value{font-variant-numeric:tabular-nums;color:var(--label-2)}
-.ntarget-calculated .ntarget-reference-value{color:var(--acc);font-weight:600}
+.ntarget-calculated .ntarget-reference-value{color:var(--acc-t);font-weight:600}
 .nreference-note{margin-top:10px;padding:0 4px;color:var(--label-2);font-size:12px;line-height:1.45}
 .nreference{margin-top:12px;border-radius:var(--r);background:var(--surface);padding:0 12px}
 .nreference summary{min-height:44px;display:flex;align-items:center;color:var(--label-2);cursor:pointer;font-size:13px}
@@ -295,13 +352,13 @@ h4.sec{
 .nai-preview>div:first-child{border-top:0}
 .nai-preview span{color:var(--label-2);font-size:12px;flex:none}
 .nai-preview strong{font-size:12px;font-weight:500;text-align:right;line-height:1.4;overflow-wrap:anywhere}
-.nai-preview .warn span,.nai-preview .warn strong{color:var(--orange)}
+.nai-preview .warn span,.nai-preview .warn strong{color:var(--orange-t)}
 .nsafety-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-top:var(--hair) solid var(--sep);font-size:13px}
 .nsafety-row:first-child{border-top:0}
 .nsafety-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:0 0 174px}
 .nsafety-buttons button{min-height:44px;padding:6px 8px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--label-2);font-size:12px}
-.nsafety-buttons button.on{background:var(--acc-soft);color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc-line)}
-.ntarget-paused{display:block;color:var(--orange);font-size:11px;line-height:1.4}
+.nsafety-buttons button.on{background:var(--acc-soft);color:var(--acc-t);box-shadow:inset 0 0 0 1px var(--acc-line)}
+.ntarget-paused{display:block;color:var(--orange-t);font-size:11px;line-height:1.4}
 .nref-list{display:grid;gap:10px;margin-top:10px}
 .nref-card{padding:12px;border-radius:var(--r);background:var(--surface)}
 .nref-head,.nref-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -309,8 +366,8 @@ h4.sec{
 .nref-value{margin-top:5px;font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
 .nref-meta,.nref-card p{font-size:12px;line-height:1.45;color:var(--label-2)}
 .nref-card p{margin:7px 0}
-.nref-actions a,.nref-actions button{min-height:44px;display:inline-flex;align-items:center;color:var(--acc);font-size:13px}
-.nutrient-details dd small.paused-target{color:var(--orange)}
+.nref-actions a,.nref-actions button{min-height:44px;display:inline-flex;align-items:center;color:var(--acc-t);font-size:13px}
+.nutrient-details dd small.paused-target{color:var(--orange-t)}
 @media(max-width:420px){.nsafety-row{align-items:stretch;flex-direction:column}.nsafety-buttons{width:100%;flex-basis:auto}}
 
 /* ------------------------------------------------------ inset group list -- */
@@ -347,22 +404,22 @@ h4.sec{
 .lrow-v{color:var(--label-2);font-size:17px;letter-spacing:-.012em;flex:0 1 auto;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
 .lrow-c{color:var(--label);font-size:15px;flex:none;--icon-stroke:2.4}
-.lrow-k{color:var(--acc);font-size:17px;flex:none;--icon-stroke:2.4}
-.lrow.danger,.lrow.danger .lrow-t{color:var(--red)}
+.lrow-k{color:var(--acc-t);font-size:17px;flex:none;--icon-stroke:2.4}
+.lrow.danger,.lrow.danger .lrow-t{color:var(--red-t)}
 /* an (i) before a row's control: painted small and dim so the control stays the loud thing,
    but with a finger-sized target like everything else — the padding is the hit area and the
    vertical negative margin keeps it from making the row taller. The horizontal ones pull the
    hit area back under the row's own 12px gap instead of adding to it. */
 .helpbtn{
-  color:var(--label-3);font-size:16px;background:none;line-height:0;flex:none;
-  margin:-11px -2px -11px -4px;padding:11px 4px;
+  color:var(--label-t);font-size:16px;background:none;line-height:0;flex:none;
+  margin:-14px -12px -14px -14px;padding:14px;
 }
 .helpbtn:active{color:var(--label)}
 
 /* -------------------------------------------------------------- buttons -- */
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;
-  padding:14px 18px;border-radius:var(--r);font-size:17px;font-weight:600;
+  min-height:50px;padding:14px 22px;border-radius:999px;font-size:17px;font-weight:600;
   letter-spacing:-.012em;background:var(--surface-2);color:var(--label);
   transition:transform var(--fast) var(--ease),background var(--fast),opacity var(--fast);
 }
@@ -372,48 +429,60 @@ h4.sec{
    icon-only ghost button did the same to the text beside it, one word per line, which is
    what a 44px cross had been doing to the meal form since it was written. flex:none does
    not help: its basis is auto, which resolves to that width:100%. */
-.btn.inline{width:auto;flex:0 0 auto;padding:11px 13px;font-size:15px;gap:5px}
+.btn.inline{width:auto;flex:0 0 auto;min-height:44px;padding:11px 16px;font-size:15px;gap:5px}
 .btn.inline .icn{font-size:15px}
-.btn.icon{width:auto;flex:0 0 auto;padding:8px}
+.btn.icon{width:auto;flex:0 0 auto;min-height:44px;min-width:44px;padding:8px}
 .row > .grow{flex:1;min-width:0}
 .stp.grow{flex:1;min-width:96px}
 .btn .icn{font-size:19px}
 .btn:active{transform:scale(.975)}
-.btn.primary{background:var(--acc);color:var(--on-acc)}
+.btn.primary{background:var(--acc);color:var(--on-acc);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 6px 16px -8px color-mix(in srgb,var(--acc) 70%,transparent)}
 .btn.primary:active{background:var(--acc-2)}
-.btn.tinted{background:var(--acc-soft);color:var(--acc)}
-.btn.danger{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
-.btn.ghost,.btn.plain{background:none;color:var(--acc);font-weight:400}
+.btn.tinted{background:var(--acc-soft);color:var(--acc-t)}
+.btn.danger{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red-t)}
+.btn.ghost,.btn.plain{background:none;color:var(--acc-t);font-weight:400}
 .btn.ghost:active,.btn.plain:active{background:var(--surface-2)}
-.btn.sm{padding:8px 14px;width:auto;font-size:15px;border-radius:var(--r-sm);gap:5px}
+.btn.sm{min-height:44px;padding:8px 16px;width:auto;font-size:15px;border-radius:999px;gap:5px}
 .btn.sm .icn{font-size:16px}
-.btn.xs{padding:5px 10px;width:auto;font-size:13px;border-radius:7px;gap:4px}
+.btn.xs{min-height:32px;padding:5px 12px;width:auto;font-size:13px;border-radius:999px;gap:4px}
 .btn:disabled{opacity:.32;pointer-events:none}
 
 /* ----------------------------------------------------------- tab bar ----- */
 #tabbar{
-  position:fixed;left:0;right:0;bottom:0;z-index:50;
-  display:flex;justify-content:space-around;align-items:flex-end;
-  padding:7px 6px calc(6px + var(--sab));
-  background:color-mix(in srgb,var(--bg-el) 72%,transparent);
-  backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
-  border-top:var(--hair) solid var(--sep-op);
+  position:fixed;left:12px;right:12px;bottom:calc(10px + var(--sab));z-index:50;
+  max-width:536px;margin:0 auto;
+  display:flex;justify-content:space-around;align-items:flex-end;gap:2px;
+  padding:6px;border-radius:999px;
+  background:rgb(var(--glass-base)/var(--glass-a));
+  backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));
+  box-shadow:inset 0 0 0 var(--hair) var(--glass-rim),inset 0 1px 0 var(--glass-hi),var(--glass-shadow);
+  transition:padding var(--med) var(--ease);
 }
-:root[data-theme="light"] #tabbar{background:rgba(249,249,251,.78)}
 #tabbar button{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
-  color:var(--label-3);font-size:10px;font-weight:500;letter-spacing:.005em;padding-top:3px;
-  transition:color var(--fast);
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-height:50px;padding:4px 2px;border-radius:999px;
+  color:var(--label-t);font-size:10px;font-weight:500;letter-spacing:.005em;
+  transition:color var(--fast),background var(--fast),min-height var(--med) var(--ease);
 }
+#tabbar button>span:not(.cir){
+  max-height:14px;overflow:hidden;
+  transition:max-height var(--med) var(--ease),opacity var(--fast);
+}
+/* Folded while you scroll down: icons only, a little tighter. The first scroll up opens it. */
+#tabbar.min{padding:4px 6px}
+#tabbar.min button{min-height:44px}
+#tabbar.min button>span:not(.cir){max-height:0;opacity:0}
+#tabbar.min button.start{margin-top:-14px}
+#tabbar.min button.start .cir{width:46px;height:46px}
 /* The inactive tint is semi-transparent, so wherever two strokes cross inside an
    icon (the calendar's hangers over its frame, the divider's caps on its sides)
    the alpha doubled up and the icon read as a stack of loose layers. Carrying the
    fade on the <svg> instead of in the stroke colour flattens the icon first and
    fades it as one shape — and it does that for every icon, not just this one. */
 #tabbar button .icn{font-size:25px;--icon-stroke:1.65;color:var(--label)}
-#tabbar button.on{color:var(--acc)}
+#tabbar button.on{color:var(--acc-t);background:var(--acc-soft)}
 #tabbar button.on .icn{--icon-stroke:2;color:inherit;opacity:1}
-#tabbar button.start{margin-top:-24px}
+#tabbar button.start{margin-top:-22px;background:none}
 #tabbar button.start .cir{
   width:52px;height:52px;border-radius:50%;background:var(--acc);color:var(--on-acc);
   display:flex;align-items:center;justify-content:center;position:relative;
@@ -422,14 +491,14 @@ h4.sec{
 }
 #tabbar button.start:active .cir{transform:scale(.93)}
 #tabbar button.start .cir .icn{font-size:26px;--icon-stroke:2;color:inherit;opacity:1}
-#tabbar button.start span{color:var(--acc);font-weight:600}
+#tabbar button.start span{color:var(--acc-t);font-weight:600}
 /* `.cir` is itself a <span>, so the label rules above and below reach it too and
    outrank the `.cir` block — which is how the running state ended up painting an
    orange play glyph onto an orange disc. Both states restate their own colour.
    The disc is orange in either theme, so its glyph is black, not `--on-acc`. */
 #tabbar button.start .cir{color:var(--on-acc)}
 #tabbar button.start.rec .cir{background:var(--orange);color:#000;box-shadow:0 6px 18px -4px color-mix(in srgb,var(--orange) 55%,transparent)}
-#tabbar button.start.rec span{color:var(--orange)}
+#tabbar button.start.rec span{color:var(--orange-t)}
 #tabbar button.start.rec .cir::after{
   content:'';position:absolute;inset:0;border-radius:50%;
   border:2px solid var(--orange);animation:ping 1.9s var(--ease) infinite;
@@ -442,7 +511,7 @@ h4.sec{
   flex:1;text-align:center;padding:8px 2px 9px;border-radius:10px;
   background:none;border:none;transition:background var(--fast);
 }
-.wday .lbl{font-size:11px;color:var(--label-3);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
+.wday .lbl{font-size:11px;color:var(--label-t);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
 .wday .num{font-size:17px;font-weight:400;margin:4px 0;letter-spacing:-.012em}
 .wday .dot{width:5px;height:5px;border-radius:50%;background:transparent;margin:0 auto}
 .wday .dot.plan{background:var(--label-3)}
@@ -474,10 +543,10 @@ h4.sec{
 .chev{color:var(--label);flex:none;font-size:15px;--icon-stroke:2.4}
 .tag{
   display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);
-  color:var(--label-2);border-radius:6px;padding:3px 7px;font-size:12px;
+  color:var(--label-2);border-radius:999px;padding:3px 9px;font-size:12px;
   font-weight:500;text-transform:capitalize;
 }
-.tag.acc{background:var(--acc-soft);color:var(--acc)}
+.tag.acc{background:var(--acc-soft);color:var(--acc-t)}
 
 /* ---------------------------------------------------------------- chips -- */
 .chips{
@@ -497,11 +566,11 @@ h4.sec{
 
 /* --- text field --- */
 .field,.input{
-  width:100%;background:var(--surface);border:none;border-radius:var(--r);
-  padding:13px 15px;font-size:17px;letter-spacing:-.012em;outline:none;
+  width:100%;background:var(--surface);border:none;border-radius:var(--r-lg);
+  padding:13px 16px;font-size:17px;letter-spacing:-.012em;outline:none;
   transition:box-shadow var(--fast);
 }
-.field::placeholder,.input::placeholder{color:var(--label-3)}
+.field::placeholder,.input::placeholder{color:var(--label-t)}
 .field:focus,.input:focus{box-shadow:inset 0 0 0 2px var(--acc)}
 .field.area,textarea.input{min-height:92px;resize:vertical;line-height:1.42}
 .exnote{
@@ -512,7 +581,7 @@ h4.sec{
 /* --- search field --- */
 .searchf{position:relative;display:flex;align-items:center}
 .searchf .lead{
-  position:absolute;left:11px;font-size:16px;color:var(--label-3);
+  position:absolute;left:11px;font-size:16px;color:var(--label-t);
   pointer-events:none;--icon-stroke:2.1;z-index:1;
 }
 .searchf .field{padding-left:35px;padding-right:36px;background:var(--surface-2);border-radius:10px}
@@ -555,29 +624,29 @@ h4.sec{
    padding box, which is what the thumb needs. */
 .seg{
   position:relative;display:flex;
-  background:var(--surface-3);border-radius:9px;padding:2px;isolation:isolate;
+  background:var(--surface-3);border-radius:999px;padding:3px;isolation:isolate;
 }
 .seg>button{flex:1 1 0;min-width:0}
 :root[data-theme="light"] .seg{background:rgba(118,118,128,.12)}
 .seg-sel{
-  position:absolute;z-index:0;top:2px;bottom:2px;left:2px;
-  width:calc((100% - 4px)/var(--n));
+  position:absolute;z-index:0;top:3px;bottom:3px;left:3px;
+  width:calc((100% - 6px)/var(--n));
   transform:translateX(calc(100% * var(--i)));
-  background:var(--surface);border-radius:7px;
-  box-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.06);
+  background:var(--surface);border-radius:999px;
+  box-shadow:0 3px 8px rgba(0,0,0,.14),0 1px 1px rgba(0,0,0,.06),inset 0 1px 0 var(--glass-hi);
   transition:transform var(--med) var(--ease);
 }
 :root[data-theme="light"] .seg-sel{background:#fff}
 .seg button{
   position:relative;z-index:1;padding:6px 8px;font-size:14px;font-weight:500;
   letter-spacing:-.006em;color:var(--label);display:flex;align-items:center;
-  justify-content:center;gap:5px;min-height:30px;transition:opacity var(--fast);
+  justify-content:center;gap:5px;min-height:40px;transition:opacity var(--fast);
 }
 .seg button .icn{font-size:16px}
 .seg button:not(.on){color:var(--label-2);font-weight:400}
 .seg button:active{opacity:.5}
 /* sitting in a list row: shrink to content instead of filling the row */
-.seg-inline{flex:none;min-width:132px}
+.seg-inline{flex:none;min-width:144px}
 .seg-range{margin-bottom:10px}
 .seg-inline button{padding:5px 10px;font-size:13px;min-height:28px}
 .seg-inline button .icn{font-size:14px}
@@ -667,7 +736,7 @@ h4.sec{
 
 .sethead{
   display:flex;align-items:center;gap:8px;padding:0 0 6px;
-  font-size:11px;color:var(--label-3);font-weight:500;text-transform:uppercase;letter-spacing:.045em;
+  font-size:11px;color:var(--label-t);font-weight:500;text-transform:uppercase;letter-spacing:.045em;
 }
 .sethead .n-sp{width:24px;flex:none}
 .sethead .w-sp{flex:1.4;text-align:center}
@@ -684,7 +753,7 @@ h4.sec{
   transition:background var(--fast),color var(--fast);
 }
 .setrow button.n{border:0;padding:0;cursor:pointer}
-.setrow .n.warm{background:color-mix(in srgb,var(--orange) 22%,transparent);color:var(--orange);font-weight:700}
+.setrow .n.warm{background:color-mix(in srgb,var(--orange) 22%,transparent);color:var(--orange-t);font-weight:700}
 .setrow .stp.w{flex:1.4;min-width:0}
 .setrow .stp.r{flex:1;min-width:0}
 .setrow .stp.eff{flex:1.1;min-width:0}
@@ -706,16 +775,16 @@ h4.sec{
 /* why the next target is what it is (issue #17) */
 .progline{
   display:flex;align-items:flex-start;gap:7px;margin:6px 0 2px;
-  font-size:13px;line-height:1.38;color:var(--acc);
+  font-size:13px;line-height:1.38;color:var(--acc-t);
 }
-.progline.warn{color:var(--yellow)}
+.progline.warn{color:var(--yellow-t)}
 .progline svg{flex:none;margin-top:2px}
 
 /* start a timed set (issue #16) — sits where you'd otherwise reach for the checkbox */
 .setrow .setgo{
   width:30px;height:30px;border-radius:50%;flex:none;
   display:flex;align-items:center;justify-content:center;
-  background:var(--surface-2);color:var(--acc);font-size:14px;
+  background:var(--surface-2);color:var(--acc-t);font-size:14px;
   transition:background var(--fast),opacity var(--fast);
 }
 .setrow .setgo:disabled{opacity:.3;cursor:default}
@@ -728,14 +797,14 @@ h4.sec{
 
 /* --- rest timer --- */
 #timer{
-  position:fixed;left:12px;right:12px;bottom:calc(88px + var(--sab));z-index:60;
+  position:fixed;left:12px;right:12px;bottom:calc(96px + var(--sab));z-index:60;
   /* nearly opaque: the set rows underneath were reading through the old 82% and made the
      clock hard to pick out mid-set. The blur stays, so it still sits above the page. */
   background:color-mix(in srgb,var(--surface) 97%,transparent);
   backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
-  border-radius:var(--r-lg);padding:12px 14px;
+  border-radius:26px;padding:12px 16px;
   display:flex;align-items:center;gap:12px;
-  box-shadow:0 12px 34px -8px rgba(0,0,0,.55);
+  box-shadow:inset 0 0 0 var(--hair) var(--glass-rim),0 12px 34px -8px rgba(0,0,0,.55);
   animation:slideup var(--med) var(--ease);
 }
 @keyframes slideup{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
@@ -753,7 +822,7 @@ h4.sec{
 /* work timer (issue #16): the same bar doing the opposite job — outlined and tinted so a
    glance tells "you are holding this" apart from "you are recovering". */
 #timer.working{border:var(--hair) solid var(--acc)}
-#timer.working .t{color:var(--acc)}
+#timer.working .t{color:var(--acc-t)}
 #timer.working .grow{flex:1;min-width:0}
 #timer.working .lbl{
   font-size:12px;color:var(--label-2);margin-bottom:5px;text-transform:capitalize;
@@ -764,29 +833,43 @@ h4.sec{
 #modal-root{position:fixed;inset:0;z-index:100;display:none}
 #modal-root.open{display:block}
 .mback{
-  position:absolute;inset:0;background:rgba(0,0,0,.4);
+  position:absolute;inset:0;background:rgba(0,0,0,.32);
   backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
   touch-action:none;overscroll-behavior:none;
 }
 .sheet{
-  position:absolute;left:0;right:0;bottom:0;background:var(--bg-el);
-  border-radius:var(--r-xl) var(--r-xl) 0 0;
-  padding:8px 18px calc(20px + var(--sab));
-  max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  /* Partial sheets float, inset from the screen edges, on glass; the bottom corners round in to
+     follow the display. Past most of the screen height (.tall, set from Modals.jsx) a sheet
+     anchors to the edges on an opaque background instead — the way system sheets do. */
+  position:absolute;left:8px;right:8px;bottom:calc(8px + var(--sab));
+  background:rgb(var(--glass-sheet-base)/var(--glass-sheet-a));
+  backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));
+  border-radius:var(--r-xl);
+  box-shadow:inset 0 0 0 var(--hair) var(--glass-rim),inset 0 1px 0 var(--glass-hi),var(--glass-shadow);
+  padding:8px 18px 20px;
+  max-height:calc(90vh - 16px);max-height:calc(100dvh - var(--sat) - 24px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
   animation:sheetup .34s var(--ease);
   overscroll-behavior:contain;touch-action:pan-y;will-change:transform;
+  transition:left var(--med) var(--ease),right var(--med) var(--ease),bottom var(--med) var(--ease),border-radius var(--med) var(--ease);
 }
-:root[data-theme="light"] .sheet{background:var(--bg)}
+.sheet.tall{
+  left:0;right:0;bottom:0;border-radius:var(--r-xl) var(--r-xl) 0 0;
+  background:var(--bg-el);backdrop-filter:none;-webkit-backdrop-filter:none;
+  padding-bottom:calc(20px + var(--sab));
+}
+:root[data-theme="light"] .sheet.tall{background:var(--bg)}
 @keyframes sheetup{from{transform:translateY(100%)}to{transform:none}}
 .sheet .grab{width:36px;height:5px;border-radius:99px;background:var(--label-4);margin:6px auto 14px}
 .sheet h3{font-size:20px;font-weight:600;letter-spacing:-.021em;margin-bottom:14px}
 .center{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  width:min(84vw,300px);background:var(--bg-el);border-radius:var(--r-lg);padding:20px;
-  box-shadow:0 20px 60px -12px rgba(0,0,0,.5);
+  width:min(84vw,300px);padding:20px;border-radius:28px;
+  background:rgb(var(--glass-sheet-base)/var(--glass-sheet-a));
+  backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(var(--glass-sat)) blur(var(--glass-blur));
+  box-shadow:inset 0 0 0 var(--hair) var(--glass-rim),inset 0 1px 0 var(--glass-hi),0 20px 60px -12px rgba(0,0,0,.5);
   animation:pop .28s var(--ease);
 }
-:root[data-theme="light"] .center{background:#fff}
 @keyframes pop{from{transform:translate(-50%,-50%) scale(.94);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
 
 /* --- RIR/RPE conversion table (effort help sheet) ---
@@ -808,11 +891,11 @@ h4.sec{
 .efftbl .hd{background:var(--surface-2);padding-top:8px;padding-bottom:8px}
 .efftbl .hd .n,.efftbl .hd .f{
   font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--label-3);
+  color:var(--label-t);
 }
 /* the row a working set usually lands on — the anchor the others are read against */
 .efftbl .r.on{background:var(--acc-soft)}
-.efftbl .r.on .n{color:var(--acc)}
+.efftbl .r.on .n{color:var(--acc-t)}
 .efftbl .r.on .f{color:var(--label)}
 
 /* --- glyph picker (replaces the emoji grid) --- */
@@ -862,7 +945,7 @@ h4.sec{
 .hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
 .hm-wrap::-webkit-scrollbar{display:none}
 .hm-months{display:flex;margin-left:28px;margin-bottom:5px}
-.hm-months span{flex:none;width:14px;font-size:11px;color:var(--label-3);white-space:nowrap;overflow:visible}
+.hm-months span{flex:none;width:14px;font-size:11px;color:var(--label-t);white-space:nowrap;overflow:visible}
 .hm-body{display:flex}
 .hm-days{display:flex;flex-direction:column;gap:3px;flex:none;width:28px}
 .hm-days span{height:11px;font-size:10px;color:var(--label-2);line-height:11px}
@@ -877,7 +960,7 @@ h4.sec{
 .hm-c.future{opacity:.3}
 .hm-legend{
   display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:9px;
-  font-size:11px;color:var(--label-3);
+  font-size:11px;color:var(--label-t);
 }
 .hm-legend .hm-c{width:10px;height:10px}
 
@@ -914,7 +997,7 @@ h4.sec{
 .stat-v{font-size:26px;font-weight:600;letter-spacing:-.026em;line-height:1.1}
 .mchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .mchip{font-size:12px;padding:4px 9px;border-radius:99px;background:var(--surface-2);color:var(--label-2)}
-.mchip.miss{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange)}
+.mchip.miss{background:color-mix(in srgb,var(--orange) 16%,transparent);color:var(--orange-t)}
 
 /* --- stat tiles --- */
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
@@ -930,7 +1013,7 @@ h4.sec{
 /* --- PR badge --- */
 .pr{
   display:inline-flex;align-items:center;gap:4px;
-  background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow);
+  background:color-mix(in srgb,var(--yellow) 18%,transparent);color:var(--yellow-t);
   border-radius:6px;padding:3px 8px;font-size:12px;font-weight:500;
 }
 .pr .icn{font-size:13px}
@@ -955,36 +1038,38 @@ h4.sec{
   padding-left:18px;color:var(--label-2);font-size:15px;line-height:1.5;
   display:flex;flex-direction:column;gap:9px;
 }
-.steps-list::marker{color:var(--label-3)}
+.steps-list::marker{color:var(--label-t)}
 
 /* --- month calendar --- */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}
-.cal-h{text-align:center;font-size:11px;color:var(--label-3);font-weight:500;text-transform:uppercase;padding:2px 0}
+.cal-h{text-align:center;font-size:11px;color:var(--label-t);font-weight:500;text-transform:uppercase;padding:2px 0}
 .cal-d{
   aspect-ratio:1;border-radius:10px;background:var(--surface);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   font-weight:400;font-size:15px;color:var(--label);transition:background var(--fast);
 }
 .cal-d:active{background:var(--surface-2)}
-.cal-d.has{background:var(--acc-soft);color:var(--acc)}
+.cal-d.has{background:var(--acc-soft);color:var(--acc-t)}
 .cal-d.today{box-shadow:inset 0 0 0 1.8px var(--acc)}
 .cal-d i{width:5px;height:5px;border-radius:50%;background:transparent}
 .cal-d i.done{background:var(--acc)}
 .cal-d i.plan{background:var(--label-3)}
 .cal-d i.ovr{background:var(--orange)}
-.cal-legend{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:12px;color:var(--label-3)}
+.cal-legend{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:12px;color:var(--label-t)}
 .cal-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px}
 
 /* --- accent swatches --- */
 .swatches{display:flex;gap:12px;flex-wrap:wrap}
 .swatch{width:32px;height:32px;border-radius:50%;flex:none;position:relative;transition:transform var(--fast)}
 .swatch:active{transform:scale(.9)}
+/* the 12px gap between swatches is exactly the 6px each side the target grows by */
+.swatch::before{content:'';position:absolute;inset:-6px;border-radius:50%}
 .swatch.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;box-shadow:0 0 0 2px var(--label)}
 
 /* --- supersets --- */
 .ss-label{
   font-size:12px;font-weight:600;letter-spacing:-.004em;text-transform:none;
-  color:var(--acc);margin:8px 0 5px 4px;display:flex;align-items:center;gap:5px;
+  color:var(--acc-t);margin:8px 0 5px 4px;display:flex;align-items:center;gap:5px;
 }
 .ss-label .icn{font-size:13px}
 .item.in-ss{box-shadow:inset 3px 0 0 var(--acc)}
@@ -993,11 +1078,11 @@ h4.sec{
   background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--acc-line);
 }
 .ss-hd{
-  font-size:12px;font-weight:600;color:var(--acc);margin-bottom:12px;
+  font-size:12px;font-weight:600;color:var(--acc-t);margin-bottom:12px;
   text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;
 }
 .ss-ex{position:relative}
-.ss-amp{text-align:center;font-size:15px;font-weight:600;color:var(--acc);margin:14px 0 8px}
+.ss-amp{text-align:center;font-size:15px;font-weight:600;color:var(--acc-t);margin:14px 0 8px}
 
 /* --- home: today's session row --- */
 .today-row{
@@ -1006,7 +1091,7 @@ h4.sec{
   transition:background var(--fast);width:100%;text-align:left;
 }
 .today-row:active{background:var(--surface-3)}
-.today-row .lbl2{font-size:11px;font-weight:500;letter-spacing:.03em;text-transform:uppercase;color:var(--label-3)}
+.today-row .lbl2{font-size:11px;font-weight:500;letter-spacing:.03em;text-transform:uppercase;color:var(--label-t)}
 .today-row .ttl{
   font-weight:500;font-size:17px;line-height:1.25;text-transform:capitalize;
   letter-spacing:-.012em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;
@@ -1083,3 +1168,32 @@ h4.sec{
   .report .rh { break-after: avoid }
   @page { margin: 16mm }
 }
+
+
+/* ----------------------------------------------------- scroll edge effect -- */
+/* A soft blur-and-fade where content slides under the status bar and the floating tab bar,
+   instead of a hard cut or a dark band. It is the sanctioned effect — do not add a darkening
+   gradient beside it. */
+body::before,body::after{
+  content:'';position:fixed;left:0;right:0;z-index:40;pointer-events:none;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+body::before{
+  top:0;height:calc(var(--sat) + 14px);
+  -webkit-mask-image:linear-gradient(to bottom,#000 35%,transparent);mask-image:linear-gradient(to bottom,#000 35%,transparent);
+}
+body::after{
+  bottom:0;height:calc(92px + var(--sab));
+  -webkit-mask-image:linear-gradient(to top,#000 30%,transparent);mask-image:linear-gradient(to top,#000 30%,transparent);
+}
+@media (prefers-reduced-transparency: reduce){body::before,body::after{display:none}}
+
+
+/* ------------------------------------------------------------- hit areas -- */
+/* Dense controls keep their look but are tappable at 44pt: the target grows past the visible
+   edge with an invisible pseudo-element. Segments sit side by side, so only the vertical
+   extent grows and neighbours are never overlapped. */
+.seg button::after{content:'';position:absolute;left:0;right:0;top:-4px;bottom:-4px}
+.seg-inline button::after{top:-8px;bottom:-8px}
+.sw{position:relative}
+.sw::after{content:'';position:absolute;inset:-7px -4px}

@@ -7,6 +7,8 @@ import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
+  // glass: how see-through bars and sheets are — 'frosted' (default, easier to read) | 'clear'
+  glass: 'frosted',
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
   theme: 'dark', accent: 'lime', body: 'male', targetW: null, targetWU: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},

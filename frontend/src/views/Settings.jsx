@@ -237,6 +237,14 @@ export default function Settings() {
           onChange={v => update(s => { s.theme = v })}
         />
       </Row>
+      <Row icon="sparkles" iconTint="var(--blue)" title={t('Glass')} subtitle={t('How see-through bars and sheets are')}>
+        <Segmented
+          className="seg-inline"
+          options={[{ value: 'frosted', label: t('Frosted') }, { value: 'clear', label: t('Clear') }]}
+          value={S.glass === 'clear' ? 'clear' : 'frosted'}
+          onChange={v => update(s => { s.glass = v })}
+        />
+      </Row>
       {/* Purely how the muscle map is drawn — nothing else in the app reads this. */}
       <Row icon="figureStrength" iconTint="var(--teal)" title={t('Body diagram')}>
         <Segmented
