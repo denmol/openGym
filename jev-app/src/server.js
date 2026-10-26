@@ -72,7 +72,7 @@ export function createApp({ orchestrator }) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const jev = new GuardedJev(await makeJev());
-  const orchestrator = new Orchestrator({ jev, engine: makeEngine() });
+  const orchestrator = new Orchestrator({ jev, engine: await makeEngine() });
   const { first } = startCanary(jev, { everyMs: Number(process.env.CANARY_INTERVAL_MS) || 60_000, onResult: (r) => !r.ok && console.error('CANARY FAILED — breaker open, failing closed:', r.failures) });
   first.then((r) => console.log(`canary: ${r.ok ? 'pass' : 'FAIL ' + r.failures.join('; ')}`));
   const port = Number(process.env.PORT) || 8787;

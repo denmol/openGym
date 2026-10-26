@@ -17,7 +17,7 @@ const CASES = [
 ];
 
 const jev = await makeJev();
-const engine = makeEngine();
+const engine = await makeEngine();
 const o = new Orchestrator({ jev, engine });
 await mkdir(new URL('../logs/', import.meta.url), { recursive: true });
 
