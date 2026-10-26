@@ -12,6 +12,7 @@ import webpush from 'web-push';
 import {
   decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
 } from './nutrition-context.js';
+import { dataDirProblem } from './deploy.js';
 import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, TRAINER_SYSTEM } from './trainer.js';
 
 const PORT = +(process.env.PORT || 3000);
@@ -65,6 +66,13 @@ const OFF_TIMEOUT_MS = 12000;
 const COACH_TIMEOUT_MS = 120000;          // reasoning models can take a while
 // Secure cookies require HTTPS; over plain http://localhost the flag would drop the cookie
 const SECURE = /^https:/i.test(ORIGIN) ? ' Secure;' : '';
+
+// On a host with no persistent disk (Vercel) the data directory has to be a deliberate choice.
+const deployProblem = dataDirProblem(process.env);
+if (deployProblem) {
+  console.error(deployProblem.fatal ? 'FATAL: ' + deployProblem.message : 'WARNING: ' + deployProblem.message);
+  if (deployProblem.fatal) process.exit(1);
+}
 
 fs.mkdirSync(DATA, { recursive: true });
 
