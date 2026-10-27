@@ -16,3 +16,12 @@ describe('detectLang', () => {
     for (const p of ['sv', 'de', 'xx']) expect(LANGS[detectLang([p])]).toBeTruthy()
   })
 })
+
+describe('Swedish exercise instructions', () => {
+  it('has the same number of steps as the English source for every exercise', async () => {
+    const { EXDB } = await import('./exercises-data.js')
+    const sv = (await import('../instr/sv.js')).default
+    const off = EXDB.filter(e => e.st?.length && (sv[e.id] || []).length !== e.st.length).map(e => e.id)
+    expect(off).toEqual([])
+  })
+})

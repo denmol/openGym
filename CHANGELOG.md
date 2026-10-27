@@ -1,5 +1,9 @@
 # Changelog
 
+## Exercise instructions in Swedish
+
+The how-to steps for all 1,324 exercises are now shown in Swedish (they stayed in English before).
+
 ## Every language is complete again
 
 Eleven of the twelve languages were missing about 760 strings added since the trainer, food and week
