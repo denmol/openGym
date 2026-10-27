@@ -1,5 +1,10 @@
 # Changelog
 
+## Exercise instructions in German and Portuguese
+
+All 1,324 exercises now have their how-to steps in German and Portuguese too, so every language in the
+app shows instructions in its own language.
+
 ## Exercise instructions in Swedish
 
 The how-to steps for all 1,324 exercises are now shown in Swedish (they stayed in English before).

@@ -17,11 +17,11 @@ describe('detectLang', () => {
   })
 })
 
-describe('Swedish exercise instructions', () => {
-  it('has the same number of steps as the English source for every exercise', async () => {
+describe('translated exercise instructions', () => {
+  it.each(['sv', 'de', 'pt'])('%s has the same number of steps as the English source for every exercise', async lang => {
     const { EXDB } = await import('./exercises-data.js')
-    const sv = (await import('../instr/sv.js')).default
-    const off = EXDB.filter(e => e.st?.length && (sv[e.id] || []).length !== e.st.length).map(e => e.id)
+    const pack = (await import(`../instr/${lang}.js`)).default
+    const off = EXDB.filter(e => e.st?.length && (pack[e.id] || []).length !== e.st.length).map(e => e.id)
     expect(off).toEqual([])
   })
 })
