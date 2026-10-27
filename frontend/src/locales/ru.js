@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "Открыть уведомления",
   "Source code": "Исходный код",
   "credits and licences": "благодарности и лицензии",
+  // --- tab bar menu ---
+  "Menu": "Меню",
 }

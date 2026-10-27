@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "고지 열기",
   "Source code": "소스 코드",
   "credits and licences": "크레딧 및 라이선스",
+  // --- tab bar menu ---
+  "Menu": "메뉴",
 }

@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "Abrir os avisos",
   "Source code": "Código-fonte",
   "credits and licences": "créditos e licenças",
+  // --- tab bar menu ---
+  "Menu": "Menu",
 }

@@ -5,7 +5,9 @@ import { effectiveRoutine } from '../lib/history.js'
 import { todayISO } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
-import { tabBarFolded } from '../lib/chrome.js'
+import { tabBarFolded, moreActive, moreItemsFor } from '../lib/chrome.js'
+import { useUI } from '../store/useUI.js'
+import { Row, Section } from './ui.jsx'
 
 export default function TabBar({ onStart }) {
   const nav = useNavigate()
@@ -36,7 +38,15 @@ export default function TabBar({ onStart }) {
   useEffect(() => { setFolded(false) }, [loc.pathname])
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
-  const on = k => cur === k || (cur === 'settings' && k === 'home')
+  const on = k => cur === k
+  const openMore = () => useUI.getState().openSheet(close => <>
+    <h3>{t('Menu')}</h3>
+    <Section>
+      {moreItemsFor(!!user?.admin).map(([k, icon, label]) =>
+        <Row key={k} icon={icon} title={t(label)} accessory="chevron" onClick={() => { close(); nav('/' + k) }} />)}
+    </Section>
+    <div style={{ height: 8 }} />
+  </>)
 
   const startWorkout = () => {
     if (!S.active) {
@@ -55,14 +65,14 @@ export default function TabBar({ onStart }) {
     <nav id="tabbar" className={folded ? 'min' : ''}>
       <Tab k="home" icon="house" to="/home" label={t('Home')} />
       <Tab k="plan" icon="calendar" to="/plan" label={t('Plan')} />
-      <Tab k="food" icon="forkKnife" to="/food" label={t('Food')} />
       <button className={'start' + (S.active ? ' rec' : '')} onClick={startWorkout}>
         <span className="cir"><Icon name={S.active ? 'play' : 'dumbbell'} /></span>
         <span>{S.active ? t('Resume') : t('Start')}</span>
       </button>
-      <Tab k="stats" icon="chart" to="/stats" label={t('Stats')} />
-      <Tab k="history" icon="clock" to="/history" label={t('History')} />
-      <Tab k="library" icon="list" to="/library" label={t('Exercises')} />
+      <Tab k="food" icon="forkKnife" to="/food" label={t('Food')} />
+      <button className={moreActive(cur) ? 'on' : ''} onClick={openMore}>
+        <Icon name="more" /><span>{t('Menu')}</span>
+      </button>
     </nav>
   )
 }

@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "打开声明",
   "Source code": "源代码",
   "credits and licences": "致谢与许可",
+  // --- tab bar menu ---
+  "Menu": "菜单",
 }

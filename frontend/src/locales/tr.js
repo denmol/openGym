@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "Bildirimleri aç",
   "Source code": "Kaynak kod",
   "credits and licences": "katkılar ve lisanslar",
+  // --- tab bar menu ---
+  "Menu": "Menü",
 }

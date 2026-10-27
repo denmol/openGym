@@ -1505,4 +1505,6 @@ export default {
   "Open the notices": "Öppna meddelandena",
   "Source code": "Källkod",
   "credits and licences": "tack och licenser",
+  // --- tab bar menu ---
+  "Menu": "Meny",
 }

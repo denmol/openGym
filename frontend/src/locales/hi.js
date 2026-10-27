@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "नोटिस खोलें",
   "Source code": "सोर्स कोड",
   "credits and licences": "श्रेय और लाइसेंस",
+  // --- tab bar menu ---
+  "Menu": "मेन्यू",
 }
