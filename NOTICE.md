@@ -50,14 +50,23 @@ SOFTWARE.
 
 ## Exercise data & media
 
-The exercise names, instructions (English in `frontend/src/lib/exercises-data.js`, other
-languages in `frontend/src/instr/`, regenerated via `scripts/build-instructions.mjs`), images
-and animations (fetched into `media/` at build time) come from
-[**hasaneyldrm/exercises-dataset**](https://github.com/hasaneyldrm/exercises-dataset)
-and are **not** covered by openGym's AGPL license — they remain under that dataset's own terms.
-The media files are not distributed in this repository; they are downloaded from the upstream
-source on first run. If you redistribute openGym with the media included, review the upstream
-license first.
+Two different terms apply to what comes from
+[**hasaneyldrm/exercises-dataset**](https://github.com/hasaneyldrm/exercises-dataset):
+
+* **Names, categories and instruction text** (English in `frontend/src/lib/exercises-data.js`,
+  other languages in `frontend/src/instr/`) are released by that dataset under the **MIT
+  License**. The Swedish, German and Portuguese instruction packs are translations of the
+  English text and are covered by the same notice. The dataset's licence text is at
+  https://github.com/hasaneyldrm/exercises-dataset.
+* **Images and animations** (fetched at build time, not stored in this repository) are
+  © **Gym visual** — https://gymvisual.com/ — and are **not** covered by the AGPL or the MIT
+  licence. The dataset redistributes them with Gym visual's permission at 180 × 180 pixels with
+  the credit line above; reuse is governed by
+  [Gym visual's terms](https://gymvisual.com/content/3-terms-and-conditions-of-use). Any use
+  beyond that, in particular a commercial product, needs a licence from Gym visual. See
+  `docs/LICENSE-AUDIT.md`.
+
+The credit lines are shown in the app under Settings → credits and licences.
 
 ## Open Food Facts
 
