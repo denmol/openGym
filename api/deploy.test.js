@@ -27,3 +27,8 @@ test('a lookalike path is not mistaken for /tmp', () => {
   assert.equal(dataDirProblem({ VERCEL: '1', DATA_DIR: '/tmpfoo' }), null);
   assert.equal(dataDirProblem({ VERCEL: '1', DATA_DIR: '/mnt/data' }), null);
 });
+
+test('on Vercel a Blob store is persistent storage, so nothing needs saying', () => {
+  assert.equal(dataDirProblem({ VERCEL: '1', BLOB_STORE_ID: 'store_x' }), null);
+  assert.equal(dataDirProblem({ VERCEL: '1', BLOB_READ_WRITE_TOKEN: 't', DATA_DIR: '/tmp/x' }), null);
+});

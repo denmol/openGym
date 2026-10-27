@@ -1,9 +1,7 @@
 /* opengym-api — passkey (WebAuthn) auth + per-user state storage for openGym
-   No framework, JSON-file storage, signed session cookies.               */
+   No framework, JSON-file storage (or Vercel Blob), signed session cookies.               */
 import http from 'node:http';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse
@@ -13,10 +11,10 @@ import {
   decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
 } from './nutrition-context.js';
 import { dataDirProblem } from './deploy.js';
+import { storeFromEnv, ConflictError } from './store.js';
 import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, TRAINER_SYSTEM } from './trainer.js';
 
 const PORT = +(process.env.PORT || 3000);
-const DATA = process.env.DATA_DIR || '/data';
 const RP_ID = process.env.RP_ID || 'localhost';
 const ORIGIN = process.env.ORIGIN || 'http://localhost:8080';
 const RP_NAME = process.env.RP_NAME || 'Dagsnav';
@@ -74,35 +72,70 @@ if (deployProblem) {
   if (deployProblem.fatal) process.exit(1);
 }
 
-fs.mkdirSync(DATA, { recursive: true });
+const store = await storeFromEnv(process.env);
+// Without a disk of its own (Vercel + Blob) every request may land on a different instance:
+// anything held in this process's memory or on a timer is unreliable there. Those features are
+// switched off or made stateless below rather than left to fail quietly.
+const SERVERLESS = store.kind === 'blob';
 
 /* ---------- secret + db ---------- */
-const secretFile = path.join(DATA, 'secret');
-if (!fs.existsSync(secretFile)) fs.writeFileSync(secretFile, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
-const SECRET = fs.readFileSync(secretFile, 'utf8').trim();
-
-const dbFile = path.join(DATA, 'db.json');
-let db = { users: [], creds: [], subs: [], invites: [] };
-try { db = JSON.parse(fs.readFileSync(dbFile, 'utf8')); } catch {}
-db.subs = db.subs || [];
-db.invites = db.invites || [];
-const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
-function saveDb() { atomicWrite(dbFile, JSON.stringify(db, null, 2)); }
-function atomicWrite(file, content) {
-  const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, content);
-  fs.renameSync(tmp, file);
+// SESSION_SECRET lets a host that wants the secret in its own settings keep it there.
+async function loadSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  const have = await store.get('secret');
+  if (have) return have.text.trim();
+  const fresh = crypto.randomBytes(32).toString('hex');
+  try { await store.put('secret', fresh, { create: true, private: true }); return fresh; }
+  catch (e) {                                   // another instance won the race — use theirs
+    if (!(e instanceof ConflictError)) throw e;
+    return (await store.get('secret')).text.trim();
+  }
 }
-const stateFile = uid => path.join(DATA, 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json');
-function readState(uid) {
-  try { return JSON.parse(fs.readFileSync(stateFile(uid), 'utf8')); } catch { return null; }
+const SECRET = await loadSecret();
+
+let db = { users: [], creds: [], subs: [], invites: [] };
+let dbEtag = null;                              // what we last read, for conditional writes
+const normalizeDb = () => { db.users ||= []; db.creds ||= []; db.subs ||= []; db.invites ||= []; };
+async function loadDb() {
+  const r = await store.get('db.json');
+  if (!r) { db = { users: [], creds: [], subs: [], invites: [] }; dbEtag = null; }
+  else { try { db = JSON.parse(r.text); dbEtag = r.etag; } catch { throw new Error('db.json is not valid JSON'); } }
+  normalizeDb();
+}
+await loadDb();
+const isAdmin = user => !!user && (user.admin === true || ADMIN_UIDS.includes(user.id));
+// A writer that finds the file changed under it (another instance saved first) gets a
+// ConflictError instead of silently overwriting that change; the request fails with 409 and the
+// client simply tries again against fresh data. On a single machine this never happens.
+async function saveDb() {
+  const text = JSON.stringify(db, null, 2);
+  try {
+    dbEtag = dbEtag === null ? await store.put('db.json', text, { create: true, private: true })
+                             : await store.put('db.json', text, { ifMatch: dbEtag, private: true });
+  } catch (e) { if (e instanceof ConflictError) await loadDb().catch(() => {}); throw e; }
+}
+// Serverless instances share nothing but the store, so each request starts from what is there.
+async function refreshDb() { if (SERVERLESS) await loadDb(); }
+
+const stateName = uid => 'state-' + uid.replace(/[^a-zA-Z0-9_-]/g, '') + '.json';
+async function readState(uid) {
+  try { const r = await store.get(stateName(uid)); return r ? JSON.parse(r.text) : null; } catch { return null; }
 }
 
 /* ---------- push notifications (Web Push / VAPID) ---------- */
-const vapidFile = path.join(DATA, 'vapid.json');
-let vapid;
-try { vapid = JSON.parse(fs.readFileSync(vapidFile, 'utf8')); }
-catch { vapid = webpush.generateVAPIDKeys(); fs.writeFileSync(vapidFile, JSON.stringify(vapid), { mode: 0o600 }); }
+async function loadVapid() {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)
+    return { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY };
+  const have = await store.get('vapid.json');
+  if (have) { try { return JSON.parse(have.text); } catch {} }
+  const fresh = webpush.generateVAPIDKeys();
+  try { await store.put('vapid.json', JSON.stringify(fresh), { create: true, private: true }); return fresh; }
+  catch (e) {
+    if (!(e instanceof ConflictError)) throw e;
+    return JSON.parse((await store.get('vapid.json')).text);
+  }
+}
+const vapid = await loadVapid();
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || (SECURE ? ORIGIN : 'mailto:admin@localhost');
 webpush.setVapidDetails(VAPID_SUBJECT, vapid.publicKey, vapid.privateKey);
 
@@ -125,13 +158,14 @@ async function sendPush(userId, payload) {
       }
     }
   }));
-  if (dirty) saveDb();
+  if (dirty) await saveDb().catch(e => console.error('saveDb after push', e.message));
 }
 
 // Rest-timer alerts: client schedules on start/extend, cancels on skip or on-screen completion —
 // this only fires when the tab was backgrounded/suspended and never got to cancel it itself.
 const restTimers = new Map(); // userId -> Timeout
 function scheduleRestTimer(userId, sec) {
+  if (SERVERLESS) return;                       // no process stays alive to fire it
   const t = restTimers.get(userId);
   if (t) clearTimeout(t);
   restTimers.set(userId, setTimeout(() => {
@@ -165,10 +199,10 @@ function userNow(tz) {
     return { date: `${g('year')}-${g('month')}-${g('day')}`, hhmm: `${g('hour')}:${g('minute')}` };
   } catch { return null; } // unknown/invalid tz string — skip this user rather than guess
 }
-setInterval(() => {
+if (!SERVERLESS) setInterval(async () => {
   for (const user of db.users) {
     if (!db.subs.some(s => s.userId === user.id)) continue;
-    const S = readState(user.id);
+    const S = await readState(user.id);
     if (!S?.reminder?.on) continue;
     const now = userNow(S.reminder.tz || 'UTC');
     if (!now || S.reminder.time !== now.hhmm) continue;
@@ -179,7 +213,7 @@ setInterval(() => {
     const routine = (S.routines || []).find(r => r.id === rid);
     console.log('reminder firing', user.id, rid);
     user.lastReminder = now.date;
-    saveDb();
+    await saveDb().catch(e => console.error('reminder saveDb', e.message));
     sendPush(user.id, {
       title: routine ? `${routine.emoji || '🏋️'} ${routine.name} today` : 'Workout planned today',
       body: "It's on your plan — let's go 💪",
@@ -246,20 +280,29 @@ function sessionCookie(user) {
 }
 const clearCookie = `gymsid=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
 
-/* ---------- challenge store (in-memory, 5 min TTL) ---------- */
+/* ---------- challenge store (5 min TTL) ----------
+   On a machine of our own it is a one-shot in-memory map. Serverless instances do not share
+   memory, so there the challenge travels inside the (signed) id the browser sends back instead.
+   It is then valid for its 5 minutes rather than strictly once; the authenticator's signature
+   counter and the origin/RP checks still bind the response. */
 const challenges = new Map(); // cid -> {challenge, name?, uid?, exp}
 function putChallenge(data) {
+  const exp = Date.now() + 5 * 60000;
+  if (SERVERLESS) return sign(Buffer.from(JSON.stringify({ ...data, exp })).toString('base64url'));
   const cid = crypto.randomBytes(16).toString('base64url');
-  challenges.set(cid, { ...data, exp: Date.now() + 5 * 60000 });
+  challenges.set(cid, { ...data, exp });
   return cid;
 }
 function takeChallenge(cid) {
-  const c = challenges.get(cid);
-  challenges.delete(cid);
+  let c;
+  if (SERVERLESS) {
+    const payload = typeof cid === 'string' ? verifySig(cid) : null;
+    try { c = payload && JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')); } catch { c = null; }
+  } else { c = challenges.get(cid); challenges.delete(cid); }
   if (!c || c.exp < Date.now()) return null;
   return c;
 }
-setInterval(() => { for (const [k, v] of challenges) if (v.exp < Date.now()) challenges.delete(k); }, 60000).unref();
+if (!SERVERLESS) setInterval(() => { for (const [k, v] of challenges) if (v.exp < Date.now()) challenges.delete(k); }, 60000).unref();
 
 /* ---------- helpers ---------- */
 function json(res, code, obj, extraHeaders) {
@@ -391,7 +434,6 @@ function aiReserve(uid) {
 
 /* ---------- Open Food Facts ---------- */
 
-const offDir = path.join(DATA, 'off');
 
 /** EAN-8/UPC-A/EAN-13/GTIN-14, check digit included. Same rule as the client, on purpose:
     a code that cannot be real is not worth a round trip to anybody's API. */
@@ -424,22 +466,23 @@ function trimProduct(p) {
   return out;
 }
 
-const offCachePath = code => path.join(offDir, code + '.json');
+const offName = code => 'off/' + code + '.json';
 
-function offCached(code) {
+async function offCached(code) {
   try {
-    const c = JSON.parse(fs.readFileSync(offCachePath(code), 'utf8'));
-    const ttl = c.product ? OFF_TTL_MS : OFF_MISS_TTL_MS;
-    if (Date.now() - (c.at || 0) < ttl) return c;
+    const r = await store.get(offName(code));
+    const c = r && JSON.parse(r.text);
+    if (c) {
+      const ttl = c.product ? OFF_TTL_MS : OFF_MISS_TTL_MS;
+      if (Date.now() - (c.at || 0) < ttl) return c;
+    }
   } catch { /* no cache, or unreadable — fetch it */ }
   return null;
 }
 
-function offStore(code, product) {
-  try {
-    fs.mkdirSync(offDir, { recursive: true });
-    fs.writeFileSync(offCachePath(code), JSON.stringify({ at: Date.now(), code, product }));
-  } catch (e) { console.error('off cache write', e.message); }
+async function offStore(code, product) {
+  try { await store.put(offName(code), JSON.stringify({ at: Date.now(), code, product })); }
+  catch (e) { console.error('off cache write', e.message); }
 }
 
 async function offFetch(code) {
@@ -520,7 +563,7 @@ const routes = {
     const code = validBarcode(new URL(req.url, 'http://x').searchParams.get('code'));
     if (!code) return json(res, 400, { error: 'not a barcode' });
 
-    const hit = offCached(code);
+    const hit = await offCached(code);
     if (hit) return json(res, hit.product ? 200 : 404,
       hit.product ? { code, product: hit.product, cached: true } : { error: 'not found', cached: true });
 
@@ -529,7 +572,7 @@ const routes = {
 
     try {
       const { product } = await offFetch(code);
-      offStore(code, product);
+      await offStore(code, product);
       if (!product) return json(res, 404, { error: 'not found' });
       return json(res, 200, { code, product });
     } catch (e) {
@@ -592,7 +635,7 @@ const routes = {
 
     const body = await readBody(req);
     const today = new Date().toISOString().slice(0, 10);
-    const decision = decideNutritionAssist(body.context, readState(user.id), today);
+    const decision = decideNutritionAssist(body.context, await readState(user.id), today);
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad nutrition context' });
     const context = decision.context;
     if (decision.mode === 'local') return json(res, 200, {
@@ -633,7 +676,7 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
 
     const body = await readBody(req);
-    const decision = decideTrainer(body.context, readState(user.id));
+    const decision = decideTrainer(body.context, await readState(user.id));
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad trainer context' });
     if (decision.mode === 'local') return json(res, 200, { local: true, reasons: decision.reasons, ...aiQuota(user.id) });
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
@@ -726,7 +769,7 @@ const routes = {
       counter: credential.counter || 0,
       transports: body.credential?.response?.transports || []
     });
-    saveDb();
+    await saveDb();
     json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
   },
 
@@ -762,7 +805,7 @@ const routes = {
     } catch (e) { return json(res, 400, { error: 'verification failed: ' + e.message }); }
     if (!verification.verified) return json(res, 400, { error: 'not verified' });
     cred.counter = verification.authenticationInfo.newCounter;
-    saveDb();
+    await saveDb();
     const user = db.users.find(u => u.id === cred.userId);
     if (!user) return json(res, 500, { error: 'user missing' });
     if (user.disabled) return json(res, 403, { error: 'this account has been disabled' });
@@ -779,17 +822,14 @@ const routes = {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
     user.sv = sessionVersion(user) + 1;
-    saveDb();
+    await saveDb();
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
   },
 
   'GET /api/data': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    try {
-      const state = JSON.parse(fs.readFileSync(stateFile(user.id), 'utf8'));
-      json(res, 200, { state });
-    } catch { json(res, 200, { state: null }); }
+    json(res, 200, { state: await readState(user.id) });
   },
 
   'PUT /api/data': async (req, res) => {
@@ -798,7 +838,7 @@ const routes = {
     const body = await readBody(req);
     if (!body.state || typeof body.state !== 'object') return json(res, 400, { error: 'state required' });
     delete body.state.active;              // in-progress workouts stay device-local
-    atomicWrite(stateFile(user.id), JSON.stringify(body.state));
+    await store.put(stateName(user.id), JSON.stringify(body.state), { private: true });
     json(res, 200, { ok: true, ts: body.state._ts || null });
   },
 
@@ -812,7 +852,7 @@ const routes = {
     if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return json(res, 400, { error: 'invalid subscription' });
     db.subs = db.subs.filter(s => s.endpoint !== sub.endpoint);
     db.subs.push({ userId: user.id, endpoint: sub.endpoint, keys: sub.keys, created: new Date().toISOString() });
-    saveDb();
+    await saveDb();
     json(res, 200, { ok: true });
   },
 
@@ -821,7 +861,7 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     const body = await readBody(req);
     db.subs = db.subs.filter(s => !(s.userId === user.id && s.endpoint === body.endpoint));
-    saveDb();
+    await saveDb();
     json(res, 200, { ok: true });
   },
 
@@ -870,8 +910,8 @@ const routes = {
   // One row per user, cheap enough for a personal instance (reads each state file once).
   'GET /api/admin/users': async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    const users = db.users.map(u => {
-      const S = readState(u.id) || {};
+    const users = await Promise.all(db.users.map(async u => {
+      const S = await readState(u.id) || {};
       const workouts = S.workouts || [];
       const last = workouts[workouts.length - 1];
       return {
@@ -883,7 +923,7 @@ const routes = {
         hasPush: db.subs.some(s => s.userId === u.id),
         live: livePresence(u.id)
       };
-    });
+    }));
     json(res, 200, { users, invite_only: INVITE_ONLY, now: Date.now() });
   },
 
@@ -893,7 +933,7 @@ const routes = {
     const id = new URL(req.url, 'http://x').searchParams.get('id');
     const u = db.users.find(x => x.id === id);
     if (!u) return json(res, 404, { error: 'no such user' });
-    const S = readState(u.id) || {};
+    const S = await readState(u.id) || {};
     json(res, 200, {
       user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null },
       unit: S.unit || 'kg',
@@ -912,7 +952,7 @@ const routes = {
     if (isAdmin(u)) return json(res, 400, { error: 'cannot disable an admin' });
     u.disabled = !!body.disabled;
     if (u.disabled) presence.delete(u.id);   // drop them off "training now" at once
-    saveDb();
+    await saveDb();
     json(res, 200, { ok: true, id: u.id, disabled: u.disabled });
   },
 
@@ -936,7 +976,7 @@ const routes = {
     do { code = crypto.randomBytes(8).toString('hex').toUpperCase(); } while (db.invites.some(i => i.code === code));
     const invite = { code, note: String(body.note || '').slice(0, 60), createdBy: admin.id, created: new Date().toISOString() };
     db.invites.push(invite);
-    saveDb();
+    await saveDb();
     json(res, 200, { invite });
   },
 
@@ -947,7 +987,7 @@ const routes = {
     if (!inv) return json(res, 404, { error: 'no such code' });
     if (inv.usedBy) return json(res, 400, { error: 'already used — cannot revoke' });
     db.invites = db.invites.filter(i => i.code !== inv.code);
-    saveDb();
+    await saveDb();
     json(res, 200, { ok: true });
   }
 };
@@ -957,8 +997,12 @@ http.createServer(async (req, res) => {
   const key = req.method + ' ' + url.pathname;
   const handler = routes[key];
   if (!handler) return json(res, 404, { error: 'not found' });
-  try { await handler(req, res); }
+  try { await refreshDb(); await handler(req, res); }
   catch (e) {
+    if (e instanceof ConflictError) {           // someone else saved db.json first — safe to retry
+      if (!res.headersSent) json(res, 409, { error: 'data changed at the same moment — try again' });
+      return;
+    }
     console.error(key, e);
     if (!res.headersSent) json(res, 500, { error: 'server error' });
   }

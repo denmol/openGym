@@ -16,21 +16,23 @@ One origin also means passkeys and cookies work as they do behind the Docker Com
 nginx `proxy_pass http://api:3000` in `web/nginx.conf` is what the rewrite replaces; that file stays
 for Docker Compose.
 
-## Read this before using it for real
+## Storage: private Vercel Blob
 
-**The API keeps all data in files, and Vercel has no persistent disk.** Accounts, passkeys, every
-workout, the session secret and the push keys live under `DATA_DIR`. On Vercel only `/tmp` is writable,
-and it belongs to one instance and is lost when that instance is replaced. So:
+Vercel has no persistent disk, so on Vercel the API stores everything in a **private Blob store**
+(`api/store.js`) instead of files: `db.json` (accounts, passkeys, invites, push subscriptions),
+`state-<uid>.json` (each person's workouts), `secret`, `vapid.json`, and the Open Food Facts cache.
+Connect a Blob store to the project and the API picks it up (`BLOB_STORE_ID` / `BLOB_READ_WRITE_TOKEN`);
+nothing else to set. Anywhere else (Docker, `node server.js`) it keeps using `DATA_DIR` files exactly
+as before.
 
-- With no `DATA_DIR` set, the API **refuses to start** on Vercel and says why (`api/deploy.js`).
-- With `DATA_DIR=/tmp/opengym` it starts with a warning, and **loses everyone's data** whenever an
-  instance is recycled. That is fine for a throwaway demo and nothing else.
-
-Ways to make it real (none is done here, because each is a decision):
-1. Keep the API on your own machine and point the Vercel rewrite for `/api/(.*)` at it, using Vercel
-   only for the frontend. Your data stays in your folder, which is what this project is for.
-2. Replace the file storage in `api/server.js` with a database or object store (Vercel Blob, Postgres,
-   Redis). A real change to how accounts and state are saved.
+- **Concurrent writes.** `db.json` is read fresh on every request and written with an ETag
+  precondition. If two instances save at the same moment the second gets `409 — try again` instead of
+  silently overwriting. Per-user state is last-writer-wins, as it always was.
+- **Without a Blob store** the API refuses to start on Vercel unless `DATA_DIR=/tmp/...` is set (a demo
+  that loses its data when an instance is recycled).
+- `SESSION_SECRET`, `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` can be set as env vars instead of being
+  generated into the store.
+- Blob has usage limits on the free plan; a handful of users is far below them, but check your plan.
 
 ## Environment variables (Project Settings → Environment Variables)
 
@@ -39,27 +41,23 @@ Ways to make it real (none is done here, because each is a decision):
 | `RP_ID` | your production domain, e.g. `gym.example.com` (no scheme) |
 | `ORIGIN` | `https://gym.example.com` |
 | `RP_NAME` | display name shown in the passkey prompt |
-| `DATA_DIR` | `/tmp/opengym` for a demo only (see above) |
+| `BLOB_STORE_ID` | set automatically when a Blob store is connected to the project |
 | `INVITE_ONLY` | `1` is sensible on a public URL: otherwise anyone can create a profile |
 | `OPENAI_API_KEY` etc. | optional, for the AI coach and trainer check-in (see `.env.example`) |
 
 **Passkeys are bound to one domain.** A passkey made on `gym.example.com` does not work on a preview
 deployment's `*.vercel.app` URL, so passkey sign-in only works on the domain `RP_ID`/`ORIGIN` name.
 
-## What does not carry over
+## What works differently on Vercel
 
-- **Push reminders and rest-timer notifications.** The API schedules these with `setTimeout` and
-  `setInterval` in memory. A function instance is not kept running between requests, so they are
-  unreliable on Vercel. Fine under Docker.
-- **Exercise images and GIFs.** In Docker they are served by nginx from a downloaded volume. Here the
-  frontend is built to load them from the dataset's GitHub repository instead (`VITE_IMG_BASE` /
-  `VITE_GIF_BASE` in the service's `buildCommand`). `raw.githubusercontent.com` is not a CDN: it
-  caches for minutes, and the service worker only caches same-origin media, so they are not available
-  offline as they are when self-hosted. Hosting the media yourself (e.g. Vercel Blob) is the fix.
-- **`jev-app/`** (Coach Desk) is not deployed. Nothing in the app calls it, it is not reachable
-  without a rewrite, and it writes logs to disk.
-
-## Not verified
-
-This configuration has not been run: neither `vercel dev` nor a real deployment was available. The
-shape follows Vercel's Services documentation and the JSON is valid, but the first deploy is the test.
+- **Rest-timer and daily-reminder push notifications are off.** They rely on `setTimeout` /
+  `setInterval` in a long-running process; a function instance is not kept alive. Subscribing,
+  the test notification and everything else push-related still work. Under Docker all of it works.
+- **Sign-in challenges are signed tokens, not a memory map** (instances share no memory). Each is
+  valid for its 5 minutes rather than strictly once.
+- **"Training now" in the admin view and the AI daily cap are per instance**, so they are approximate.
+  The cap is a guard against runaway cost, not a hard limit, on Vercel.
+- **Exercise images and GIFs** load from the dataset's GitHub repository (`VITE_IMG_BASE` /
+  `VITE_GIF_BASE` in the `buildCommand`). `raw.githubusercontent.com` is not a CDN and the service
+  worker only caches same-origin media, so they are not available offline as when self-hosted.
+- **`jev-app/`** (Coach Desk) is not deployed: nothing in the app calls it and it writes logs to disk.

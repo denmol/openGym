@@ -11,13 +11,15 @@
 /** null when nothing needs saying, otherwise { fatal, message }. */
 export function dataDirProblem(env) {
   if (!env.VERCEL) return null;
+  // A Blob store is the persistent storage Vercel does offer: store.js uses it and ignores DATA_DIR.
+  if (env.BLOB_READ_WRITE_TOKEN || env.BLOB_STORE_ID) return null;
   if (!env.DATA_DIR) {
     return {
       fatal: true,
       message: 'Running on Vercel with no DATA_DIR. This server keeps accounts, passkeys and workouts in files, ' +
         'and Vercel functions have no persistent disk, so it will not start by default. ' +
         'Set DATA_DIR=/tmp/opengym only for a throwaway demo (everything is lost when the instance is recycled), ' +
-        'or move storage to a database before using this for real. See docs/VERCEL.md.'
+        'or connect a private Vercel Blob store (BLOB_STORE_ID / BLOB_READ_WRITE_TOKEN) for real use. See docs/VERCEL.md.'
     };
   }
   if (/^\/tmp(\/|$)/.test(env.DATA_DIR)) {
