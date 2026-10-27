@@ -56,8 +56,9 @@ deployment's `*.vercel.app` URL, so passkey sign-in only works on the domain `RP
   the test notification and everything else push-related still work. Under Docker all of it works.
 - **Sign-in challenges are signed tokens, not a memory map** (instances share no memory). Each is
   valid for its 5 minutes rather than strictly once.
-- **"Training now" in the admin view and the AI daily cap are per instance**, so they are approximate.
-  The cap is a guard against runaway cost, not a hard limit, on Vercel.
+- **"Training now" in the admin view is per instance**, so it is approximate. The AI and barcode
+  daily caps are exact: the count is kept in the Blob store (`api/counters.js`) and reserved with an
+  ETag precondition, so two instances cannot both take the last call.
 - **Exercise images and GIFs** load from the dataset's GitHub repository (`VITE_IMG_BASE` /
   `VITE_GIF_BASE` in the `buildCommand`). `raw.githubusercontent.com` is not a CDN and the service
   worker only caches same-origin media, so they are not available offline as when self-hosted.

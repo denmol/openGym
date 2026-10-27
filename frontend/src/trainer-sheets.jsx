@@ -24,6 +24,7 @@ import { EXIDX } from './lib/exercises.js'
 import { exLine } from './lib/history.js'
 import { MUSCLE_NAME } from './lib/muscles.js'
 import { flexOf, flexWeek } from './lib/flex.js'
+import { CLINICIAN } from './lib/clinician.js'
 import { nextSession, deloadAdvised, DELOAD_RIR } from './lib/trainer-next.js'
 import { replanDue, replanProposals, markReplanned, planAgeWeeks } from './lib/trainer-replan.js'
 
@@ -198,7 +199,9 @@ function Turn({ turn }) {
   return <div style={{ marginTop: 12 }}>
     {turn.question && <div className="small dim" style={{ lineHeight: 1.4, marginBottom: 6 }}>{t('You asked')}: {turn.question}</div>}
     {a.status === 'outside_scope' && <div className="small" style={{ lineHeight: 1.45 }}>
-      {t('Your log can’t answer that. For pain, injury, illness, diet or supplements, ask a clinician or a registered dietitian.')}
+      {CLINICIAN
+        ? t('Your log can’t answer that: it holds training, body weight and food, not a clinical assessment.')
+        : t('Your log can’t answer that. For pain, injury, illness, diet or supplements, ask a clinician or a registered dietitian.')}
     </div>}
     {a.status === 'ok' && <>
       <div className="tt" style={{ fontSize: 16, marginBottom: 6 }}>{a.headline}</div>
@@ -428,7 +431,9 @@ function Trainer({ close }) {
     <div style={{ marginTop: 10 }}><Voice S={S} analysis={analysis} /></div>
 
     <div className="dim small" style={{ lineHeight: 1.45, margin: '4px 2px 6px' }}>
-      {t('General training information, not medical advice. If something hurts or you are unwell, see a clinician.')}
+      {CLINICIAN
+        ? t('General training information from your own log. The clinical judgement stays with you.')
+        : t('General training information, not medical advice. If something hurts or you are unwell, see a clinician.')}
     </div>
   </>
 }

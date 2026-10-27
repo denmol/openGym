@@ -1479,4 +1479,7 @@ export default {
   'New personal bests: {0}': 'Nya personbästa: {0}',
   'Protein about {0} g a day ({1} g per kg), over {2} logged days': 'Protein cirka {0} g per dag ({1} g per kg), över {2} loggade dagar',
   'Body weight {0}': 'Kroppsvikt {0}',
+  // --- clinician instance ---
+  'Your log can’t answer that: it holds training, body weight and food, not a clinical assessment.': 'Din logg kan inte svara på det: den innehåller träning, kroppsvikt och mat, inte en klinisk bedömning.',
+  'General training information from your own log. The clinical judgement stays with you.': 'Allmän träningsinformation ur din egen logg. Den kliniska bedömningen ligger hos dig.',
 }

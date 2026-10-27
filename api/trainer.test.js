@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cleanTrainerContext, decideTrainer, trainerSchema, trainerPayload, trainerProblems, medicalFlag, EVIDENCE_IDS,
-  MAX_HISTORY, MAX_HISTORY_ANSWER, TRAINER_SYSTEM
+  MAX_HISTORY, MAX_HISTORY_ANSWER, TRAINER_SYSTEM, trainerSystem
 } from './trainer.js';
 
 const FINDINGS = [
@@ -240,4 +240,41 @@ test('a medical word in an earlier question keeps the model out of a harmless fo
   assert.equal(decideTrainer(c, { coachProfile: { age: 34 } }).mode, 'local');
   assert.ok(decideTrainer(c, { coachProfile: { age: 34 } }).reasons.includes('medical'));
   assert.equal(decideTrainer(c, { coachProfile: { age: 34 } }, { clinician: true }).mode, 'ai');
+});
+
+/* ------------------------------ the prompt, general and clinician ------------------------------ */
+
+test('the general prompt sends medical talk to a clinician and stops', () => {
+  assert.equal(TRAINER_SYSTEM, trainerSystem(false));
+  assert.match(trainerSystem(false), /tell them to talk to a clinician and stop there/);
+  assert.match(trainerSystem(false), /No diagnosis, no medical advice, no supplements or drugs/);
+});
+
+test('the clinician prompt changes the register, not the checks', () => {
+  const g = trainerSystem(false), c = trainerSystem(true);
+  assert.notEqual(g, c);
+  assert.match(c, /specialist nurse/);
+  assert.match(c, /clinical terms/);
+  assert.doesNotMatch(c, /talk to a clinician and stop there/);
+  assert.match(c, /Never diagnose/);
+  assert.match(c, /never give drug or supplement doses/);
+  // everything that keeps the answer honest is word for word the same
+  const keep = [
+    'Every number you write must be a number from a finding',
+    'You may cite a study only through the "cites" field',
+    'Never describe a heuristic or a practice as established science',
+    'If a finding says there is not enough data',
+    'At most 4 paragraphs of at most 60 words each',
+    'set status to "outside_scope"',
+    'never from an earlier answer'
+  ];
+  for (const line of keep) { assert.ok(g.includes(line), 'general: ' + line); assert.ok(c.includes(line), 'clinician: ' + line); }
+});
+
+test('only the medical line differs between the two prompts', () => {
+  const g = trainerSystem(false).split('\n'), c = trainerSystem(true).split('\n');
+  assert.equal(g.length, c.length);
+  const differing = g.filter((line, i) => line !== c[i]);
+  assert.equal(differing.length, 1);
+  assert.match(differing[0], /No diagnosis/);
 });
