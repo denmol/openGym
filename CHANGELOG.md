@@ -1,5 +1,11 @@
 # Changelog
 
+## Every language is complete again
+
+Eleven of the twelve languages were missing about 760 strings added since the trainer, food and week
+features (everything fell back to English mid-screen). They are now translated, a test keeps the
+languages in step, and the app starts in the browser's language when none has been chosen.
+
 ## The app is now called Pass
 
 Renamed from Dagsnav: app name, home-screen label, page title, passkey prompt (`RP_NAME` default) and
