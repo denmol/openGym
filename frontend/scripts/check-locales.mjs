@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const localesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'locales')
-const files = readdirSync(localesDir).filter(f => f.endsWith('.js')).sort()
+const files = readdirSync(localesDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js')).sort()
 
 if (!files.length) {
   console.error(`No locale files found in ${localesDir}`)
