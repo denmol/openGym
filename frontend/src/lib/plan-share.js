@@ -9,6 +9,7 @@
 //     a page break — each exercise, and each routine that fits, stays in one place.
 
 import { EXIDX, isBodyweightEq } from './exercises.js'
+import { parseJSONLoose } from './coach-parse.js'
 import { modeOf, fmtSec, isBw, isPerSide, sideReps } from './history.js'
 import { uid, todayISO, DAYN, fmtNum, exCount } from './format.js'
 import { t } from './i18n.js'
@@ -72,7 +73,8 @@ export function buildPlanBundle(S, name) {
  * is trained.
  */
 export function parsePlan(raw) {
-  const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+  // A pasted file may have been through a phone: typographic quotes are repaired, not refused.
+  const data = typeof raw === 'string' ? parseJSONLoose(raw) : raw
   if (!data || !data.opengym_plan || !Array.isArray(data.routines)) {
     throw new Error(t('this isn’t a Dagsnav plan file'))
   }
