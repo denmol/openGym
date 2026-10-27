@@ -9,7 +9,7 @@
     "frontend": {
       "root": "frontend",
       "framework": "vite",
-      "buildCommand": "VITE_IMG_BASE=https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/images/ VITE_GIF_BASE=https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/videos/ npm run build"
+      "buildCommand": "node ../scripts/build-foods.mjs && VITE_IMG_BASE=https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/images/ VITE_GIF_BASE=https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/videos/ npm run build"
     }
   },
   "rewrites": [
