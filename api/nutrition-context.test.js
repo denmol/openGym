@@ -153,3 +153,8 @@ test('local review text is fixed and contains no insulin or carbohydrate calcula
   assert.equal(Array.isArray(answer.questions), true);
   assert.equal(/bolus|correction factor|insulin-on-board/i.test(JSON.stringify(answer)), false);
 });
+
+test('clinician instance: health flags no longer route the assistant to the fixed text', () => {
+  assert.equal(decideNutritionAssist(RAW_CONTEXT, null, '2026-08-23', { clinician: true }).mode, 'ai');
+  assert.equal(decideNutritionAssist(null, null, '2026-08-23', { clinician: true }).mode, 'invalid');
+});

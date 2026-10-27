@@ -94,9 +94,10 @@ export function cleanTrainerContext(raw) {
 const adult = age => typeof age === 'number' && Number.isInteger(age) && age >= 18 && age <= 100;
 
 /** 'ai' when a model may phrase the verdict, 'local' when the fixed text is all there is. */
-export function decideTrainer(rawContext, storedState) {
+export function decideTrainer(rawContext, storedState, { clinician = false } = {}) {
   const context = cleanTrainerContext(rawContext);
   if (!context) return { mode: 'invalid', context: null };
+  if (clinician) return { mode: 'ai', context, reasons: [] };   // clinician instance: no medical routing
   const profile = storedState?.coachProfile;
   const reasons = [];
   if (context.medical) reasons.push('client');

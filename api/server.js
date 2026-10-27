@@ -27,6 +27,9 @@ const INVITE_ONLY = /^(1|true|yes|on)$/i.test(process.env.INVITE_ONLY || '');
 // internet don't want the same number. Only affects cookies minted from now on — the expiry is
 // baked into each cookie when it's issued, so lowering this never cuts an existing session short.
 const SESSION_DAYS = Math.max(1, +(process.env.SESSION_DAYS || 90) || 90);
+// For an instance used only by clinicians (frontend build flag VITE_CLINICIAN_MODE is the other half):
+// health flags no longer route the trainer and nutrition assistant to the fixed "ask a clinician" text.
+const CLINICIAN = /^(1|true|yes|on)$/i.test(process.env.CLINICIAN_MODE || '');
 const MAX_BODY = 5 * 1024 * 1024;
 /* ---------- AI coach (optional) ----------
    Off unless OPENAI_API_KEY is set: the key lives here, in the server's environment, and
@@ -635,7 +638,7 @@ const routes = {
 
     const body = await readBody(req);
     const today = new Date().toISOString().slice(0, 10);
-    const decision = decideNutritionAssist(body.context, await readState(user.id), today);
+    const decision = decideNutritionAssist(body.context, await readState(user.id), today, { clinician: CLINICIAN });
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad nutrition context' });
     const context = decision.context;
     if (decision.mode === 'local') return json(res, 200, {
@@ -676,7 +679,7 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
 
     const body = await readBody(req);
-    const decision = decideTrainer(body.context, await readState(user.id));
+    const decision = decideTrainer(body.context, await readState(user.id), { clinician: CLINICIAN });
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad trainer context' });
     if (decision.mode === 'local') return json(res, 200, { local: true, reasons: decision.reasons, ...aiQuota(user.id) });
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
@@ -684,6 +687,7 @@ const routes = {
     const context = decision.context;
     const messages = [
       { role: 'system', content: TRAINER_SYSTEM },
+      ...(CLINICIAN ? [{ role: 'system', content: 'The reader is a specialist nurse. Speak at a professional level and do not tell them to consult a clinician as a way of ending the answer. Everything else above still holds: use only the numbers and citations in the findings.' }] : []),
       { role: 'user', content: JSON.stringify(trainerPayload(context)) }
     ];
     const schema = trainerSchema(context);
