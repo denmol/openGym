@@ -4,12 +4,13 @@ import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, nativeLoad, nativeSave, syncReminder } from '../lib/mobile.js'
+import { detectLang } from '../lib/i18n.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
   // glass: how see-through bars and sheets are — 'frosted' (default, easier to read) | 'clear'
   glass: 'frosted',
-  unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
+  unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: detectLang(),
   theme: 'dark', accent: 'lime', body: 'male', targetW: null, targetWU: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',

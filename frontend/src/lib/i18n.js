@@ -21,6 +21,16 @@ const DATE_LOCALES = {
 const localePacks = import.meta.glob('../locales/*.js')
 const instrPacks = import.meta.glob('../instr/*.js')
 
+// The language to start in when nothing has been chosen yet: the first of the browser's
+// preferred languages that the app has a pack for, else English.
+export function detectLang(prefs = typeof navigator !== 'undefined' ? (navigator.languages?.length ? navigator.languages : [navigator.language]) : []) {
+  for (const p of prefs || []) {
+    const base = String(p || '').toLowerCase().split('-')[0]
+    if (LANGS[base]) return base
+  }
+  return 'en'
+}
+
 let lang = 'en'
 let dict = {}
 let instr = null            // { exId: [steps] } for the current language, null = English

@@ -1482,4 +1482,10 @@ export default {
   // --- clinician instance ---
   'Your log can’t answer that: it holds training, body weight and food, not a clinical assessment.': 'Din logg kan inte svara på det: den innehåller träning, kroppsvikt och mat, inte en klinisk bedömning.',
   'General training information from your own log. The clinical judgement stays with you.': 'Allmän träningsinformation ur din egen logg. Den kliniska bedömningen ligger hos dig.',
+  "No exercises yet.": "Inga övningar ännu.",
+  "Live demo — everything stays in this browser.": "Livedemo – allt stannar i den här webbläsaren.",
+  "Start the demo": "Starta demot",
+  "Self-host it in a minute →": "Kör den själv på en minut →",
+  "{0} nights recorded": "{0} registrerade nätter",
+  "Exercise": "Övning",
 }
