@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractJSON, parseCoachReply } from './coach-parse.js'
+import { extractJSON, parseCoachReply, repairJSON } from './coach-parse.js'
 
 describe('extractJSON', () => {
   it('takes a bare object as it is', () => {
@@ -73,5 +73,47 @@ describe('parseCoachReply', () => {
 
   it('explains an object that is not a plan at all', () => {
     expect(() => parseCoachReply('{"sorry":"need more info"}')).toThrow(/no training days in it/)
+  })
+})
+
+describe('quotes that went through a phone', () => {
+  // The reply as it arrived: typographic quotes throughout, one ” used to open a string, and
+  // \u escapes for å/ä/ö.
+  const PHONE = '{“opengym_plan”:1,“name”:“Styrka och fettminskning”,“week”:{“1”:“r1”,“2”:“r2”},“routines”:[{“id”:“r1”,“name”:”\\u00d6verkropp A”,“emoji”:“barbell”,“ex”:[{“id”:“0030”,“sets”:3,“reps”:8,“prog”:“linear”,“inc”:2.5},{“id”:“2330”,“sets”:3,“reps”:8,“prog”:“double”,“inc”:2.5,“repsMin”:8,“repsMax”:12}]},{“id”:“r2”,“name”:“Underkropp och b\\u00e5l A”,“emoji”:“legs”,“ex”:[{“id”:“0026”,“sets”:3,“reps”:8,“prog”:“off”,“inc”:0}]}]}'
+
+  it('reads a plan whose quotes were all smartened', () => {
+    const d = parseCoachReply(PHONE)
+    expect(d.name).toBe('Styrka och fettminskning')
+    expect(d.routines).toHaveLength(2)
+    expect(d.routines[0].name).toBe('Överkropp A')
+    expect(d.routines[1].name).toBe('Underkropp och båol A'.replace('båol', 'bål'))
+    expect(d.routines[0].ex[1]).toMatchObject({ id: '2330', repsMin: 8, repsMax: 12 })
+    expect(d.week).toEqual({ 1: 'r1', 2: 'r2' })
+  })
+
+  it('finds the plan inside a message that has smart quotes around it too', () => {
+    const d = parseCoachReply('Här är ditt “schema”:\n\n' + PHONE + '\n\nLycka till!')
+    expect(d.routines).toHaveLength(2)
+  })
+
+  it('keeps a quoted word inside a value as text', () => {
+    const d = parseCoachReply('{“name”:“the “big” day”,“routines”:[]}')
+    expect(d.name).toBe('the "big" day')
+  })
+
+  it('drops a trailing comma and turns non-breaking spaces into spaces', () => {
+    const d = parseCoachReply('{"name":"a b","routines":[{"id":"r1","ex":[],},],}')
+    expect(d.name).toBe('a b')
+    expect(d.routines).toHaveLength(1)
+  })
+
+  it('leaves valid JSON exactly as it was', () => {
+    const ok = '{"name":"a “quoted” word, with, commas","routines":[]}'
+    expect(repairJSON(ok)).toBe(ok)
+    expect(parseCoachReply(ok).name).toBe('a “quoted” word, with, commas')
+  })
+
+  it('still says so when it really is not JSON', () => {
+    expect(() => parseCoachReply('{“name”: oops}')).toThrow(/not valid JSON/)
   })
 })

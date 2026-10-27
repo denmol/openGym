@@ -7,6 +7,14 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### Pasting a plan from a phone
+
+- 📋 **A plan that went through a phone now reads.** Copying a reply through a phone or a chat app
+  turns the straight quotes into typographic ones (`“ ”`), and a JSON parser then sees no strings at
+  all. The paste is repaired before it is read: typographic quotes become real ones (or escaped ones
+  when they sit inside a value), non-breaking spaces and trailing commas are cleaned up, and valid
+  JSON is left exactly as it was. Applies to the AI coach's paste box and to plan files.
+
 ### A trainer that plans ahead
 
 - 📋 **Next session, in numbers.** The trainer sheet now shows the coming session exercise by exercise:
