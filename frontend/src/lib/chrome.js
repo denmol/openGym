@@ -22,3 +22,17 @@ export function tabBarFolded(folded, y, lastY) {
 export const TALL_RATIO = 0.82
 export const sheetIsTall = (contentHeight, viewportHeight) =>
   viewportHeight > 0 && contentHeight >= viewportHeight * TALL_RATIO
+
+// The tab bar keeps five places: Home, Plan, Start, Food and More. Everything else lives under
+// More, which lights up while you are on one of those screens so you still see where you are.
+// Entries are [route, icon, label, adminOnly]; labels are source strings for t().
+export const MORE_ITEMS = [
+  ['stats', 'chart', 'Stats'],
+  ['history', 'clock', 'History'],
+  ['library', 'list', 'Exercises'],
+  ['settings', 'gear', 'Settings'],
+  ['admin', 'shield', 'Admin dashboard', true]
+]
+// /report is opened from Settings, so it belongs under More as well.
+export const moreActive = cur => cur === 'report' || MORE_ITEMS.some(([k]) => k === cur)
+export const moreItemsFor = admin => MORE_ITEMS.filter(([, , , adminOnly]) => !adminOnly || admin)

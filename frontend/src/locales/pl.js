@@ -1457,4 +1457,6 @@ export default {
   "Open the notices": "Otwórz informacje",
   "Source code": "Kod źródłowy",
   "credits and licences": "podziękowania i licencje",
+  // --- tab bar menu ---
+  "Menu": "Menu",
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## A simpler tab bar
+
+The bottom bar now has five places: Home, Plan, Start, Food and Menu. Stats, History, Exercises and
+Settings (and Admin for admins) are in the Menu, which lights up while you are on one of them.
+
 ## Credits and licences in the app
 
 Settings now has a "credits and licences" page: the Gym visual credit line, Livsmedelsverket (CC BY 4.0),
