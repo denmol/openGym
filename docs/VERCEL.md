@@ -21,8 +21,9 @@ for Docker Compose.
 Vercel has no persistent disk, so on Vercel the API stores everything in a **private Blob store**
 (`api/store.js`) instead of files: `db.json` (accounts, passkeys, invites, push subscriptions),
 `state-<uid>.json` (each person's workouts), `secret`, `vapid.json`, and the Open Food Facts cache.
-Connect a Blob store to the project and the API picks it up (`BLOB_STORE_ID` / `BLOB_READ_WRITE_TOKEN`);
-nothing else to set. Anywhere else (Docker, `node server.js`) it keeps using `DATA_DIR` files exactly
+Create the store **connected to the project** (dashboard: Storage → Create → Blob → private → connect to the
+project). A store that is not connected gives the functions no credentials and the API crashes at start with
+"No blob credentials found". Connecting sets `BLOB_READ_WRITE_TOKEN`; nothing else to set. Anywhere else (Docker, `node server.js`) it keeps using `DATA_DIR` files exactly
 as before.
 
 - **Concurrent writes.** `db.json` is read fresh on every request and written with an ETag
@@ -41,7 +42,7 @@ as before.
 | `RP_ID` | your production domain, e.g. `gym.example.com` (no scheme) |
 | `ORIGIN` | `https://gym.example.com` |
 | `RP_NAME` | display name shown in the passkey prompt |
-| `BLOB_STORE_ID` | set automatically when a Blob store is connected to the project |
+| `BLOB_READ_WRITE_TOKEN` | set automatically when a Blob store is connected to the project |
 | `INVITE_ONLY` | `1` is sensible on a public URL: otherwise anyone can create a profile |
 | `OPENAI_API_KEY` etc. | optional, for the AI coach and trainer check-in (see `.env.example`) |
 
@@ -61,3 +62,14 @@ deployment's `*.vercel.app` URL, so passkey sign-in only works on the domain `RP
   `VITE_GIF_BASE` in the `buildCommand`). `raw.githubusercontent.com` is not a CDN and the service
   worker only caches same-origin media, so they are not available offline as when self-hosted.
 - **`jev-app/`** (Coach Desk) is not deployed: nothing in the app calls it and it writes logs to disk.
+
+## Deployed
+
+Production: `https://opengym-chi.vercel.app`. `RP_ID` and `ORIGIN` must match that domain exactly; a custom
+domain means changing both. Checked on that deployment: the page loads, `/api/config` answers, and the API
+wrote its secret and push keys to the Blob store.
+
+## Not verified
+
+Passkey registration and sign-in, and data sync, have not been exercised on the deployed site. Blob
+free-plan limits have not been checked.
