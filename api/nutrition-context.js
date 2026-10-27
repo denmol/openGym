@@ -89,9 +89,10 @@ function storedNutritionNeedsLocal(state, today) {
     !currentReview(goals.safetyReviewedAt, today) || goals.targetReviewRequired !== false;
 }
 
-export function decideNutritionAssist(rawContext, storedState, today) {
+export function decideNutritionAssist(rawContext, storedState, today, { clinician = false } = {}) {
   const context = cleanNutritionContext(rawContext);
   if (!context) return { mode: 'invalid', context: null };
+  if (clinician) return { mode: 'ai', context };     // clinician instance: no health-flag routing
   const clientLocal = Object.values(context.medical).some(Boolean);
   return { mode: clientLocal || storedNutritionNeedsLocal(storedState, today) ? 'local' : 'ai', context };
 }

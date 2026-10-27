@@ -8,6 +8,7 @@
 import { api } from './api.js'
 import { getLang } from './i18n.js'
 import { coachProfileOf, medicalFlag } from './coach-profile.js'
+import { CLINICIAN } from './clinician.js'
 
 export const MAX_QUESTION = 300
 const SENT = 10          // findings that go to the model; the rest are shown but not phrased
@@ -29,7 +30,7 @@ export function trainerContext(S, analysis, question = '') {
       .slice(0, SENT)
       .map(({ code, kind, basis, evidence, facts }) => ({ code, kind, basis, evidence, facts })),
     question: q,
-    medical: !!(medicalFlag(p.limits) || medicalFlag(p.dislikes) || medicalFlag(q) || minor || !!(S && S.health && S.health.on !== false))
+    medical: !CLINICIAN && !!(medicalFlag(p.limits) || medicalFlag(p.dislikes) || medicalFlag(q) || minor || !!(S && S.health && S.health.on !== false))
   }
 }
 

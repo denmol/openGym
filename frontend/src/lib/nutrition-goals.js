@@ -1,6 +1,7 @@
 import { NUTRIENTS } from './foods.js'
 import { bmr } from './nutrition.js'
 import { weightIn } from './history.js'
+import { CLINICIAN } from './clinician.js'
 
 export const NUTRITION_GOALS = ['maintain', 'lose', 'muscle', 'health']
 export const NUTRIENT_TARGETS = [...NUTRIENTS]
@@ -289,6 +290,7 @@ export function weightKgOf(entry) {
 
 /** Medical contexts must use a complete target set supplied by the person's clinician. */
 export const needsClinicianTargets = (profile, { diabetes = false } = {}) => {
+  if (CLINICIAN) return false
   const clean = cleanNutritionProfile(profile)
   return diabetes === true || clean.condition || clean.medication ||
     (clean.incretinUse != null && clean.incretinUse !== 'none') ||
@@ -296,6 +298,7 @@ export const needsClinicianTargets = (profile, { diabetes = false } = {}) => {
 }
 
 export function nutritionAiGate(profile, { age, today, diabetes = false } = {}) {
+  if (CLINICIAN) return false
   const clean = cleanNutritionProfile(profile)
   return ageOf(age) == null || diabetes === true || clean.condition || clean.medication ||
     clean.incretinUse !== 'none' || clean.weightPhase !== null ||

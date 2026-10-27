@@ -183,3 +183,10 @@ test('medicalFlag matches stems in English and Swedish', () => {
 test('the evidence ids the server accepts are the seven in the registry', () => {
   assert.equal(EVIDENCE_IDS.length, 7);
 });
+
+test('clinician instance: medical flags and a missing age no longer send the trainer to the fixed text', () => {
+  const state = { coachProfile: { limits: 'knee pain', age: null }, health: { on: true } };
+  assert.equal(decideTrainer({ ...RAW, medical: true }, state).mode, 'local');
+  assert.equal(decideTrainer({ ...RAW, medical: true }, state, { clinician: true }).mode, 'ai');
+  assert.equal(decideTrainer(null, state, { clinician: true }).mode, 'invalid');
+});
