@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { t } from './lib/i18n.js'
-import { todayISO, fmtNum } from './lib/format.js'
+import { todayISO, fmtNum, fmtDate } from './lib/format.js'
 import { Button, TextField } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
 import { analyze, applyTrainerAction, revertTrainerAction, MAJOR, WINDOW_DAYS } from './lib/trainer.js'
@@ -18,6 +18,13 @@ import { EVIDENCE, doiUrl, pubmedUrl } from './lib/trainer-evidence.js'
 import { trainerContext, trainerStatus, askTrainer, MAX_QUESTION } from './lib/trainer-ai.js'
 import { coachProfileOf, isCoachReady } from './lib/coach-profile.js'
 import { coachWizardSheet } from './coach-sheets.jsx'
+import { startFlow } from './sheets.jsx'
+import { EXIDX } from './lib/exercises.js'
+import { exLine } from './lib/history.js'
+import { MUSCLE_NAME } from './lib/muscles.js'
+import { flexOf, flexWeek } from './lib/flex.js'
+import { nextSession, deloadAdvised, DELOAD_RIR } from './lib/trainer-next.js'
+import { replanDue, replanProposals, markReplanned, planAgeWeeks } from './lib/trainer-replan.js'
 
 const update = (...a) => useStore.getState().update(...a)
 const ui = () => useUI.getState()
@@ -189,11 +196,119 @@ function Voice({ S, analysis }) {
   </div>
 }
 
+/* ------------------------------- next session ------------------------------- */
+
+const KIND_TAG = {
+  up: ['Heavier', 'var(--green-t)'], hold: ['Same again', 'var(--label-2)'], deload: ['Back off', 'var(--orange-t)'],
+  lighter: ['Lighter', 'var(--blue-t)'], first: ['Baseline', 'var(--label-2)']
+}
+
+function NextSession({ S, analysis }) {
+  const advised = deloadAdvised(analysis)
+  const [light, setLight] = useState(advised)
+  const today = todayISO()
+  const session = useMemo(() => nextSession(S, today, { deload: light }),
+    [S.workouts, S.routines, S.week, S.dayPlan, S.flex, S.unit, S.active, light, today])
+  if (!session || S.active) return null
+  const flex = flexOf(S).on ? flexWeek(S, today) : null
+  const { routine, items, unit } = session
+  const when = flex ? t('Next in your rotation') : session.today ? t('Today') : fmtDate(session.iso, true)
+
+  return <div className="card" style={{ marginBottom: 10 }}>
+    <div className="row between" style={{ gap: 10, alignItems: 'flex-start' }}>
+      <div style={{ minWidth: 0 }}>
+        <h2 style={{ margin: 0 }}>{t('Next session')}</h2>
+        <div className="muted small" style={{ marginTop: 3 }}>{routine.name} · {when}</div>
+      </div>
+      {flex && <span className="tag nocap">{t('{0} of {1} this week', flex.done, flex.perWeek)}</span>}
+    </div>
+
+    <div className="row" style={{ gap: 8, margin: '12px 0 4px' }}>
+      <Button size="sm" variant={light ? undefined : 'primary'} onClick={() => setLight(false)}>{t('Normal session')}</Button>
+      <Button size="sm" variant={light ? 'primary' : undefined} onClick={() => setLight(true)}>{t('Lighter session')}</Button>
+    </div>
+    {advised && <div className="small" style={{ lineHeight: 1.45, color: 'var(--orange-t)', marginBottom: 6 }}>
+      {t('Your log suggests taking it lighter this time — see the findings below.')}
+    </div>}
+    {light && <div className="dim small" style={{ lineHeight: 1.45, marginBottom: 6 }}>
+      {t('Half the sets at the weight you already handle, stopping with about {0} reps left.', DELOAD_RIR)}
+    </div>}
+
+    {items.map(it => {
+      const tag = KIND_TAG[it.kind]
+      const line = exLine({ id: it.id, sets: it.sets, reps: it.reps, weight: it.weight, sec: it.sec, mode: it.mode }, unit)
+      return <div key={it.id} style={{ padding: '9px 0', borderTop: '1px solid var(--sep)' }}>
+        <div className="row between" style={{ gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="tt" style={{ fontSize: 15 }}>{EXIDX[it.id] ? EXIDX[it.id].n : it.id}</div>
+            <div className="small" style={{ marginTop: 2 }}>{line}</div>
+          </div>
+          {tag && <span className="tag nocap" style={{ color: tag[1], flex: 'none' }}>{t(tag[0])}</span>}
+        </div>
+        {it.why && !light && <div className="dim small" style={{ marginTop: 4, lineHeight: 1.4 }}>{t(...it.why)}</div>}
+      </div>
+    })}
+
+    <div style={{ marginTop: 10 }}>
+      <Button variant="primary" icon="play" onClick={() => startFlow(routine.id, { light })}>{t('Start this session')}</Button>
+    </div>
+    <div className="dim small" style={{ marginTop: 8, lineHeight: 1.4 }}>
+      {t('The numbers come from the progression rule set for each exercise; the workout pre-fills the same ones.')}
+    </div>
+  </div>
+}
+
+/* ------------------------------- program review ------------------------------- */
+
+function Proposal({ a, onApply }) {
+  const swap = a.type === 'swap'
+  return <div style={{ padding: '10px 0', borderTop: '1px solid var(--sep)' }}>
+    <div className="tt" style={{ fontSize: 15 }}>
+      {swap ? t('{0} → {1}', a.from, a.to) : t('{0}: {1} → {2} sets', a.exercise, a.from, a.to)}
+    </div>
+    <div className="muted small" style={{ marginTop: 3, lineHeight: 1.4 }}>
+      {swap
+        ? t('No progress on {0} for {1} weeks ({2} sessions). A similar exercise can get it moving again. In {3}; the weight starts fresh.', a.from, fmtNum(a.weeks), a.sessions, a.routine)
+        : t('{0} gets too few sets a week. In {1}.', t(MUSCLE_NAME[a.muscle] || a.muscle || ''), a.routine)}
+    </div>
+    <div style={{ marginTop: 8 }}><Button size="sm" variant="primary" icon="plus" onClick={onApply}>{t('Apply')}</Button></div>
+  </div>
+}
+
+function Review({ S, analysis, onApply }) {
+  const [open, setOpen] = useState(false)
+  const due = replanDue(S, analysis)
+  const proposals = useMemo(() => analysis.ready ? replanProposals(S, analysis) : [], [analysis, S.routines, S.week])
+  if (!analysis.ready) return null
+  const weeks = Math.floor(planAgeWeeks(S))
+  const show = open || due
+  const reviewed = () => { update(s => markReplanned(s)); ui().toast(t('Marked as reviewed')) }
+
+  if (!show) return <div style={{ marginBottom: 10 }}>
+    <Button size="sm" icon="clipboard" onClick={() => setOpen(true)}>{t('Review my program')}</Button>
+  </div>
+
+  return <div className="card" style={{ marginBottom: 10, borderLeft: due ? '3px solid var(--blue-t)' : undefined }}>
+    <h2 style={{ margin: 0 }}>{t('Program review')}</h2>
+    <div className="muted small" style={{ marginTop: 4, lineHeight: 1.45 }}>
+      {due
+        ? t('It has been about {0} weeks since your program was set up or reviewed. This is what your log suggests changing. Nothing changes until you apply it, and each change can be undone.', weeks)
+        : t('What your log suggests changing. Nothing changes until you apply it, and each change can be undone.')}
+    </div>
+    {proposals.length === 0
+      ? <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>{t('Nothing to change: your program matches what you actually do.')}</div>
+      : <div style={{ marginTop: 6 }}>{proposals.map((a, i) => <Proposal key={a.type + a.routineId + (a.exId || '') + i} a={a} onApply={() => onApply(a)} />)}</div>}
+    <div style={{ marginTop: 10 }}>
+      <Button size="sm" icon="checkCircle" onClick={reviewed}>{t('Mark as reviewed')}</Button>
+    </div>
+  </div>
+}
+
 /* ------------------------------- the sheet ------------------------------- */
 
 function Trainer({ close }) {
   const S = useStore(s => s.S)
-  const analysis = useMemo(() => analyze(S), [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit])
+  const analysis = useMemo(() => analyze(S), [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit, S.flex])
   const profile = coachProfileOf(S)
   const [shown, setShown] = useState(5)
   const fresh = S.trainerUndo && S.trainerUndo.at && (Date.now() - new Date(S.trainerUndo.at + 'T00:00:00').getTime()) / 86400000 <= 14
@@ -235,10 +350,13 @@ function Trainer({ close }) {
       </div>
       : null}
 
+    <NextSession S={S} analysis={analysis} />
+    <Review S={S} analysis={analysis} onApply={apply} />
+
     {applied.length > 0 && <div className="card" style={{ marginBottom: 10 }}>
       <h2>{t('Changes the trainer made')}</h2>
       {applied.map((a, i) => <div key={i} className="row between" style={{ gap: 10, marginBottom: 6 }}>
-        <div className="small">{a.exercise}: {a.from} → {a.to} {t('sets')}</div>
+        <div className="small">{a.type === 'swap' ? t('{0} → {1}', a.from, a.to) : <>{a.exercise}: {a.from} → {a.to} {t('sets')}</>}</div>
         <Button size="sm" icon="reset" onClick={() => revert(a)}>{t('Undo')}</Button>
       </div>)}
     </div>}
@@ -267,6 +385,9 @@ export function useTrainerHeadline() {
   return useMemo(() => {
     if (!S.workouts || !S.workouts.length) return null
     const a = analyze(S)
-    return { text: headlineOf(a), kind: (a.findings.find(f => f.kind === 'act') || a.findings.find(f => f.kind === 'watch') || { kind: a.ready ? 'good' : 'info' }).kind }
-  }, [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit])
+    return {
+      text: headlineOf(a), review: replanDue(S, a),
+      kind: (a.findings.find(f => f.kind === 'act') || a.findings.find(f => f.kind === 'watch') || { kind: a.ready ? 'good' : 'info' }).kind
+    }
+  }, [S.workouts, S.routines, S.week, S.bodyweight, S.sleep, S.coachProfile, S.unit, S.flex, S.replanAt, S.trainerUndo, S.coachUndo])
 }

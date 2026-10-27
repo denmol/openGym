@@ -18,6 +18,7 @@ import { healthSheet, healthSummary, importGlucoseSheet, undoImport, hasImported
 import { diabetesOn } from '../lib/diabetes.js'
 import { barcodeDiagnostics } from '../barcode-sheets.jsx'
 import Icon from '../components/Icon.jsx'
+import { flexOf } from '../lib/flex.js'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 
 export default function Settings() {
@@ -128,6 +129,16 @@ export default function Settings() {
       )}
     </Section>
     {!user && !DEMO && !MOBILE && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
+
+    {/* ---------- training week ---------- */}
+    <Section title={t('Training week')} footer={t('Your routines stay as they are. With a flexible week the app drops the fixed days: it shows the next routine in turn and counts sessions, so a night shift never counts as a missed day.')}>
+      <Row icon="calendar" iconTint="var(--blue)" title={t('Flexible week')} subtitle={t('For shift work: aim for a number of sessions, not fixed days.')}>
+        <Switch checked={flexOf(S).on} onChange={v => update(s => { s.flex = { on: v, perWeek: flexOf(s).perWeek } })} />
+      </Row>
+      {flexOf(S).on && <SelectRow icon="target" iconTint="var(--green)" title={t('Sessions per week')}
+        value={flexOf(S).perWeek} onChange={v => update(s => { s.flex = { on: true, perWeek: v } })}
+        options={[1, 2, 3, 4, 5, 6, 7].map(v => ({ value: v, label: String(v) }))} />}
+    </Section>
 
     {/* ---------- AI coach ---------- */}
     <Section title={t('AI coach')} footer={t('Your answers stay on this device. Nothing is sent anywhere unless you paste the prompt into a chat yourself. The trainer works out its findings on this device and, only if the server has an AI key and you ask for a written check-in, sends just those findings.')}>

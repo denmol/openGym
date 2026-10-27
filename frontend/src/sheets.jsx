@@ -19,6 +19,7 @@ import { loadOfWorkouts } from './lib/muscles.js'
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { buildPlanBundle, parsePlan, mergePlan, printPlan } from './lib/plan-share.js'
 import { estimate1RM, best1RM, is1RMRecord, REP_CAP } from './lib/onerm.js'
+import { planItem } from './lib/trainer-next.js'
 import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS } from './lib/progression.js'
 import { MOBILE, shareExport } from './lib/mobile.js'
 
@@ -865,16 +866,26 @@ export function WorkoutRow({ w, onClick }) {
 }
 
 /* ============================ workout lifecycle ============================ */
-export function startFlow(routineId) {
-  bwSheet({ required: true, onDone: bw => beginWorkout(routineId, bw) })
+export function startFlow(routineId, opts) {
+  bwSheet({ required: true, onDone: bw => beginWorkout(routineId, bw, opts) })
 }
-export function beginWorkout(routineId, bw) {
+// opts.light starts the lighter version of the session the trainer advises (lib/trainer-next.js):
+// half the sets at the weight already handled. The prescription is recorded as the target, so a
+// lighter session is judged against what it asked for and never reads as a string of misses.
+export function beginWorkout(routineId, bw, opts) {
   const st = S()
   const r = routineId ? st.routines.find(x => x.id === routineId) : null
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards. `plan` is
   // kept on the entry purely so the workout can explain the number it chose.
+  const light = !!(opts && opts.light)
   const entries = (r ? r.ex : []).map(cfg => {
+    if (light && !isCardio(cfg.id)) {
+      const it = planItem(st, r, cfg, { deload: true })
+      const target = { ...cfg, sets: it.sets, ...(it.weight != null ? { weight: it.weight } : {}) }
+      const sets = buildSets(st, target).slice(0, it.sets).map(x => (it.weight != null && !x.done ? { ...x, w: it.weight } : x))
+      return { id: cfg.id, sg: cfg.sg, target, plan: { policy: 'lighter', kind: 'lighter', why: it.why }, sets }
+    }
     const plan = nextPrescription(st, cfg, r)
     return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
   })
