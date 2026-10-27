@@ -15,7 +15,8 @@ import Icon from './components/Icon.jsx'
 import { analyze, applyTrainerAction, revertTrainerAction, MAJOR, WINDOW_DAYS } from './lib/trainer.js'
 import { describe, headlineOf, BASIS_LABEL, BASIS_NOTE } from './lib/trainer-text.js'
 import { EVIDENCE, doiUrl, pubmedUrl } from './lib/trainer-evidence.js'
-import { trainerContext, trainerStatus, askTrainer, MAX_QUESTION } from './lib/trainer-ai.js'
+import { trainerContext, trainerStatus, askTrainer, MAX_QUESTION, MAX_HISTORY } from './lib/trainer-ai.js'
+import { weekSummary } from './lib/trainer-week.js'
 import { coachProfileOf, isCoachReady } from './lib/coach-profile.js'
 import { coachWizardSheet } from './coach-sheets.jsx'
 import { startFlow } from './sheets.jsx'
@@ -137,11 +138,12 @@ function Voice({ S, analysis }) {
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(false)
   const [question, setQuestion] = useState('')
-  const [res, setRes] = useState(null)
+  const [res, setRes] = useState(null)          // only ever the "no model for this profile" notice
+  const [thread, setThread] = useState([])      // answered turns: { question, answer }
   const [err, setErr] = useState(null)
   useEffect(() => { trainerStatus().then(setStatus) }, [])
 
-  const context = useMemo(() => trainerContext(S, analysis, question), [S, analysis, question])
+  const context = useMemo(() => trainerContext(S, analysis, question, thread), [S, analysis, question, thread])
 
   if (!status) return null
   if (!status.enabled) {
@@ -153,8 +155,9 @@ function Voice({ S, analysis }) {
   const ask = async q => {
     setBusy(true); setErr(null); setRes(null)
     try {
-      const out = await askTrainer(trainerContext(S, analysis, q))
-      setRes(out)
+      const out = await askTrainer(trainerContext(S, analysis, q, thread))
+      if (out.answer) { setThread(th => [...th, { question: q, answer: out.answer }]); setQuestion('') }
+      else setRes(out)
     } catch (e) {
       setErr(e.status === 429 ? t('Daily limit reached. The findings above are still current.')
         : e.fallback ? t('The model’s answer didn’t match your numbers, so it was thrown away. The findings above are what stands.')
@@ -173,7 +176,7 @@ function Voice({ S, analysis }) {
     </Button>
     <div className="row" style={{ gap: 8, marginTop: 10 }}>
       <TextField style={{ flex: 1, minWidth: 0 }} value={question} maxLength={MAX_QUESTION}
-        placeholder={t('Or ask about your training…')} onChange={e => setQuestion(e.target.value)} />
+        placeholder={thread.length ? t('Ask a follow-up…') : t('Or ask about your training…')} onChange={e => setQuestion(e.target.value)} />
       <Button size="sm" disabled={busy || !question.trim()} onClick={() => ask(question)}>{t('Ask')}</Button>
     </div>
     <Disclosure context={context} />
@@ -181,19 +184,72 @@ function Voice({ S, analysis }) {
     {res && res.local && <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>
       {t('AI isn’t used for this profile (age, health mode, or a medical note). The findings above are the whole answer.')}
     </div>}
-    {res && res.answer && res.answer.status === 'outside_scope' && <div className="small" style={{ marginTop: 10, lineHeight: 1.45 }}>
+    {thread.map((turn, i) => <Turn key={i} turn={turn} />)}
+    {thread.length > 0 && <div style={{ marginTop: 4 }}>
+      <Button size="sm" icon="reset" onClick={() => { setThread([]); setRes(null); setErr(null) }}>{t('New conversation')}</Button>
+      {thread.length > MAX_HISTORY && <span className="dim small" style={{ marginLeft: 10 }}>{t('Only the last {0} turns are remembered.', MAX_HISTORY)}</span>}
+    </div>}
+  </div>
+}
+
+/** One turn of the conversation: the question (if there was one) and what came back. */
+function Turn({ turn }) {
+  const a = turn.answer
+  return <div style={{ marginTop: 12 }}>
+    {turn.question && <div className="small dim" style={{ lineHeight: 1.4, marginBottom: 6 }}>{t('You asked')}: {turn.question}</div>}
+    {a.status === 'outside_scope' && <div className="small" style={{ lineHeight: 1.45 }}>
       {t('Your log can’t answer that. For pain, injury, illness, diet or supplements, ask a clinician or a registered dietitian.')}
     </div>}
-    {res && res.answer && res.answer.status === 'ok' && <div style={{ marginTop: 12 }}>
-      <div className="tt" style={{ fontSize: 16, marginBottom: 6 }}>{res.answer.headline}</div>
-      {res.answer.paragraphs.map((p, i) => <div key={i} style={{ marginBottom: 10 }}>
+    {a.status === 'ok' && <>
+      <div className="tt" style={{ fontSize: 16, marginBottom: 6 }}>{a.headline}</div>
+      {a.paragraphs.map((p, i) => <div key={i} style={{ marginBottom: 10 }}>
         <div className="small" style={{ lineHeight: 1.5 }}>{p.text}</div>
         {p.cites.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
           {[...new Set(p.cites)].map(id => <Source key={id} id={id} />)}
         </div>}
       </div>)}
-    </div>}
+    </>}
   </div>
+}
+
+/* ------------------------------- the week ------------------------------- */
+
+const signed = (n, unit) => (n > 0 ? '+' : n < 0 ? '−' : '±') + fmtNum(Math.abs(n)) + (unit ? ' ' + unit : '')
+
+/** The week so far (or last week, early in the week), worked out from the log when Home opens. */
+export function WeekCard({ onOpen }) {
+  const S = useStore(s => s.S)
+  const w = useMemo(() => weekSummary(S), [S.workouts, S.meals, S.bodyweight, S.flex, S.week, S.routines, S.myFoods, S.nutritionGoals, S.coachProfile, S.unit])
+  if (!w || (w.sessions === 0 && w.prevSets === 0)) return null
+  const names = w.prs.map(id => (EXIDX[id] || {}).n || id)
+  const rows = []
+  rows.push({
+    icon: w.aim && w.sessions >= w.aim ? 'checkCircle' : 'flag',
+    text: w.aim ? t('{0} of {1} sessions', w.sessions, w.aim) : t('{0} sessions', w.sessions),
+    good: !!(w.aim && w.sessions >= w.aim)
+  })
+  if (w.sets > 0) rows.push({
+    icon: 'chartLine',
+    text: w.prevSets > 0 ? t('{0} working sets ({1} the week before)', w.sets, signed(w.sets - w.prevSets)) : t('{0} working sets', w.sets)
+  })
+  if (names.length) rows.push({ icon: 'trophy', text: t(names.length === 1 ? 'New personal best: {0}' : 'New personal bests: {0}', names.slice(0, 3).join(', ')), good: true })
+  if (w.protein) rows.push({ icon: 'lightbulb', text: t('Protein about {0} g a day ({1} g per kg), over {2} logged days', w.protein.avgG, fmtNum(w.protein.gPerKg), w.protein.days) })
+  if (w.weightDelta != null) {
+    const unit = S.unit === 'lb' ? 'lb' : 'kg'
+    const shown = Math.round((unit === 'lb' ? w.weightDelta / 0.45359237 : w.weightDelta) * 10) / 10     // a change can be negative: weightIn refuses those
+    rows.push({ icon: 'info', text: t('Body weight {0}', signed(shown, unit)) })
+  }
+
+  return <button className="card" style={{ width: '100%', textAlign: 'left' }} onClick={onOpen}>
+    <div className="row between" style={{ marginBottom: 6 }}>
+      <h2 style={{ margin: 0 }}>{w.which === 'previous' ? t('Last week') : t('Your week')}</h2>
+      <span className="dim small">{fmtDate(w.start, true)} – {fmtDate(w.end, true)}</span>
+    </div>
+    {rows.map((r, i) => <div key={i} className="row small" style={{ gap: 8, padding: '3px 0', alignItems: 'flex-start', color: r.good ? 'var(--green-t)' : undefined }}>
+      <Icon name={r.icon} style={{ fontSize: 15, marginTop: 1, flex: 'none' }} />
+      <span style={{ lineHeight: 1.4 }}>{r.text}</span>
+    </div>)}
+  </button>
 }
 
 /* ------------------------------- next session ------------------------------- */

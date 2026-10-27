@@ -26,7 +26,7 @@ export const BASIS_NOTE = {
 export const CODES = [
   'data_thin', 'volume_none', 'volume_low', 'volume_high', 'frequency_low', 'progressing', 'stalled',
   'falling', 'fatigue', 'block_long', 'adherence', 'effort_far', 'rate_effort', 'weight_fast',
-  'weight_on_track', 'weight_flat', 'guideline_met'
+  'weight_on_track', 'weight_flat', 'guideline_met', 'protein_low', 'weight_down_muscle'
 ]
 
 // Numbers go through the locale (a decimal comma in Swedish), like the rest of the app.
@@ -125,6 +125,17 @@ export function describe(f) {
       return {
         title: t('Weight is holding steady'),
         body: t('The trend across {0} weigh-ins is roughly flat.', x.weighIns)
+      }
+    case 'protein_low':
+      return {
+        title: t('Protein is below where gains levelled off'),
+        body: t('You logged about {0} g of protein a day over {1} days, around {2} g per kg of body weight. In a meta-analysis of strength-training trials, protein supplements added no more lean mass beyond about {3} g per kg a day. If you don’t log every meal, treat this as a rough guide.', n(x.avgG), x.days, n(x.gPerKg), n(x.target)) +
+          (x.goal === 'fatloss' ? ' ' + t('While losing weight, higher intakes are common in practice; a dietitian can set a number for you.') : '')
+      }
+    case 'weight_down_muscle':
+      return {
+        title: t('Weight is falling while you aim to build muscle'),
+        body: t('Your weight is falling about {0}% a week ({1} kg) across {2} weigh-ins. A review of off-season nutrition for bodybuilders aims for a gain of roughly {3}–{4}% a week for novice and intermediate lifters. It is a narrative review, not a trial, but it points the same way: building muscle usually takes eating enough.', n(x.pct), n(x.kgPerWeek), x.weighIns, n(x.aimLowPct), n(x.aimHighPct))
       }
     case 'guideline_met':
       return {

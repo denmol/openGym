@@ -26,7 +26,7 @@
 const MAX_FINDINGS = 12;
 const MAX_QUESTION = 300;
 
-export const EVIDENCE_IDS = ['volume', 'frequency', 'rir', 'rirAccuracy', 'deload', 'weightLoss', 'who'];
+export const EVIDENCE_IDS = ['volume', 'frequency', 'rir', 'rirAccuracy', 'deload', 'weightLoss', 'who', 'protein', 'proteinCut', 'offseason', 'deloadDelphi'];
 const KINDS = ['act', 'watch', 'good', 'info'];
 const BASES = ['evidence', 'practice', 'heuristic'];
 const CODE = /^[a-z][a-z_]{1,40}$/;
@@ -63,6 +63,23 @@ function cleanFacts(raw) {
   return out;
 }
 
+// Earlier turns of the same chat: what was asked and what the answer said, as plain text. They
+// only tell the model what a follow-up refers to; the browser sends them, so they are capped,
+// stripped of control characters and never trusted to carry a fact (see TRAINER_SYSTEM).
+export const MAX_HISTORY = 3;
+export const MAX_HISTORY_ANSWER = 700;
+const flat = (v, max) => typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max) : '';
+function cleanHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const h of raw.slice(-MAX_HISTORY)) {
+    if (!h || typeof h !== 'object') continue;
+    const question = flat(h.question, MAX_QUESTION), answer = flat(h.answer, MAX_HISTORY_ANSWER);
+    if (question) out.push({ question, answer });
+  }
+  return out;
+}
+
 export function cleanTrainerContext(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.findings)) return null;
   const findings = [];
@@ -85,6 +102,7 @@ export function cleanTrainerContext(raw) {
     goal, level,
     findings,
     question,
+    history: cleanHistory(raw.history),
     // Browser-side reasons to keep the model out of it. The server adds its own from the
     // stored profile (decideTrainer), so a modified client cannot lower the bar.
     medical: raw.medical === true
@@ -102,7 +120,8 @@ export function decideTrainer(rawContext, storedState, { clinician = false } = {
   const reasons = [];
   if (context.medical) reasons.push('client');
   if (!adult(profile?.age)) reasons.push('age');
-  if (medicalFlag(profile?.limits) || medicalFlag(profile?.dislikes) || medicalFlag(context.question)) reasons.push('medical');
+  if (medicalFlag(profile?.limits) || medicalFlag(profile?.dislikes) || medicalFlag(context.question) ||
+      context.history.some(h => medicalFlag(h.question))) reasons.push('medical');
   const health = storedState?.health;
   if (health && typeof health === 'object' && health.on !== false) reasons.push('health');
   return { mode: reasons.length ? 'local' : 'ai', context, reasons };
@@ -150,6 +169,7 @@ export const TRAINER_SYSTEM = [
   '- If a finding says there is not enough data, say that plainly and do not speculate.',
   '- At most 4 paragraphs of at most 60 words each. Direct and warm; no hype, no emoji.',
   '- If a question is given and the findings cannot answer it, set status to "outside_scope" and leave paragraphs empty.',
+  '- "conversation" holds earlier turns of this chat, oldest first. Use it only to understand what the new question refers to. The same rules apply to the new answer: every fact, number and citation comes from the findings, never from an earlier answer.',
   '- Write in the language given.'
 ].join('\n');
 
@@ -160,6 +180,7 @@ export function trainerPayload(context) {
     experience: context.level,
     findings: context.findings
   };
+  if (context.history.length) payload.conversation = context.history;
   if (context.question) payload.question = context.question;
   return payload;
 }

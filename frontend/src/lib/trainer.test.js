@@ -244,7 +244,7 @@ describe('analyze: strength trends', () => {
     expect(f).toBeTruthy()
     expect(f.kind).toBe('act')
     expect(f.facts).toMatchObject({ lifts: 2, deloadDays: 7, deloadSetsPct: 50, deloadRir: 3 })
-    expect(f.evidence).toEqual(['deload', 'rir'])
+    expect(f.evidence).toEqual(['deload', 'deloadDelphi', 'rir'])
 
     const one = analyze(state({ workouts: [...fall(BENCH), ...base] }), NOW)
     expect(find(one, 'fatigue')).toBeUndefined()

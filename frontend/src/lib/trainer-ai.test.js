@@ -25,7 +25,9 @@ const FIXTURES = {
   weight_fast: F('weight_fast', { pct: 1.3, kgPerWeek: 1.2, weighIns: 6, fast: 1, slow: 0.25, trialSlow: 0.7, trialFast: 1.4 }, { kind: 'act' }),
   weight_on_track: F('weight_on_track', { pct: 0.6, kgPerWeek: 0.5, weighIns: 6, fast: 1, slow: 0.25, trialSlow: 0.7, trialFast: 1.4 }, { kind: 'good' }),
   weight_flat: F('weight_flat', { pct: 0, kgPerWeek: 0, weighIns: 5, fast: 1, slow: 0.25, trialSlow: 0.7, trialFast: 1.4 }, { kind: 'info' }),
-  guideline_met: F('guideline_met', { perWeek: 2.5 }, { kind: 'good' })
+  guideline_met: F('guideline_met', { perWeek: 2.5 }, { kind: 'good' }),
+  protein_low: F('protein_low', { gPerKg: 1.1, avgG: 85, days: 9, kg: 78, target: 1.6, goal: 'muscle' }, { basis: 'evidence' }),
+  weight_down_muscle: F('weight_down_muscle', { pct: 0.4, kgPerWeek: 0.3, weighIns: 7, aimLowPct: 0.25, aimHighPct: 0.5 }, { basis: 'practice' })
 }
 
 suite('fixed text', () => {
@@ -155,5 +157,38 @@ suite('in Swedish', () => {
       expect(low.title).toBe('Bröst ligger lite lågt')
       expect(describe(FIXTURES.weight_fast).body).toMatch(/0,7 %/)
     } finally { await setLang('en') }
+  })
+})
+
+suite('follow-up questions', () => {
+  const analysis = { findings: [FIXTURES.volume_low] }
+  const ok = (headline, ...texts) => ({ status: 'ok', headline, paragraphs: texts.map(text => ({ text, cites: [], findings: [] })) })
+
+  it('a first question carries no history field at all', () => {
+    expect('history' in trainerContext({}, analysis, 'hello')).toBe(false)
+    expect('history' in trainerContext({}, analysis, 'hello', [])).toBe(false)
+  })
+
+  it('turns earlier answers into plain text next to their questions', async () => {
+    const { answerText } = await import('./trainer-ai.js')
+    expect(answerText(ok('Chest is light', 'Add a set.', 'Then recheck.'))).toBe('Chest is light Add a set. Then recheck.')
+    expect(answerText({ status: 'outside_scope' })).toBe('')
+    expect(answerText(null)).toBe('')
+    const c = trainerContext({}, analysis, 'and legs?', [{ question: 'how is chest?', answer: ok('Chest is light', 'Add a set.') }])
+    expect(c.history).toEqual([{ question: 'how is chest?', answer: 'Chest is light Add a set.' }])
+    expect(c.question).toBe('and legs?')
+  })
+
+  it('sends at most the last three turns, oldest first, and caps their length', () => {
+    const thread = [1, 2, 3, 4, 5].map(n => ({ question: 'q' + n, answer: ok('h' + n, 'x'.repeat(2000)) }))
+    const c = trainerContext({}, analysis, 'next', thread)
+    expect(c.history.map(h => h.question)).toEqual(['q3', 'q4', 'q5'])
+    expect(c.history.every(h => h.answer.length <= 700)).toBe(true)
+  })
+
+  it('a medical word in an earlier question marks the whole chat as medical, as the server does', () => {
+    const thread = [{ question: 'I had chest pain yesterday', answer: ok('h', 't') }]
+    expect(trainerContext({}, analysis, 'and now?', thread).medical).toBe(true)
+    expect(trainerContext({}, analysis, 'and now?', []).medical).toBe(false)
   })
 })

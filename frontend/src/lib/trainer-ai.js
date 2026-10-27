@@ -11,16 +11,28 @@ import { coachProfileOf, medicalFlag } from './coach-profile.js'
 import { CLINICIAN } from './clinician.js'
 
 export const MAX_QUESTION = 300
+export const MAX_HISTORY = 3             // earlier turns that go along with a follow-up
+const MAX_HISTORY_ANSWER = 700
+
+/** An answer as the plain text the next question is shown, so a follow-up can refer to it. */
+export const answerText = a => !a || a.status !== 'ok' ? '' :
+  [a.headline, ...(a.paragraphs || []).map(p => p.text)].filter(Boolean).join(' ').slice(0, MAX_HISTORY_ANSWER)
+
+/** The last few turns as { question, answer } — what the person asked and what was said. */
+export const historyOf = thread => (thread || []).slice(-MAX_HISTORY)
+  .map(h => ({ question: String(h.question || '').slice(0, MAX_QUESTION), answer: answerText(h.answer) }))
+  .filter(h => h.question)
 const SENT = 10          // findings that go to the model; the rest are shown but not phrased
 
 /**
  * The complete record that would be sent. The sheet shows it before anything leaves the
  * device, so what the model sees is what the person can read.
  */
-export function trainerContext(S, analysis, question = '') {
+export function trainerContext(S, analysis, question = '', thread = []) {
   const p = coachProfileOf(S)
   const q = String(question || '').trim().slice(0, MAX_QUESTION)
   const minor = p.age != null && p.age < 18
+  const history = historyOf(thread)
   return {
     language: getLang() === 'sv' ? 'sv' : 'en',
     goal: p.goal,
@@ -30,7 +42,9 @@ export function trainerContext(S, analysis, question = '') {
       .slice(0, SENT)
       .map(({ code, kind, basis, evidence, facts }) => ({ code, kind, basis, evidence, facts })),
     question: q,
-    medical: !CLINICIAN && !!(medicalFlag(p.limits) || medicalFlag(p.dislikes) || medicalFlag(q) || minor || !!(S && S.health && S.health.on !== false))
+    // Earlier turns only appear when there are some, so a first question reads exactly as before.
+    ...(history.length ? { history } : {}),
+    medical: !CLINICIAN && !!(medicalFlag(p.limits) || medicalFlag(p.dislikes) || medicalFlag(q) || history.some(h => medicalFlag(h.question)) || minor || !!(S && S.health && S.health.on !== false))
   }
 }
 
