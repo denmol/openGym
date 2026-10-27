@@ -7,6 +7,23 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### Measuring the AI, and an exact daily cap
+
+- 📊 **How often the models' answers pass their checks.** Every AI answer is validated before it is
+  shown, and a failure costs a call and gives fixed text instead. The server now counts the outcome —
+  accepted first try, accepted after the repair round, rejected twice, outside the log's scope, kept
+  local, provider error — and the *kind* of rule an answer broke ("number not in the findings"). Counts
+  only: never the answer, the question or who asked. Admin shows the last 30 days and says when more
+  than one answer in five fails twice.
+- 🔢 **The daily AI cap is exact on Vercel.** It used to be a Map in the process, which on serverless
+  hosting meant a cap per instance. The count is now a small document per day in the store, reserved
+  with a precondition, and shared by the AI features and the barcode lookup. If the store is too busy
+  to settle, the call is refused rather than let through.
+- 🩺 **A prompt for clinicians.** On a clinician instance the trainer's system prompt no longer ends
+  every mention of pain or illness with "talk to a clinician". It writes at a professional level, says
+  what the log can and cannot show, and carries on with what the findings support. Only that one line
+  differs; the rules about facts, numbers and citations are the same text, and a test pins that.
+
 ### A trainer that looks at food, the week and the conversation
 
 - 🥩 **Food and weight in the findings.** Once enough is logged (five whole days, so a forgotten

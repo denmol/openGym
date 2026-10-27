@@ -12,7 +12,9 @@ import {
 } from './nutrition-context.js';
 import { dataDirProblem } from './deploy.js';
 import { storeFromEnv, ConflictError } from './store.js';
-import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, TRAINER_SYSTEM } from './trainer.js';
+import { createDailyCounter } from './counters.js';
+import { createQuality } from './quality.js';
+import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, trainerSystem } from './trainer.js';
 
 const PORT = +(process.env.PORT || 3000);
 const RP_ID = process.env.RP_ID || 'localhost';
@@ -419,21 +421,16 @@ function weekToMap(week) {
   return out;
 }
 
-// Calls per user per UTC day. In memory on purpose: a restart forgiving the count is a far
-// smaller problem than another file to keep in ./data, and the cap exists to stop a runaway
-// loop rather than a determined person.
-const aiCalls = new Map();                // uid -> { day, n }, shared by coach and nutrition
-function aiQuota(uid) {
-  const day = new Date().toISOString().slice(0, 10);
-  const rec = aiCalls.get(uid);
-  if (!rec || rec.day !== day) { aiCalls.set(uid, { day, n: 0 }); return { used: 0, left: COACH_DAILY_LIMIT }; }
-  return { used: rec.n, left: Math.max(0, COACH_DAILY_LIMIT - rec.n) };
-}
-function aiReserve(uid) {
-  if (aiQuota(uid).left <= 0) return false;
-  aiCalls.get(uid).n++;
-  return true;
-}
+// Calls per user per UTC day, kept in the store so every instance sees the same count (a Map in
+// the process would make the cap per instance on serverless hosting). See counters.js.
+const aiCounter = createDailyCounter(store, 'ai', COACH_DAILY_LIMIT);      // shared by coach, nutrition and trainer
+const aiQuota = uid => aiCounter.status(uid);
+const aiReserve = uid => aiCounter.reserve(uid);
+// How often the models' answers pass their checks — counts only, see quality.js.
+const quality = createQuality(store);
+// What a provider failure was, in words that say what to do about it.
+const errKind = e => e && e.name === 'AbortError' ? 'timeout' : e && e.status === 401 ? 'provider key rejected'
+  : e && e.status === 429 ? 'provider quota or rate limit' : 'provider error';
 
 /* ---------- Open Food Facts ---------- */
 
@@ -503,16 +500,8 @@ async function offFetch(code) {
 }
 
 // Per user per UTC day, like the coach. Not about cost — about not becoming the reason
-// Open Food Facts rate-limits this server.
-const offCounts = new Map();
-function offQuota(uid) {
-  const day = new Date().toISOString().slice(0, 10);
-  const k = uid + '|' + day;
-  const n = (offCounts.get(k) || 0) + 1;
-  if (offCounts.size > 500) for (const key of offCounts.keys()) if (!key.endsWith(day)) offCounts.delete(key);
-  offCounts.set(k, n);
-  return { n, left: OFF_DAILY_LIMIT - n, ok: n <= OFF_DAILY_LIMIT };
-}
+// Open Food Facts rate-limits this server. Shared through the store like the AI cap.
+const offCounter = createDailyCounter(store, 'off', OFF_DAILY_LIMIT);
 
 async function askOpenAI(messages, name, schema, maxCompletionTokens = null) {
   const ctrl = new AbortController();
@@ -555,7 +544,7 @@ const routes = {
   'GET /api/coach/status': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    const q = aiQuota(user.id);
+    const q = await aiQuota(user.id);
     json(res, 200, { enabled: !!OPENAI_KEY, model: OPENAI_KEY ? COACH_MODEL : null, limit: COACH_DAILY_LIMIT, ...q });
   },
 
@@ -570,8 +559,7 @@ const routes = {
     if (hit) return json(res, hit.product ? 200 : 404,
       hit.product ? { code, product: hit.product, cached: true } : { error: 'not found', cached: true });
 
-    const q = offQuota(user.id);
-    if (!q.ok) return json(res, 429, { error: 'daily lookup limit reached', limit: OFF_DAILY_LIMIT });
+    if (!(await offCounter.reserve(user.id))) return json(res, 429, { error: 'daily lookup limit reached', limit: OFF_DAILY_LIMIT });
 
     try {
       const { product } = await offFetch(code);
@@ -616,18 +604,20 @@ const routes = {
     }
 
     try {
-      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      if (!(await aiReserve(user.id))) return json(res, 429, { error: 'daily limit reached', ...(await aiQuota(user.id)) });
       const data = await askOpenAI(messages, 'opengym_plan', PLAN_SCHEMA);
       const text = data?.choices?.[0]?.message?.content || '';
       let plan;
-      try { plan = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      try { plan = JSON.parse(text); } catch { await quality.record('plan', 'rejected', ['not json']); return json(res, 502, { error: 'model did not return json' }); }
+      await quality.record('plan', 'ok1');
       json(res, 200, {
         plan: { opengym_plan: 1, name: plan.name, week: weekToMap(plan.week), routines: plan.routines },
         raw: text,
         usage: data.usage || null,
-        ...aiQuota(user.id)
+        ...(await aiQuota(user.id))
       });
     } catch (e) {
+      if (!(e instanceof ConflictError)) await quality.record('plan', 'error', [errKind(e)]);
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }
   },
@@ -641,9 +631,10 @@ const routes = {
     const decision = decideNutritionAssist(body.context, await readState(user.id), today, { clinician: CLINICIAN });
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad nutrition context' });
     const context = decision.context;
-    if (decision.mode === 'local') return json(res, 200, {
-      answer: nutritionReviewAnswer(context), local: true, usage: null, ...aiQuota(user.id)
-    });
+    if (decision.mode === 'local') {
+      await quality.record('nutrition', 'local');
+      return json(res, 200, { answer: nutritionReviewAnswer(context), local: true, usage: null, ...(await aiQuota(user.id)) });
+    }
 
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
 
@@ -658,15 +649,17 @@ const routes = {
     ];
 
     try {
-      if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+      if (!(await aiReserve(user.id))) return json(res, 429, { error: 'daily limit reached', ...(await aiQuota(user.id)) });
       const data = await askOpenAI(messages, 'dagsnav_nutrition_highlights', nutritionSchema(facts), 200);
       const text = data?.choices?.[0]?.message?.content || '';
       let selected;
-      try { selected = JSON.parse(text); } catch { return json(res, 502, { error: 'model did not return json' }); }
+      try { selected = JSON.parse(text); } catch { await quality.record('nutrition', 'rejected', ['not json']); return json(res, 502, { error: 'model did not return json' }); }
       const answer = nutritionAnswer(selected?.highlights, context);
-      if (!answer) return json(res, 502, { error: 'model returned an invalid explanation' });
-      json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
+      if (!answer) { await quality.record('nutrition', 'rejected', ['invalid explanation']); return json(res, 502, { error: 'model returned an invalid explanation' }); }
+      await quality.record('nutrition', 'ok1');
+      json(res, 200, { answer, usage: data.usage || null, ...(await aiQuota(user.id)) });
     } catch (e) {
+      if (!(e instanceof ConflictError)) await quality.record('nutrition', 'error', [errKind(e)]);
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }
   },
@@ -681,34 +674,39 @@ const routes = {
     const body = await readBody(req);
     const decision = decideTrainer(body.context, await readState(user.id), { clinician: CLINICIAN });
     if (decision.mode === 'invalid') return json(res, 400, { error: 'bad trainer context' });
-    if (decision.mode === 'local') return json(res, 200, { local: true, reasons: decision.reasons, ...aiQuota(user.id) });
+    if (decision.mode === 'local') { await quality.record('trainer', 'local'); return json(res, 200, { local: true, reasons: decision.reasons, ...(await aiQuota(user.id)) }); }
     if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
 
     const context = decision.context;
     const messages = [
-      { role: 'system', content: TRAINER_SYSTEM },
-      ...(CLINICIAN ? [{ role: 'system', content: 'The reader is a specialist nurse. Speak at a professional level and do not tell them to consult a clinician as a way of ending the answer. Everything else above still holds: use only the numbers and citations in the findings.' }] : []),
+      { role: 'system', content: trainerSystem(CLINICIAN) },
       { role: 'user', content: JSON.stringify(trainerPayload(context)) }
     ];
     const schema = trainerSchema(context);
     try {
-      let problems = [];
+      let problems = [], firstProblems = [];
       // One retry, told exactly what was wrong. A second failure is a failure: the browser
       // shows the fixed text, which is always correct if less friendly.
       for (let attempt = 0; attempt < 2; attempt++) {
-        if (!aiReserve(user.id)) return json(res, 429, { error: 'daily limit reached', ...aiQuota(user.id) });
+        if (!(await aiReserve(user.id))) return json(res, 429, { error: 'daily limit reached', ...(await aiQuota(user.id)) });
         const data = await askOpenAI(messages, 'dagsnav_trainer', schema, 3000);
         const text = data?.choices?.[0]?.message?.content || '';
         let answer;
         try { answer = JSON.parse(text); } catch { problems = ['not json']; answer = null; }
         if (answer) problems = trainerProblems(answer, context);
-        if (!problems.length) return json(res, 200, { answer, usage: data.usage || null, ...aiQuota(user.id) });
+        if (!problems.length) {
+          await quality.record('trainer', answer.status === 'outside_scope' ? 'scope' : attempt === 0 ? 'ok1' : 'ok2', firstProblems);
+          return json(res, 200, { answer, usage: data.usage || null, ...(await aiQuota(user.id)) });
+        }
+        if (attempt === 0) firstProblems = problems;
         messages.push({ role: 'assistant', content: text });
         messages.push({ role: 'user', content: 'Rejected: ' + problems.join('; ') + '. Rewrite using only numbers and citations from the findings.' });
       }
       console.error('trainer: rejected twice:', problems.join('; '));
-      json(res, 502, { error: 'the model\'s answer did not match the findings', fallback: true, ...aiQuota(user.id) });
+      await quality.record('trainer', 'rejected', problems);
+      json(res, 502, { error: 'the model\'s answer did not match the findings', fallback: true, ...(await aiQuota(user.id)) });
     } catch (e) {
+      if (!(e instanceof ConflictError)) await quality.record('trainer', 'error', [errKind(e)]);
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }
   },
@@ -958,6 +956,12 @@ const routes = {
     if (u.disabled) presence.delete(u.id);   // drop them off "training now" at once
     await saveDb();
     json(res, 200, { ok: true, id: u.id, disabled: u.disabled });
+  },
+
+  // How often the models' answers pass their checks (quality.js): counts only, no content.
+  'GET /api/admin/quality': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, await quality.summary(30));
   },
 
   'GET /api/admin/invites': async (req, res) => {

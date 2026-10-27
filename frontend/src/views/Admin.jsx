@@ -88,6 +88,36 @@ function InvitesCard({ invites, reload }) {
   </div>
 }
 
+const FEATURE_NAME = { trainer: 'Trainer check-in', nutrition: 'Nutrition highlights', plan: 'Program writer' }
+const pct = r => Math.round(r * 100) + '%'
+
+// How often the models' answers pass their checks (api/quality.js). Counts only: what the outcome
+// was and which kind of rule an answer broke, never the answer, the question or who asked.
+function QualityCard({ data }) {
+  const features = data ? Object.entries(data.features) : []
+  return <div className="card">
+    <h2 style={{ margin: 0 }}>AI answers</h2>
+    <div className="small muted" style={{ margin: '6px 0 8px' }}>Last {data ? data.days : 30} days. Every answer is checked against the person's own numbers before it is shown.</div>
+    {!data && <div className="dim small">Loading…</div>}
+    {data && !features.length && <div className="dim small">Nothing recorded yet — it fills as the trainer and the other AI features are used.</div>}
+    {features.map(([name, t]) => <div key={name} style={{ padding: '8px 2px', borderTop: '1px solid var(--sep)' }}>
+      <div className="row between"><span className="small" style={{ fontWeight: 600 }}>{FEATURE_NAME[name] || name}</span><span className="dim small">{t.calls} calls</span></div>
+      {t.rates
+        ? <div className="small" style={{ marginTop: 3 }}>
+          {pct(t.rates.ok1)} accepted first try · {pct(t.rates.ok2)} after a repair · <span style={{ color: t.rates.rejected > 0.2 ? 'var(--orange-t)' : undefined }}>{pct(t.rates.rejected)} rejected</span>
+        </div>
+        : <div className="dim small" style={{ marginTop: 3 }}>No answers to judge yet.</div>}
+      <div className="dim small" style={{ marginTop: 2 }}>{t.error} provider {t.error === 1 ? 'error' : 'errors'} · {t.local} kept local · {t.scope} outside the log's scope</div>
+      {Object.keys(t.problems).length > 0 && <div className="dim small" style={{ marginTop: 4 }}>
+        Most common reason an answer was refused: {Object.entries(t.problems).slice(0, 3).map(([k, n]) => k + ' (' + n + ')').join(', ')}
+      </div>}
+      {t.rates && t.rates.rejected > 0.2 && t.rejected >= 5 && <div className="small" style={{ marginTop: 4, color: 'var(--orange-t)' }}>
+        More than one in five answers failed its checks twice. The wording the model is given probably needs work.
+      </div>}
+    </div>)}
+  </div>
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const user = useStore(s => s.user)
@@ -96,11 +126,13 @@ export default function Admin() {
   const [users, setUsers] = useState(null)
   const [invites, setInvites] = useState(null)
   const [inviteOnly, setInviteOnly] = useState(false)
+  const [qualityData, setQualityData] = useState(null)
 
   const loadUsers = () => api('/api/admin/users').then(d => { setUsers(d.users); setInviteOnly(d.invite_only) }).catch(e => toast(e.message || 'Failed to load'))
   const loadInvites = () => api('/api/admin/invites').then(d => setInvites(d.invites)).catch(() => {})
+  const loadQuality = () => api('/api/admin/quality').then(setQualityData).catch(() => {})
   // poll every 15s so the "training now" section stays live without a manual refresh
-  useEffect(() => { if (!user?.admin) return; loadUsers(); loadInvites(); const iv = setInterval(loadUsers, 15000); return () => clearInterval(iv) }, [])
+  useEffect(() => { if (!user?.admin) return; loadUsers(); loadInvites(); loadQuality(); const iv = setInterval(loadUsers, 15000); return () => clearInterval(iv) }, [])
   if (!user?.admin) return null
 
   const openUser = id => openSheet(close => <UserDetail id={id} onChanged={loadUsers} close={close} />)
@@ -133,6 +165,7 @@ export default function Admin() {
     </div>}
 
     <InvitesCard invites={invites} reload={loadInvites} />
+    <QualityCard data={qualityData} />
 
     <h4 className="sec">Users</h4>
     <div className="list">
