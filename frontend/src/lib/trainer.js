@@ -26,6 +26,7 @@ import { weightIn, modeOf } from './history.js'
 import { mondayOf, isoOf } from './format.js'
 import { coachProfileOf } from './coach-profile.js'
 import { flexOf } from './flex.js'
+import { proteinIntake, foodAdviceBlocked, MIN_FOOD_DAYS, PROTEIN_GKG } from './trainer-food.js'
 
 const DAY = 86400000
 export const WINDOW_DAYS = 28
@@ -234,6 +235,20 @@ const avg = xs => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
  * Read the log and return what is worth saying.
  * @returns {{ ready, goal, range, workouts, weeks, muscles, findings }}
  */
+/**
+ * The body-weight trend over the last six weeks, or null: at least three weigh-ins spanning
+ * at least two weeks. `pctPerWeek` is negative when weight is falling.
+ */
+export function weightTrend(S, now) {
+  const bw = (S.bodyweight || [])
+    .map(e => ({ t: e.t || new Date(e.d + 'T12:00:00').getTime(), kg: weightIn(e, 'kg') }))
+    .filter(p => p.kg && p.t > now - 42 * DAY).sort((a, b) => a.t - b.t)
+  if (bw.length < 3 || (bw[bw.length - 1].t - bw[0].t) / DAY < 14) return null
+  const t0 = bw[0].t
+  const tr = linearTrend(bw.map(p => ({ x: (p.t - t0) / DAY, y: p.kg })))
+  return tr ? { ...tr, weighIns: bw.length } : null
+}
+
 export function analyze(S, now = Date.now()) {
   const profile = coachProfileOf(S)
   const goal = profile.goal || null
@@ -333,7 +348,7 @@ export function analyze(S, now = Date.now()) {
   if (fatigued) {
     const sets = inWin.reduce((a, w) => a + (w.entries || []).reduce((b, e) => b + (isCardio(e.id) ? 0 : (e.sets || []).filter(isWorkingSet).length), 0), 0)
     push({
-      code: 'fatigue', kind: 'act', basis: 'practice', evidence: ['deload', 'rir'],
+      code: 'fatigue', kind: 'act', basis: 'practice', evidence: ['deload', 'deloadDelphi', 'rir'],
       facts: {
         lifts: falling.length, names: falling.slice(0, 3).map(x => x.name).join(', '),
         worstPct: Math.min(...falling.map(x => x.pct)),
@@ -374,7 +389,7 @@ export function analyze(S, now = Date.now()) {
       else break
     }
     if (run >= DELOAD_AFTER_WEEKS && !fatigued) {
-      push({ code: 'block_long', kind: 'info', basis: 'practice', evidence: ['deload'], facts: { weeks: run, typical: 5.6 } })
+      push({ code: 'block_long', kind: 'info', basis: 'practice', evidence: ['deload', 'deloadDelphi'], facts: { weeks: run, typical: 5.6 } })
     }
   }
 
@@ -396,24 +411,40 @@ export function analyze(S, now = Date.now()) {
   }
 
   /* ---- body weight, when the goal is to lose it ---- */
+  const wt = weightTrend(S, now)
   if (goal === 'fatloss') {
-    if (profile.age != null && profile.age >= 18) {
-      const bw = (S.bodyweight || [])
-        .map(e => ({ t: e.t || new Date(e.d + 'T12:00:00').getTime(), kg: weightIn(e, 'kg') }))
-        .filter(p => p.kg && p.t > now - 42 * DAY).sort((a, b) => a.t - b.t)
-      if (bw.length >= 3 && (bw[bw.length - 1].t - bw[0].t) / DAY >= 14) {
-        const t0 = bw[0].t
-        const tr = linearTrend(bw.map(p => ({ x: (p.t - t0) / DAY, y: p.kg })))
-        if (tr) {
-          const loss = -tr.pctPerWeek
-          // trialSlow / trialFast are the two rates the cited trial compared; they ride along so the
-          // text (and anything that checks it) can state them without a number of its own.
-          const facts = { pct: r2(Math.abs(tr.pctPerWeek)), kgPerWeek: r2(Math.abs(tr.slope * 7)), weighIns: bw.length, fast: FAST_LOSS_PCT, slow: SLOW_LOSS_PCT, trialSlow: 0.7, trialFast: 1.4 }
-          if (loss >= FAST_LOSS_PCT) push({ code: 'weight_fast', kind: 'act', basis: 'heuristic', evidence: ['weightLoss'], facts })
-          else if (loss >= SLOW_LOSS_PCT) push({ code: 'weight_on_track', kind: 'good', basis: 'heuristic', evidence: ['weightLoss'], facts })
-          else push({ code: 'weight_flat', kind: 'info', basis: 'heuristic', facts })
-        }
+    if (profile.age != null && profile.age >= 18 && wt) {
+      const loss = -wt.pctPerWeek
+      // trialSlow / trialFast are the two rates the cited trial compared; they ride along so the
+      // text (and anything that checks it) can state them without a number of its own.
+      const facts = { pct: r2(Math.abs(wt.pctPerWeek)), kgPerWeek: r2(Math.abs(wt.slope * 7)), weighIns: wt.weighIns, fast: FAST_LOSS_PCT, slow: SLOW_LOSS_PCT, trialSlow: 0.7, trialFast: 1.4 }
+      if (loss >= FAST_LOSS_PCT) push({ code: 'weight_fast', kind: 'act', basis: 'heuristic', evidence: ['weightLoss'], facts })
+      else if (loss >= SLOW_LOSS_PCT) push({ code: 'weight_on_track', kind: 'good', basis: 'heuristic', evidence: ['weightLoss'], facts })
+      else push({ code: 'weight_flat', kind: 'info', basis: 'heuristic', facts })
+    }
+  }
+
+  /* ---- food, once enough of it has been logged ---- */
+  // Skipped for anyone to whom "eat more" or "gain weight" is not generic advice (foodAdviceBlocked).
+  if (!foodAdviceBlocked(S)) {
+    if (goal === 'muscle' || goal === 'strength' || goal === 'fatloss') {
+      const pi = proteinIntake(S, now)
+      if (pi && pi.days >= MIN_FOOD_DAYS && pi.gPerKg < PROTEIN_GKG) {
+        push({
+          code: 'protein_low', kind: 'watch',
+          // The cited meta-analysis is about building muscle; read across to a fat-loss goal it is
+          // the app's own judgement, and the second source is a review of what contest dieters do.
+          basis: goal === 'fatloss' ? 'heuristic' : 'evidence',
+          evidence: goal === 'fatloss' ? ['protein', 'proteinCut'] : ['protein'],
+          facts: { gPerKg: r2(pi.gPerKg), avgG: Math.round(pi.avgG), days: pi.days, kg: r1(pi.kg), target: PROTEIN_GKG, goal }
+        })
       }
+    }
+    if (goal === 'muscle' && wt && -wt.pctPerWeek >= SLOW_LOSS_PCT) {
+      push({
+        code: 'weight_down_muscle', kind: 'watch', basis: 'practice', evidence: ['offseason'],
+        facts: { pct: r2(Math.abs(wt.pctPerWeek)), kgPerWeek: r2(Math.abs(wt.slope * 7)), weighIns: wt.weighIns, aimLowPct: 0.25, aimHighPct: 0.5 }
+      })
     }
   }
 

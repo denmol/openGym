@@ -7,6 +7,26 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### A trainer that looks at food, the week and the conversation
+
+- 🥩 **Food and weight in the findings.** Once enough is logged (five whole days, so a forgotten
+  lunch is not read as a diet), the trainer compares protein per kg of body weight with the point
+  where extra protein stopped adding lean mass in a meta-analysis, and tells a muscle-goal lifter whose
+  weight is falling that building muscle usually takes eating enough. Both say how firm their basis is;
+  neither is raised for a minor, for an eating-disorder, kidney or any other nutrition-safety flag, or
+  (outside a clinician instance) for a medical condition on the profile.
+- 🗓️ **The week at a glance on Home.** Sessions against the aim, working sets against the week before,
+  new personal bests and, when logged, protein and the change in weight. Worked out when the tab opens,
+  since push notifications are not available on the hosting this runs on. Monday and Tuesday show last
+  week; the rest of the week shows the week so far.
+- 💬 **Follow-up questions.** The written check-in is now a short conversation: the last three turns go
+  along as context so "and legs?" means something. They can only explain what a question refers to — the
+  new answer is checked against the findings exactly as before, so an earlier answer cannot widen what
+  it may say. A medical word in any earlier question keeps the model out of the whole chat.
+- 📚 **Four more sources**, each looked up in PubMed: Morton et al. 2018 (protein), Helms et al. 2014
+  (protein while dieting), Iraki et al. 2019 (off-season energy surplus) and Bell et al. 2023 (a
+  consensus definition of deloading, cited next to the existing survey).
+
 ### Pasting a plan from a phone
 
 - 📋 **A plan that went through a phone now reads.** Copying a reply through a phone or a chat app

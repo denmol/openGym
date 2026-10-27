@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleanTrainerContext, decideTrainer, trainerSchema, trainerPayload, trainerProblems, medicalFlag, EVIDENCE_IDS
+  cleanTrainerContext, decideTrainer, trainerSchema, trainerPayload, trainerProblems, medicalFlag, EVIDENCE_IDS,
+  MAX_HISTORY, MAX_HISTORY_ANSWER, TRAINER_SYSTEM
 } from './trainer.js';
 
 const FINDINGS = [
@@ -181,7 +182,7 @@ test('medicalFlag matches stems in English and Swedish', () => {
 });
 
 test('the evidence ids the server accepts are the seven in the registry', () => {
-  assert.equal(EVIDENCE_IDS.length, 7);
+  assert.equal(EVIDENCE_IDS.length, 11);
 });
 
 test('clinician instance: medical flags and a missing age no longer send the trainer to the fixed text', () => {
@@ -189,4 +190,54 @@ test('clinician instance: medical flags and a missing age no longer send the tra
   assert.equal(decideTrainer({ ...RAW, medical: true }, state).mode, 'local');
   assert.equal(decideTrainer({ ...RAW, medical: true }, state, { clinician: true }).mode, 'ai');
   assert.equal(decideTrainer(null, state, { clinician: true }).mode, 'invalid');
+});
+
+/* ------------------------------ follow-up questions ------------------------------ */
+
+const turn = (n, extra = {}) => ({ question: 'q' + n, answer: 'a' + n, ...extra });
+
+test('an ordinary context has no history', () => {
+  assert.deepEqual(cleanTrainerContext(RAW).history, []);
+  assert.equal('conversation' in trainerPayload(cleanTrainerContext(RAW)), false);
+});
+
+test('history keeps only the last turns, in order', () => {
+  const c = cleanTrainerContext({ ...RAW, history: [1, 2, 3, 4, 5].map(n => turn(n)) });
+  assert.equal(c.history.length, MAX_HISTORY);
+  assert.deepEqual(c.history.map(h => h.question), ['q3', 'q4', 'q5']);
+});
+
+test('history drops malformed turns and anything without a question', () => {
+  const c = cleanTrainerContext({ ...RAW, history: [null, 'x', 7, { answer: 'no question' }, { question: '   ' }, turn(1)] });
+  assert.deepEqual(c.history, [{ question: 'q1', answer: 'a1' }]);
+  assert.deepEqual(cleanTrainerContext({ ...RAW, history: 'not a list' }).history, []);
+});
+
+test('history text is flattened, stripped of control characters and capped', () => {
+  const c = cleanTrainerContext({ ...RAW, history: [{ question: 'a\n\nb\u0000c ' + 'x'.repeat(500), answer: 'y'.repeat(2000) }] });
+  assert.ok(!/[\n\u0000]/.test(c.history[0].question));
+  assert.ok(c.history[0].question.length <= 300);
+  assert.equal(c.history[0].answer.length, MAX_HISTORY_ANSWER);
+});
+
+test('history reaches the model as data, next to the question, and the prompt says how to use it', () => {
+  const c = cleanTrainerContext({ ...RAW, question: 'and legs?', history: [turn(1)] });
+  const p = trainerPayload(c);
+  assert.deepEqual(p.conversation, [{ question: 'q1', answer: 'a1' }]);
+  assert.equal(p.question, 'and legs?');
+  assert.match(TRAINER_SYSTEM, /conversation/);
+  assert.match(TRAINER_SYSTEM, /never from an earlier answer/);
+});
+
+test('an earlier answer cannot widen what the new one may say', () => {
+  const c = cleanTrainerContext({ ...RAW, history: [{ question: 'how much?', answer: 'You do 99 sets a week.' }] });
+  const bad = { status: 'ok', headline: 'Sets', paragraphs: [{ text: 'You do 99 sets.', findings: ['volume_low'], cites: ['volume'] }] };
+  assert.ok(trainerProblems(bad, c).some(p => /number not in the findings: 99/.test(p)));
+});
+
+test('a medical word in an earlier question keeps the model out of a harmless follow-up', () => {
+  const c = { ...RAW, question: 'and next week?', history: [turn(1, { question: 'I had chest pain yesterday, what now?' })] };
+  assert.equal(decideTrainer(c, { coachProfile: { age: 34 } }).mode, 'local');
+  assert.ok(decideTrainer(c, { coachProfile: { age: 34 } }).reasons.includes('medical'));
+  assert.equal(decideTrainer(c, { coachProfile: { age: 34 } }, { clinician: true }).mode, 'ai');
 });

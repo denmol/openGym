@@ -10,7 +10,7 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import { coachWizardSheet } from '../coach-sheets.jsx'
-import { trainerSheet, useTrainerHeadline } from '../trainer-sheets.jsx'
+import { trainerSheet, useTrainerHeadline, WeekCard } from '../trainer-sheets.jsx'
 import { flexOf, flexWeek } from '../lib/flex.js'
 import { foodMap } from '../lib/foods.js'
 import { dayTotals, hasMeals, nutrientTotal } from '../lib/nutrition.js'
@@ -125,6 +125,8 @@ export default function Home() {
         <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}
+
+    <WeekCard onOpen={trainerSheet} />
 
     {trainer && <button className="card row between" style={{ width: '100%', textAlign: 'left', gap: 12 }} onClick={trainerSheet}>
       <span className="row" style={{ gap: 10, minWidth: 0 }}>
