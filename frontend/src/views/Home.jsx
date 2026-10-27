@@ -11,6 +11,7 @@ import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import { coachWizardSheet } from '../coach-sheets.jsx'
 import { trainerSheet, useTrainerHeadline } from '../trainer-sheets.jsx'
+import { flexOf, flexWeek } from '../lib/flex.js'
 import { foodMap } from '../lib/foods.js'
 import { dayTotals, hasMeals, nutrientTotal } from '../lib/nutrition.js'
 import { quickLogSheet, mealSheet } from '../food-sheets.jsx'
@@ -24,8 +25,11 @@ export default function Home() {
   const trainer = useTrainerHeadline()
 
   const today = new Date()
-  const routine = effectiveRoutine(S, todayISO())
-  const todayOvr = S.dayPlan[todayISO()] !== undefined
+  // Flexible week (lib/flex.js): no weekdays, just the next routine in the rotation and a count.
+  const flex = flexOf(S)
+  const fw = flex.on ? flexWeek(S, todayISO()) : null
+  const routine = flex.on ? fw.next : effectiveRoutine(S, todayISO())
+  const todayOvr = !flex.on && S.dayPlan[todayISO()] !== undefined
   const bw = lastBW(S)
   const prevBW = S.bodyweight.length > 1 ? S.bodyweight[S.bodyweight.length - 2] : null
   const bwValue = bw ? weightIn(bw, S.unit) ?? bw.w : null
@@ -38,7 +42,7 @@ export default function Home() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i)
     const iso = isoOf(d)
-    const eff = effectiveRoutineId(S, iso), ovr = S.dayPlan[iso] !== undefined, done = doneDays.has(iso)
+    const eff = flex.on ? null : effectiveRoutineId(S, iso), ovr = !flex.on && S.dayPlan[iso] !== undefined, done = doneDays.has(iso)
     const dot = done ? ' done' : ovr && eff ? ' ovr' : eff ? ' plan' : ''
     strip.push(<div key={i} className={'wday' + (iso === todayISO() ? ' today' : '')} onClick={() => dayOverrideSheet(iso)}>
       <div className="lbl">{t(DAYS[d.getDay()])}</div><div className="num">{d.getDate()}</div><div className={'dot' + dot} /></div>)
@@ -47,7 +51,7 @@ export default function Home() {
   const wkLabel = weekOffset === 0 ? t('This week') : `${monday.getDate()} ${monday.toLocaleDateString(dateLocale(), { month: 'short' })} – ${sunday.getDate()} ${sunday.toLocaleDateString(dateLocale(), { month: 'short' })}`
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
-  const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
+  const plannedPerWeek = flex.on ? flex.perWeek : Object.keys(S.week).filter(k => S.week[k]).length
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: weightIn(b, S.unit) ?? b.w, d: b.d }))
 
   // today's session shown right under the week strip
@@ -72,7 +76,7 @@ export default function Home() {
             <Icon name={S.active ? 'timer' : routine ? glyphOf(routine.emoji) : 'moon'} />
           </span>
           <div style={{ minWidth: 0 }}>
-            <div className="lbl2">{t('Today')}</div>
+            <div className="lbl2">{flex.on ? t('Next session') : t('Today')}</div>
             <div className="ttl">{S.active ? t('{0} — in progress', S.active.name) : routine ? routine.name : t('Rest day')}{todayOvr && routine ? ' · ' + t('rescheduled') : ''}</div>
           </div>
         </div>
@@ -128,6 +132,7 @@ export default function Home() {
         <span style={{ minWidth: 0 }}>
           <span className="dim small" style={{ display: 'block' }}>{t('Your trainer')}</span>
           <span className="tt" style={{ fontSize: 16 }}>{trainer.text}</span>
+          {trainer.review && <span className="small" style={{ display: 'block', color: 'var(--blue-t)', marginTop: 2 }}>{t('Time to review your program')}</span>}
         </span>
       </span>
       <Icon name="chevronRight" className="dim" />

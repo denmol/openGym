@@ -25,6 +25,7 @@ import { rirOf, MIN_RATED } from './effort.js'
 import { weightIn, modeOf } from './history.js'
 import { mondayOf, isoOf } from './format.js'
 import { coachProfileOf } from './coach-profile.js'
+import { flexOf } from './flex.js'
 
 const DAY = 86400000
 export const WINDOW_DAYS = 28
@@ -50,7 +51,7 @@ export const EXTRAPOLATED = ['abs']
 export const MAX_SETS_PER_EXERCISE = 6
 const FAST_LOSS_PCT = 1.0          // % of body weight a week; Garthe compared 0.7 with 1.4
 const SLOW_LOSS_PCT = 0.25
-const STALL_PCT = 0.5              // |trend| under this, %/week, is "flat"
+export const STALL_PCT = 0.5              // |trend| under this, %/week, is "flat"
 const FALL_PCT = -1.0
 const DELOAD_AFTER_WEEKS = 6       // the survey's average block was 5.6 ± 2.3 weeks
 
@@ -136,7 +137,19 @@ function setsAction(S, slug, current, floor) {
  * an edit made on another device.
  */
 export function applyTrainerAction(s, a) {
-  if (!a || a.type !== 'add_sets') return false
+  if (!a) return false
+  if (a.type === 'swap') {
+    const r = (s.routines || []).find(x => x.id === a.routineId)
+    const i = r ? (r.ex || []).findIndex(x => x.id === a.fromId) : -1
+    // Only if the slot still holds the exercise that was judged, and the replacement is not
+    // already somewhere in this routine (the same lift twice in a session is never the aim).
+    if (i < 0 || (r.ex || []).some(x => x.id === a.toId) || !a.next || !a.prev) return false
+    // The slot must still be exactly what was judged; an edit made since means the proposal is stale.
+    if (JSON.stringify(r.ex[i]) !== JSON.stringify(a.prev)) return false
+    r.ex[i] = JSON.parse(JSON.stringify(a.next))
+    return true
+  }
+  if (a.type !== 'add_sets') return false
   const r = (s.routines || []).find(x => x.id === a.routineId)
   const c = r && (r.ex || []).find(x => x.id === a.exId)
   if (!c || (c.sets || 1) !== a.from || a.to > MAX_SETS_PER_EXERCISE || a.to <= a.from) return false
@@ -149,7 +162,15 @@ export function applyTrainerAction(s, a) {
  * edited since, it is left alone rather than rolled back over the edit.
  */
 export function revertTrainerAction(s, a) {
-  if (!a || a.type !== 'add_sets') return false
+  if (!a) return false
+  if (a.type === 'swap') {
+    const r = (s.routines || []).find(x => x.id === a.routineId)
+    const i = r ? (r.ex || []).findIndex(x => x.id === a.toId) : -1
+    if (i < 0 || !a.prev) return false
+    r.ex[i] = JSON.parse(JSON.stringify(a.prev))
+    return true
+  }
+  if (a.type !== 'add_sets') return false
   const r = (s.routines || []).find(x => x.id === a.routineId)
   const c = r && (r.ex || []).find(x => x.id === a.exId)
   if (!c || (c.sets || 1) !== a.to) return false
@@ -157,7 +178,7 @@ export function revertTrainerAction(s, a) {
   return true
 }
 
-function exerciseTrends(S, now) {
+export function exerciseTrends(S, now) {
   const since = now - PROGRESS_DAYS * DAY
   const out = []
   const ids = new Set()
@@ -181,7 +202,7 @@ function exerciseTrends(S, now) {
   return out
 }
 
-function primaryMuscle(ex) {
+export function primaryMuscle(ex) {
   const m = musclesOf(ex)
   let best = null
   for (const slug in m) if (!best || m[slug] > m[best]) best = slug
@@ -358,7 +379,9 @@ export function analyze(S, now = Date.now()) {
   }
 
   /* ---- showing up ---- */
-  const planned = Object.values(S.week || {}).filter(rid => (S.routines || []).some(r => r.id === rid)).length
+  // A flexible week has no weekdays to miss: the aim is the number of sessions chosen.
+  const flex = flexOf(S)
+  const planned = flex.on ? flex.perWeek : Object.values(S.week || {}).filter(rid => (S.routines || []).some(r => r.id === rid)).length
   const doneWk = inWin.length / weeks
   if (planned >= 1 && weeks >= 2 && doneWk < planned * 0.7) {
     push({ code: 'adherence', kind: 'watch', basis: 'heuristic', facts: { planned, done: r1(doneWk), weeks: base.weeks } })

@@ -7,6 +7,22 @@ you eat, and — for anyone who needs it — what the glucose meter said afterwa
 that writes the training plan, a new name to cover all of it, and one secret that should never
 have been in the repository taken back out.
 
+### A trainer that plans ahead
+
+- 📋 **Next session, in numbers.** The trainer sheet now shows the coming session exercise by exercise:
+  weight, reps and sets from the same progression rule the workout pre-fills, with the reason beside
+  each. When the trainer's own findings call for a lighter week (`fatigue`, `block_long`) there is a
+  lighter version — half the sets at the weight already handled, three reps in reserve — that starts a
+  real workout, judged against what it asked for rather than as a string of misses.
+- 🔁 **Program review every four weeks.** From the log alone (no model): short of sets for a muscle,
+  or a lift flat for six weeks or more, which can be swapped for a close relative (same movement, same
+  muscle, equipment you have). Nothing changes until you apply it; each change can be undone, and a
+  change made since the proposal is never overwritten.
+- 🌗 **Flexible week for shift work.** Settings → Training week: aim for a number of sessions instead of
+  fixed days. Home shows the next routine in the rotation and the count, a skipped day never skips a
+  routine, and the trainer measures adherence against the number you chose. The routines and the week
+  are untouched, so switching it off goes straight back.
+
 ### A look that follows iOS 26
 
 - 🪟 **Liquid Glass, as far as a web app can follow it.** The tab bar is now a floating glass capsule

@@ -27,6 +27,12 @@ export const DEF = {
   // Plan changes the trainer made (lib/trainer.js), kept so each can be undone exactly:
   // { at, actions: [{ type, routineId, exId, from, to, ... }] }.
   trainerUndo: null,
+  // The flexible week (lib/flex.js): { on, perWeek } — a number of sessions to aim for instead of
+  // fixed weekdays, for shift work. null = off. Read it through flexOf.
+  flex: null,
+  // When the program was last reviewed (YYYY-MM-DD), so the trainer's re-plan suggestion
+  // (lib/trainer-replan.js) comes round once a month and not on every visit.
+  replanAt: null,
   // The week of meals (lib/mealplan.js): references to saved meals, never copies.
   mealPlan: null,
   // Food log (lib/nutrition.js). meals are what was eaten, myMeals are saved templates

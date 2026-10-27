@@ -347,3 +347,17 @@ describe('findings', () => {
     a.findings.forEach(f => f.evidence.forEach(id => expect(EVIDENCE[id]).toBeTruthy()))
   })
 })
+
+describe('adherence in a flexible week', () => {
+  // Two sessions a week for four weeks, against a plan of five weekdays.
+  const fiveDays = over => upperOnly({ routines: [{ id: 'r1', name: 'U', ex: [] }], week: { 1: 'r1', 2: 'r1', 3: 'r1', 4: 'r1', 5: 'r1' }, ...over })
+  it('a fixed week of five days calls two sessions a week a shortfall', () => {
+    expect(codes(analyze(fiveDays(), NOW))).toContain('adherence')
+  })
+  it('a flexible week of two sessions does not', () => {
+    expect(codes(analyze(fiveDays({ flex: { on: true, perWeek: 2 } }), NOW))).not.toContain('adherence')
+  })
+  it('a flexible week still notices when the chosen number is not met', () => {
+    expect(codes(analyze(fiveDays({ flex: { on: true, perWeek: 5 } }), NOW))).toContain('adherence')
+  })
+})
