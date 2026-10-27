@@ -108,6 +108,8 @@ the exercise media (~140 MB) once. Prefer building the images yourself instead o
 `ghcr.io`? Drop the `pull` step and run `docker compose up -d --build` — you don't need Node or
 a build step locally either way.
 
+> Deploying on Vercel instead? There is a `vercel.json`, but the API stores everything in files and Vercel has no persistent disk — read **[docs/VERCEL.md](docs/VERCEL.md)** first.
+
 > Want it reachable from your phone over the internet with passkeys? You'll need an HTTPS
 > domain — a two-line change in `.env`. See **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
 
