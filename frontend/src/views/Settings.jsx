@@ -13,6 +13,7 @@ import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
 import { trainerSheet } from '../trainer-sheets.jsx'
+import { creditsSheet } from '../credits-sheet.jsx'
 import { coachProfileOf, isCoachReady } from '../lib/coach-profile.js'
 import { healthSheet, healthSummary, importGlucoseSheet, undoImport, hasImported } from '../glucose-sheets.jsx'
 import { diabetesOn } from '../lib/diabetes.js'
@@ -305,7 +306,7 @@ export default function Settings() {
     <div className="dim small" style={{ textAlign: 'center', marginTop: 4, lineHeight: 1.6 }}>
       Pass · <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">{t('free & open source (AGPL v3)')}</a><br />
       <a href={REPO} target="_blank" rel="noopener">{t('source code')}</a> · <a href="https://github.com/DuarteSantos8/openGym" target="_blank" rel="noopener">{t('based on openGym')}</a><br />
-      exercise data: hasaneyldrm/exercises-dataset (CC)
+      <a href="#credits" onClick={e => { e.preventDefault(); creditsSheet() }}>{t('credits and licences')}</a>
     </div>
   </div>
 }

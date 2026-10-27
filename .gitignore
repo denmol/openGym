@@ -28,3 +28,4 @@ frontend/src/lib/foods-data.js
 # session cookies, so anyone holding a copy can mint one. Back this directory up out of
 # band; see docs/SELF_HOSTING.md.
 data/
+frontend/public/third-party-notices.txt

@@ -1,5 +1,12 @@
 # Changelog
 
+## Credits and licences in the app
+
+Settings now has a "credits and licences" page: the Gym visual credit line, Livsmedelsverket (CC BY 4.0),
+Open Food Facts, the exercise dataset, MuscleMap and a link to the licence notices of every library in
+the web app (generated at build time). The "source code" link pointed at an old branch and now points
+at the repository. Footer text no longer calls the exercise media "CC".
+
 ## Exercise instructions in German and Portuguese
 
 All 1,324 exercises now have their how-to steps in German and Portuguese too, so every language in the
