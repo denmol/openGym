@@ -1,5 +1,10 @@
 # Changelog
 
+## The app is now called Pass
+
+Renamed from Dagsnav: app name, home-screen label, page title, passkey prompt (`RP_NAME` default) and
+texts in every language. The address and `RP_ID` are unchanged, so existing sign-ins keep working.
+
 ## Unreleased
 
 The app grows a second half. Everything until now was about training; this release adds what

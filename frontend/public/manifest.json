@@ -1,6 +1,6 @@
 {
-  "name": "Dagsnav",
-  "short_name": "Dagsnav",
+  "name": "Pass",
+  "short_name": "Pass",
   "description": "Family training, food and diabetes log",
   "start_url": "./",
   "scope": "./",
