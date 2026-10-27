@@ -115,8 +115,8 @@ export function nutritionReviewAnswer(context) {
   return {
     status: 'clinician_review',
     summary: sv
-      ? 'Dagsnav använder inte AI för personliga kostmål när en hälsomarkering eller en ej aktuell säkerhetskontroll finns. Dina sparade mål har inte ändrats.'
-      : 'Dagsnav does not use AI for personal nutrition targets when a health flag or an unconfirmed safety review exists. Your saved targets have not changed.',
+      ? 'Pass använder inte AI för personliga kostmål när en hälsomarkering eller en ej aktuell säkerhetskontroll finns. Dina sparade mål har inte ändrats.'
+      : 'Pass does not use AI for personal nutrition targets when a health flag or an unconfirmed safety review exists. Your saved targets have not changed.',
     observations: [context.incomplete.length
       ? (sv ? 'En eller flera näringsuppgifter saknas i dagens logg.' : 'One or more nutrient values are missing from the day log.')
       : (sv ? 'Dagens registrerade näringsvärden kan tas med till vårdteamet.' : 'The logged nutrient values can be taken to your care team.')],

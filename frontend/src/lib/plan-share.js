@@ -76,7 +76,7 @@ export function parsePlan(raw) {
   // A pasted file may have been through a phone: typographic quotes are repaired, not refused.
   const data = typeof raw === 'string' ? parseJSONLoose(raw) : raw
   if (!data || !data.opengym_plan || !Array.isArray(data.routines)) {
-    throw new Error(t('this isn’t a Dagsnav plan file'))
+    throw new Error(t('this isn’t a Pass plan file'))
   }
   const customEx = (Array.isArray(data.customEx) ? data.customEx : []).filter(c => c && c.id)
   const known = new Set(customEx.map(c => c.id))
@@ -253,7 +253,7 @@ export function planPrintHTML(S, owner) {
 </style></head>
 <body><div class="doc">
   <header>
-    <div class="kicker">Dagsnav</div>
+    <div class="kicker">Pass</div>
     <h1>${esc(t('Weekly Training Plan'))}</h1>
     ${sub ? `<div class="sub">${sub}</div>` : ''}
   </header>
@@ -261,7 +261,7 @@ export function planPrintHTML(S, owner) {
   ${weekHTML(S)}
   <h3 class="block">${esc(t('Routines'))}</h3>
   ${body}
-  <footer>${esc(t('Made with Dagsnav'))}</footer>
+  <footer>${esc(t('Made with Pass'))}</footer>
 </div></body></html>`
 }
 

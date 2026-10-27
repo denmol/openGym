@@ -66,7 +66,7 @@ const STATUS_TEXT = {
 const BLOCKED_HINT = {
   goal_missing: 'Choose a goal above.',
   age_missing: 'Add your age above.',
-  age_not_adult: 'Daily values for under-18s belong with a care team, so Dagsnav does not estimate them.',
+  age_not_adult: 'Daily values for under-18s belong with a care team, so Pass does not estimate them.',
   sex_missing: 'Choose the sex the equation should use.',
   height_missing: 'Add your height above.',
   weight_missing: 'Add your weight above.',
@@ -411,7 +411,7 @@ function GoalsSheet({ close }) {
               <span> · {t(reference.source)}</span>
             </small>)}
             {!paused && references.length === 0 && key === 'sugar' && <small className="ntarget-reference">
-              {t('No comparable source target — Dagsnav logs total sugar while the source concerns added and free sugar.')}
+              {t('No comparable source target — Pass logs total sugar while the source concerns added and free sugar.')}
             </small>}
             {paused && <small className="ntarget-paused">{t('Paused — needs review')}</small>}
           </span>
@@ -605,7 +605,7 @@ function AssistSheet({ date, totals, close }) {
     <h3>{t(context.clinicianReview ? 'Create care-team notes' : 'Explain this day with AI')}</h3>
     <div className="muted small" style={{ lineHeight: 1.5, marginBottom: 12 }}>
       {context.clinicianReview
-        ? t('A health flag is active. Nothing below will be sent to AI; Dagsnav creates fixed care-team notes on this server.')
+        ? t('A health flag is active. Nothing below will be sent to AI; Pass creates fixed care-team notes on this server.')
         : t('The model receives only interface language and verified fact codes for your selected goal, data completeness and filled target fields. It receives no numbers, demographics or health data.')}
     </div>
 

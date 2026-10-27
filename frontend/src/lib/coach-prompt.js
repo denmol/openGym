@@ -84,7 +84,7 @@ export function profileLines(p, unit = 'kg', bodyweight = null) {
 export function buildPrompt(profile, { lang = 'en', unit = 'kg', bodyweight = null } = {}) {
   const list = shortlist(profile.equipment)
   const langName = LANGS[lang] || 'English'
-  return `You are writing a weekly strength training plan for one person, as JSON for an app called Dagsnav.
+  return `You are writing a weekly strength training plan for one person, as JSON for an app called Pass.
 
 RULES
 ${RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}

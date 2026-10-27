@@ -46,7 +46,7 @@ const foodValue = (food, key) => {
 const BLOCKED_TEXT = {
   goal_missing: 'Choose a nutrition goal to get daily values to follow.',
   age_missing: 'Add your age in Nutrition goals to calculate daily values.',
-  age_not_adult: 'Daily values for under-18s belong with a care team, so Dagsnav does not estimate them.',
+  age_not_adult: 'Daily values for under-18s belong with a care team, so Pass does not estimate them.',
   sex_missing: 'Choose the sex the resting-energy equation should use.',
   height_missing: 'Add your height in Nutrition goals to calculate daily values.',
   weight_missing: 'Log a body weight to calculate daily values.',
