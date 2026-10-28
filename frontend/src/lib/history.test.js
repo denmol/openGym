@@ -263,7 +263,7 @@ describe('logging effort across a session', () => {
 describe('defaultConfig', () => {
   it('gives each mode a sensible starting point', () => {
     expect(defaultConfig(LIFT)).toEqual({ sets: 3, reps: 10, weight: 0, mode: 'reps' })
-    expect(defaultConfig(CARDIO)).toEqual({ sets: 1, min: 20, speed: 8 })
+    expect(defaultConfig(CARDIO)).toEqual({ sets: 1, min: 20 })
     expect(defaultConfig(LIFT, 'time')).toEqual({ sets: 3, sec: 45, weight: 0, mode: 'time' })
   })
   it('seeds the bodyweight flag from the catalogue, and only when it is true', () => {
@@ -402,5 +402,16 @@ describe('workoutVolume', () => {
   it('leaves an unloaded bodyweight set at zero volume rather than inventing a number', () => {
     const w = { entries: [{ id: BW, target: { bodyweight: true }, sets: [{ w: 0, r: 20, done: true }] }] }
     expect(workoutVolume(w)).toBe(0)
+  })
+})
+
+describe('planned cardio distance', () => {
+  const walk = 'act-walk'
+  it('seeds a set with the planned distance, and with none when none was planned', () => {
+    expect(buildSets({ workouts: [] }, { id: walk, sets: 1, min: 30, km: 2.5 })[0]).toMatchObject({ min: 30, km: 2.5 })
+    expect(buildSets({ workouts: [] }, { id: walk, sets: 1, min: 30 })[0].km).toBeNull()
+  })
+  it('does not turn an old plan\'s default speed into a distance nobody chose', () => {
+    expect(buildSets({ workouts: [] }, { id: walk, sets: 1, min: 30, speed: 8 })[0].km).toBeNull()
   })
 })

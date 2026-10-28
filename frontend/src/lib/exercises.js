@@ -23,8 +23,27 @@ export function registerCustom(list) {
   customIds = (list || []).map(e => e.id)
   ;(list || []).forEach(e => { EXIDX[e.id] = e })
 }
+// Built-in activities for what is not lifting. They are ordinary cardio exercises (body part
+// 'cardio'), so duration, distance, pace, the stats cards and every "leave cardio out" rule in
+// the trainer apply to them without a new mode. They are not in the dataset (no media, no
+// instruction text) and their names follow the language, so they are registered here and again
+// whenever the language changes.
+const ACTIVITY_DEFS = [
+  ['act-walk', 'Walk'], ['act-run', 'Run (outdoor)'], ['act-bike', 'Cycling (outdoor)'],
+  ['act-swim', 'Swimming'], ['act-hike', 'Hike'], ['act-other', 'Other activity']
+]
+export const ACTIVITY_IDS = ACTIVITY_DEFS.map(d => d[0])
+export const isActivity = id => ACTIVITY_IDS.includes(id)
+let activities = []
+export function registerActivities() {
+  activities = ACTIVITY_DEFS.map(([id, n]) => ({
+    id, n: t(n), bp: 'cardio', tg: 'cardiovascular system', eq: 'body weight', sm: [], st: [], activity: true
+  }))
+  activities.forEach(a => { EXIDX[a.id] = a })
+}
+registerActivities()
 // Full searchable catalogue — customs first so your own exercises are easy to find.
-export const allExercises = st => [...(st.customEx || []), ...EXDB]
+export const allExercises = st => [...(st.customEx || []), ...activities, ...EXDB]
 
 // Media normally sits next to the app (img/ and gif/, mounted into the web container).
 // A build can point them somewhere else — the demo build pulls them off a CDN instead of
