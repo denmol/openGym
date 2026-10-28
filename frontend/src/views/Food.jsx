@@ -12,9 +12,10 @@ import { foodMap, hasFoodDb, FOODS_SOURCE } from '../lib/foods.js'
 import { mealsOn, dayTotals, mealTotals, nutrientTotal, MEAL_NAME } from '../lib/nutrition.js'
 import { coachProfileOf } from '../lib/coach-profile.js'
 import { lastBW } from '../lib/history.js'
+import { dayActivity } from '../lib/nutrition-activity.js'
 import {
   cleanNutritionProfile, nutritionAiGate, nutritionReferenceState,
-  nutritionSafetyToday, weightKgOf
+  nutritionSafetyToday, weightKgOf, needsClinicianTargets
 } from '../lib/nutrition-goals.js'
 import {
   HEADLINE_NUTRIENTS, PROGRESS_NUTRIENTS, nutritionDayPlan, nutritionDayRows
@@ -114,6 +115,9 @@ export default function Food() {
     age: person.age, today: safetyToday, diabetes: dia
   })
   const isToday = day === todayISO()
+  const activity = dayActivity(S, day)
+  // A suggestion about eating more only where the calorie target is shown as a personal one.
+  const canSuggest = !plan.blocked && plan.values?.kcal != null && !localNotes && !needsClinicianTargets(goals, { diabetes: dia })
 
   const h = healthOf(S)
   const readings = dia ? glucoseOn(S, day) : []
@@ -158,6 +162,26 @@ export default function Food() {
           <div>{t(notice.message)}</div>
         </div>)}
       {restRows.length > 0 && <NutrientDetails rows={restRows} onInfo={openInfo} />}
+      {activity.rows.length > 0 && <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--sep)' }}>
+        <div className="small" style={{ fontWeight: 600, marginBottom: 4 }}>{t('Activity')}</div>
+        {activity.rows.map((r, i) => <div key={i} className="row between small">
+          <span>{r.name} · {t('{0} min', fmtNum(r.minutes))}</span>
+          <span className="dim">{r.kcal != null ? `≈ ${fmtNum(r.kcal)} kcal` : ''}</span>
+        </div>)}
+        {activity.total != null
+          ? <>
+            {activity.rows.length > 1 && <div className="row between small" style={{ fontWeight: 600, marginTop: 2 }}>
+              <span>{t('Total')}</span><span>≈ {fmtNum(activity.total)} kcal</span>
+            </div>}
+            <div className="dim small" style={{ marginTop: 4 }}>
+              {t('Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.')}
+            </div>
+            {canSuggest && activity.total > 0 && <div className="small" style={{ marginTop: 4 }}>
+              {t('To keep your target you can eat up to about {0} kcal extra.', fmtNum(activity.total))}
+            </div>}
+          </>
+          : <div className="dim small" style={{ marginTop: 4 }}>{t('Log your body weight to see an energy estimate.')}</div>}
+      </div>}
       {meals.length > 0 && goals.goal && <div style={{ marginTop: 10 }}>
         <Button size="sm" variant="tinted" icon={localNotes ? 'shield' : 'sparkles'} onClick={() => nutritionAssistSheet(day, totals)}>
           {t(localNotes ? 'Care-team notes' : 'Explain with AI')}

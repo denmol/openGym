@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "游泳",
   "Hike": "徒步",
   "Other activity": "其他活动",
+  "Activity": "活动",
+  "Total": "合计",
+  "{0} min": "{0} 分钟",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "估算。你的计划已包含日常活动水平，因此无需把全部数值额外吃回来。",
+  "To keep your target you can eat up to about {0} kcal extra.": "若想保持目标，可额外摄入最多约 {0} 千卡。",
+  "Log your body weight to see an energy estimate.": "记录体重以查看能量估算。",
 }

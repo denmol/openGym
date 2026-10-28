@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "Плавание",
   "Hike": "Поход",
   "Other activity": "Другая активность",
+  "Activity": "Активность",
+  "Total": "Всего",
+  "{0} min": "{0} мин",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "Оценка. Ваш план уже учитывает обычный уровень активности, поэтому не нужно съедать всю сумму дополнительно.",
+  "To keep your target you can eat up to about {0} kcal extra.": "Чтобы удержать свою цель, можно съесть до примерно {0} ккал дополнительно.",
+  "Log your body weight to see an energy estimate.": "Запишите массу тела, чтобы увидеть оценку расхода энергии.",
 }
