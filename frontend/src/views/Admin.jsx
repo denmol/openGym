@@ -34,6 +34,22 @@ function UserDetail({ id, onChanged, close }) {
       .then(() => { toast(disabled ? 'User disabled' : 'User enabled'); onChanged(); close() })
       .catch(e => toast(e.message))
   }
+  const passwordAction = action => {
+    api('/api/admin/user/password', { method: 'POST', body: JSON.stringify({ id: u.id, action }) })
+      .then(r => {
+        onChanged()
+        if (r.temporaryPassword) useUI.getState().openSheet(done => <>
+          <h3>Temporary password</h3>
+          <div className="muted small" style={{ marginBottom: 12 }}>Shown once. {u.name} is signed out everywhere and should change it in Settings after signing in.</div>
+          <div className="small dim">Username</div><div style={{ fontWeight: 600, marginBottom: 8 }}>{r.username}</div>
+          <div className="small dim">Password</div><div style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '1.2rem', marginBottom: 14, userSelect: 'all' }}>{r.temporaryPassword}</div>
+          <button className="btn primary" onClick={done}>Done</button>
+        </>)
+        else toast('Password removed')
+        close()
+      })
+      .catch(e => toast(e.message))
+  }
   return <>
     <h3 className="capitalize">{u.name}</h3>
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '8px 0 12px' }}>
@@ -52,6 +68,10 @@ function UserDetail({ id, onChanged, close }) {
       onClick={() => u.disabled ? setDisabled(false)
         : confirmSheet({ title: 'Disable ' + u.name + '?', message: 'They are signed out everywhere and can no longer sync or log in until re-enabled.', confirmText: 'Disable', danger: true, onConfirm: () => setDisabled(true) })}>
       {u.disabled ? 'Enable account' : 'Disable account'}</button>}
+    <div className="row" style={{ gap: 8, margin: '4px 0 8px' }}>
+      <button className="btn" style={{ flex: 1 }} onClick={() => confirmSheet({ title: 'Reset password for ' + u.name + '?', message: 'Sets a one-time password you read out to them, and signs them out everywhere.', confirmText: 'Reset', onConfirm: () => passwordAction('reset') })}>Reset password</button>
+      {u.hasPassword && <button className="btn danger" style={{ flex: 1 }} onClick={() => confirmSheet({ title: 'Remove ' + u.name + '’s password?', message: 'They can still sign in with a passkey.', confirmText: 'Remove', danger: true, onConfirm: () => passwordAction('remove') })}>Remove password</button>}
+    </div>
     <h4 className="sec">Workout history</h4>
     {d.workouts.length ? <div className="list" style={{ gap: 0 }}>
       {d.workouts.slice(0, 60).map(w => <div key={w.id} className="row between" style={{ padding: '9px 2px', borderBottom: '1px solid var(--sep)' }}>

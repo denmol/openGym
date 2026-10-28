@@ -1,5 +1,15 @@
 # Changelog
 
+## Password sign-in as a second way in
+
+Settings → Account → "Sign in with a password": choose a username and a password (at least 10 characters) on an
+account that already has a passkey, and sign in with them on any other device from the login screen. Setting,
+changing or removing the password is confirmed with the account's passkey first, so a stolen session cannot plant
+one. Five wrong guesses lock password sign-in for 15 minutes (the passkey still works). There is no e-mail reset:
+forget it and sign in with the passkey to set a new one, or ask the admin, who can reset it from the user's page in
+the Admin dashboard (a one-time password is shown once) or remove it. Passwords are stored as scrypt hashes and are
+never in backups or any API response.
+
 ## Import activities from Apple Health and Garmin
 
 Settings → Data → "Import activities": pick an Apple Health `export.zip` (or `export.xml`), a Garmin Connect
