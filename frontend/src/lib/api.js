@@ -57,3 +57,22 @@ export async function passkeyLogin() {
   const res = await api('/api/login/verify', { method: 'POST', body: JSON.stringify({ cid, credential: credToJSON(cred) }) })
   return res.user
 }
+
+// Username + password, as a second way in. Setting or removing one is confirmed with the
+// account's own passkey first (the server asks for it), so a stolen session cannot plant one.
+export async function passwordLogin(username, password) {
+  const res = await api('/api/password/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+  return res.user
+}
+async function stepUp() {
+  const { cid, options } = await api('/api/password/options', { method: 'POST', body: '{}' })
+  const cred = await navigator.credentials.get({ publicKey: toRequestOptions(options) })
+  return { cid, credential: credToJSON(cred) }
+}
+export async function passwordSet(username, password) {
+  const res = await api('/api/password/set', { method: 'POST', body: JSON.stringify({ username, password, ...(await stepUp()) }) })
+  return res.username
+}
+export async function passwordRemove() {
+  await api('/api/password/remove', { method: 'POST', body: JSON.stringify(await stepUp()) })
+}

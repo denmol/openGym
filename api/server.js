@@ -16,6 +16,10 @@ import { createDailyCounter } from './counters.js';
 import { PHOTO_SCHEMA, PHOTO_CALL_COST, cleanPhotoRequest, cleanPhotoItems, photoMessages } from './meal-photo.js';
 import { buildServerBackup, personalBackup, backupName, expiredBackupName, KEEP_DAYS } from './backup.js';
 import { createQuality } from './quality.js';
+import {
+  hashPassword, verifyPassword, burn, normalizeUsername, validUsername, validPassword,
+  isLocked, registerFailure, clearFailures, temporaryPassword
+} from './password.js';
 import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, trainerSystem } from './trainer.js';
 
 const PORT = +(process.env.PORT || 3000);
@@ -312,6 +316,33 @@ function takeChallenge(cid) {
   return c;
 }
 if (!SERVERLESS) setInterval(() => { for (const [k, v] of challenges) if (v.exp < Date.now()) challenges.delete(k); }, 60000).unref();
+
+/* A passkey sign-in response, checked against the stored credential. `expectUserId` also requires
+   that the challenge was issued to that signed-in user (see /api/password/options). Returns the
+   credential, or an [status, message] pair. */
+async function verifyAssertion(body, expectUserId) {
+  const c = takeChallenge(body.cid);
+  if (!c) return { error: [400, 'challenge expired — try again'] };
+  if (expectUserId && c.stepup !== expectUserId) return { error: [400, 'challenge expired — try again'] };
+  const cred = db.creds.find(x => x.id === body.credential?.id);
+  if (!cred) return { error: [404, 'unknown passkey — create a profile first'] };
+  if (expectUserId && cred.userId !== expectUserId) return { error: [403, 'that passkey belongs to another account'] };
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response: body.credential,
+      expectedChallenge: c.challenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      requireUserVerification: false,
+      credential: { id: cred.id, publicKey: b64uToBuf(cred.publicKey), counter: cred.counter, transports: cred.transports }
+    });
+  } catch (e) { return { error: [400, 'verification failed: ' + e.message] }; }
+  if (!verification.verified) return { error: [400, 'not verified'] };
+  cred.counter = verification.authenticationInfo.newCounter;
+  await saveDb();
+  return { cred };
+}
 
 /* ---------- helpers ---------- */
 function json(res, code, obj, extraHeaders) {
@@ -791,7 +822,7 @@ const routes = {
   'GET /api/me': async (req, res) => {
     const user = readSession(req);
     if (!user) return json(res, 401, { error: 'not signed in' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } });
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user), username: user.login?.name || null } });
   },
 
   'POST /api/register/options': async (req, res) => {
@@ -846,7 +877,7 @@ const routes = {
       transports: body.credential?.response?.transports || []
     });
     await saveDb();
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user), username: user.login?.name || null } }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/login/options': async (req, res) => {
@@ -859,33 +890,74 @@ const routes = {
 
   'POST /api/login/verify': async (req, res) => {
     const body = await readBody(req);
-    const c = takeChallenge(body.cid);
-    if (!c) return json(res, 400, { error: 'challenge expired — try again' });
-    const cred = db.creds.find(x => x.id === body.credential?.id);
-    if (!cred) return json(res, 404, { error: 'unknown passkey — create a profile first' });
-    let verification;
-    try {
-      verification = await verifyAuthenticationResponse({
-        response: body.credential,
-        expectedChallenge: c.challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
-        requireUserVerification: false,
-        credential: {
-          id: cred.id,
-          publicKey: b64uToBuf(cred.publicKey),
-          counter: cred.counter,
-          transports: cred.transports
-        }
-      });
-    } catch (e) { return json(res, 400, { error: 'verification failed: ' + e.message }); }
-    if (!verification.verified) return json(res, 400, { error: 'not verified' });
-    cred.counter = verification.authenticationInfo.newCounter;
-    await saveDb();
-    const user = db.users.find(u => u.id === cred.userId);
+    const a = await verifyAssertion(body);
+    if (a.error) return json(res, a.error[0], { error: a.error[1] });
+    const user = db.users.find(u => u.id === a.cred.userId);
     if (!user) return json(res, 500, { error: 'user missing' });
     if (user.disabled) return json(res, 403, { error: 'this account has been disabled' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user), username: user.login?.name || null } }, { 'Set-Cookie': sessionCookie(user) });
+  },
+
+  /* ---------- username + password (a second way in; passkeys stay the primary one) ---------- */
+  // Every failure looks the same from outside, whether the name exists, the password is wrong or
+  // the account is locked, so the form cannot be used to find out who has an account.
+  'POST /api/password/login': async (req, res) => {
+    const body = await readBody(req);
+    const name = normalizeUsername(body.username), pw = String(body.password || '');
+    const user = name ? db.users.find(u => u.login && u.login.name === name) : null;
+    const fail = () => json(res, 401, { error: 'wrong username or password' });
+    if (!user) { await burn(pw); return fail(); }
+    if (isLocked(user)) { await burn(pw); return json(res, 429, { error: 'too many attempts — try again in 15 minutes, or sign in with your passkey' }); }
+    if (!(await verifyPassword(pw, user.login.hash))) {
+      registerFailure(user);
+      await saveDb();
+      return fail();
+    }
+    if (user.disabled) return json(res, 403, { error: 'this account has been disabled' });
+    if (user.pwFail) { clearFailures(user); await saveDb(); }
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user), username: user.login?.name || null } }, { 'Set-Cookie': sessionCookie(user) });
+  },
+
+  // Setting, changing or removing a password needs a fresh passkey confirmation from the signed-in
+  // account, not just the session cookie: a stolen cookie must not be able to plant a password
+  // that would survive "Sign out everywhere".
+  'POST /api/password/options': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const allow = db.creds.filter(c => c.userId === user.id).map(c => ({ id: c.id, transports: c.transports }));
+    if (!allow.length) return json(res, 400, { error: 'this account has no passkey to confirm with' });
+    const options = await generateAuthenticationOptions({ rpID: RP_ID, userVerification: 'preferred', allowCredentials: allow });
+    json(res, 200, { cid: putChallenge({ challenge: options.challenge, stepup: user.id }), options });
+  },
+
+  'POST /api/password/set': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
+    const name = normalizeUsername(body.username), pw = String(body.password || '');
+    if (!validUsername(name)) return json(res, 400, { error: 'username must be 3–30 letters, digits, dot, dash or underscore' });
+    const bad = validPassword(pw, name);
+    if (bad) return json(res, 400, { error: bad });
+    if (db.users.some(u => u.id !== user.id && u.login && u.login.name === name)) return json(res, 409, { error: 'that username is taken' });
+    const a = await verifyAssertion(body, user.id);
+    if (a.error) return json(res, a.error[0], { error: a.error[1] });
+    user.login = { name, hash: await hashPassword(pw), set: new Date().toISOString() };
+    clearFailures(user);
+    await saveDb();
+    json(res, 200, { ok: true, username: name });
+  },
+
+  'POST /api/password/remove': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const body = await readBody(req);
+    const a = await verifyAssertion(body, user.id);
+    if (a.error) return json(res, a.error[0], { error: a.error[1] });
+    delete user.login;
+    clearFailures(user);
+    user.sv = sessionVersion(user) + 1;
+    await saveDb();
+    json(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie(user) });
   },
 
   'POST /api/logout': async (req, res) => json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie }),
@@ -997,6 +1069,7 @@ const routes = {
         lastWorkout: last ? last.d : null,
         lastSync: S._ts || null,
         hasPush: db.subs.some(s => s.userId === u.id),
+        hasPassword: !!u.login,
         live: livePresence(u.id)
       };
     }));
@@ -1011,7 +1084,7 @@ const routes = {
     if (!u) return json(res, 404, { error: 'no such user' });
     const S = await readState(u.id) || {};
     json(res, 200, {
-      user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null },
+      user: { id: u.id, name: u.name, created: u.created || null, disabled: !!u.disabled, admin: isAdmin(u), invitedBy: u.invitedBy || null, hasPassword: !!u.login },
       unit: S.unit || 'kg',
       lastSync: S._ts || null,
       routines: (S.routines || []).map(r => ({ id: r.id, name: r.name, emoji: r.emoji, count: (r.ex || []).length })),
@@ -1030,6 +1103,32 @@ const routes = {
     if (u.disabled) presence.delete(u.id);   // drop them off "training now" at once
     await saveDb();
     json(res, 200, { ok: true, id: u.id, disabled: u.disabled });
+  },
+
+  // For someone who has lost both their password and their passkey device. `reset` sets a one-time
+  // password the admin reads out (shown once, never stored in clear); `remove` takes the password
+  // away. Both end the account's sessions and clear any lock.
+  'POST /api/admin/user/password': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const body = await readBody(req);
+    const u = db.users.find(x => x.id === body.id);
+    if (!u) return json(res, 404, { error: 'no such user' });
+    let temp = null;
+    if (body.action === 'reset') {
+      temp = temporaryPassword();
+      let name = u.login?.name;
+      if (!name) {
+        const base = (u.name || 'user').toLowerCase().replace(/[^a-z0-9]+/g, '') .slice(0, 20) || 'user';
+        name = base.length >= 3 ? base : base + 'user';
+        for (let i = 2; db.users.some(x => x.id !== u.id && x.login?.name === name); i++) name = base + i;
+      }
+      u.login = { name, hash: await hashPassword(temp), set: new Date().toISOString() };
+    } else if (body.action === 'remove') delete u.login;
+    else return json(res, 400, { error: 'action must be reset or remove' });
+    clearFailures(u);
+    u.sv = sessionVersion(u) + 1;
+    await saveDb();
+    json(res, 200, { ok: true, username: u.login?.name || null, temporaryPassword: temp });
   },
 
   // Everyone's data as one file, or one person's in the format Settings → Import reads back.
@@ -1082,7 +1181,7 @@ const routes = {
     const admin = requireAdmin(req, res); if (!admin) return;
     const body = await readBody(req);
     let code;
-    // 16 hex chars = 64 bits, up from 8 chars / 32 bits. The app has no rate limiting by design
+    // 16 hex chars = 64 bits, up from 8 chars / 32 bits. The app has no general rate limiting by design (only the password lockout)
     // (that's the reverse proxy's job) and /api/register/options tells a caller whether a code is
     // good, so the code itself has to be the thing that isn't worth guessing. Codes already in
     // db.json keep working — validation is an exact string compare, never a length or format check.

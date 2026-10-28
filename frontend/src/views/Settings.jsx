@@ -12,6 +12,7 @@ import { buildBackup, parseBackup, stateFromBackup, saveSafetyCopy, readSafetyCo
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
+import { passwordSetupSheet, removePassword } from '../password-sheets.jsx'
 import { importActivities, undoActivityImport, lastActivityImport } from '../import-activity-sheet.jsx'
 import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
 import { trainerSheet } from '../trainer-sheets.jsx'
@@ -150,6 +151,11 @@ export default function Settings() {
         <Row icon="personCircle" iconTint="var(--grey)" title={user.name}
           subtitle={t('Signed in with passkey. Profile id: {0}', user.id)}
           accessory="chevron" onClick={() => copyId(user.id, toast)} />
+        <Row icon="lock" iconTint="var(--blue)" title={user.username ? t('Password sign-in') : t('Sign in with a password')}
+          subtitle={user.username ? t('Username: {0}', user.username) : t('Lets you sign in on other devices.')}
+          accessory="chevron" onClick={passwordSetupSheet} />
+        {user.username && <Row icon="trash" iconTint="var(--orange)" title={t('Remove password')}
+          onClick={() => confirmSheet({ title: t('Remove password?'), message: t('You can still sign in with your passkey. Other devices signed in with the password are signed out.'), confirmText: t('Remove'), danger: true, onConfirm: removePassword })} />}
         {user.admin && <Row icon="wrench" iconTint="var(--indigo)" title={t('Admin dashboard')} accessory="chevron" onClick={() => nav('/admin')} />}
         <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={() => confirmSheet({ title: t('Sign out?'), message: t('Your data is synced to your profile first, then cleared from this device.'), confirmText: t('Sign out'), danger: true, onConfirm: () => { signOut(); nav('/home') } })} />
         <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this profile’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
