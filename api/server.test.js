@@ -23,7 +23,7 @@ const FINDING = { code: 'volume_low', kind: 'watch', basis: 'evidence', evidence
 const GOOD = JSON.stringify({ status: 'ok', headline: 'Chest is light', paragraphs: [{ text: 'About 8.9 sets a week for chest, against 10 to 20.', findings: ['volume_low'], cites: ['volume'] }] });
 const BAD = JSON.stringify({ status: 'ok', headline: 'Chest is light', paragraphs: [{ text: 'You do 99 sets a week for chest.', findings: ['volume_low'], cites: ['volume'] }] });
 
-let model, modelPort, queue = [], servers = [];
+let model, modelPort, queue = [], servers = [], lastBody = null;
 
 before(async () => {
   fs.writeFileSync(path.join(dir, 'secret'), SECRET);
@@ -31,8 +31,10 @@ before(async () => {
   fs.writeFileSync(path.join(dir, 'state-u1.json'), JSON.stringify({ coachProfile: { age: 40, goal: 'muscle' } }));
   modelPort = await free();
   model = http.createServer((req, res) => {
-    req.resume();
+    const parts = [];
+    req.on('data', d => parts.push(d));
     req.on('end', () => {
+      try { lastBody = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { lastBody = null; }
       const content = queue.shift() ?? GOOD;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { total_tokens: 1 } }));
@@ -41,11 +43,11 @@ before(async () => {
 });
 after(() => { servers.forEach(s => s.child.kill()); model.close(); });
 
-async function start() {
+async function start(extraEnv = {}) {
   const port = await free();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: path.dirname(new URL(import.meta.url).pathname),
-    env: { ...process.env, PORT: String(port), DATA_DIR: dir, OPENAI_API_KEY: 'k', OPENAI_BASE_URL: 'http://localhost:' + modelPort, COACH_DAILY_LIMIT: '3', VERCEL: '' },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dir, OPENAI_API_KEY: 'k', OPENAI_BASE_URL: 'http://localhost:' + modelPort, COACH_DAILY_LIMIT: '3', VERCEL: '', ...extraEnv },
     stdio: 'ignore'
   });
   const s = { port, child }; servers.push(s);
@@ -118,4 +120,57 @@ test('a model that fails twice is counted as rejected, with the fixed text as th
   assert.equal(r.body.fallback, true);
   const t = (await call(s, 'GET', '/api/admin/quality', 'adm')).body.features.trainer;
   assert.equal(t.rejected, 1);
+});
+
+/* ---- meal photos ---- */
+const JPEG = 'data:image/jpeg;base64,' + Buffer.alloc(600, 7).toString('base64');
+const PLATE = JSON.stringify({ unclear: false, items: [
+  { name: 'Kokt potatis', search: 'potatis kokt', grams: 200, per100: { kcal: 77, carb: 17, sugar: 0.8, prot: 2, fat: 0.1, sat: 0, fib: 1.8, salt: 0 } },
+  { name: 'Lax', search: 'lax', grams: 120, per100: { kcal: 200, carb: 0, sugar: 0, prot: 20, fat: 13, sat: 2.5, fib: 0, salt: 0.1 } },
+  { name: 'Omöjlig', search: 'x', grams: 100, per100: { kcal: 500, carb: 90, sugar: 1, prot: 40, fat: 30, sat: 1, fib: 0, salt: 0 } }
+] });
+const photo = (s, uid, image = JPEG, extra = {}) => call(s, 'POST', '/api/food/photo', uid, { image, lang: 'sv', ...extra });
+
+test('a photo is not offered when a health flag or review is open, and costs no call', async () => {
+  const s = servers[0];                       // not a clinician instance; u1 has no nutrition review on file
+  queue = [PLATE]; lastBody = null;
+  const r = await photo(s, 'u1');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.local, true);
+  assert.equal(lastBody, null, 'the model was never called');
+  assert.equal(r.body.used, 3, 'nothing was taken from the allowance');
+});
+
+test('on a clinician instance a photo reaches the model as an image, costs two calls, and drops impossible rows', async () => {
+  const c = await start({ CLINICIAN_MODE: '1' });
+  queue = [PLATE]; lastBody = null;
+  const r = await photo(c, 'adm');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.unclear, false);
+  assert.deepEqual(r.body.items.map(i => i.name), ['Kokt potatis', 'Lax'], 'macros heavier than the food are thrown away');
+  assert.equal(r.body.used, 2);
+  const parts = lastBody.messages[1].content;
+  assert.equal(parts[1].type, 'image_url');
+  assert.equal(parts[1].image_url.url, JPEG);
+  const q = (await call(c, 'GET', '/api/admin/quality', 'adm')).body.features.photo;
+  assert.equal(q.ok1, 1);
+  assert.ok(!JSON.stringify(q).includes('potatis'), 'counts only, never what was on the plate');
+});
+
+test('a second photo would pass the daily limit and is refused', async () => {
+  const c = servers[servers.length - 1];
+  const r = await photo(c, 'adm');
+  assert.equal(r.status, 429);
+  assert.equal(r.body.left, 1);
+});
+
+test('a bad or oversized photo is refused before any call is taken', async () => {
+  const c = servers[servers.length - 1];
+  const before = (await call(c, 'GET', '/api/coach/status', 'u2')).body.used;
+  assert.equal((await photo(c, 'u2', 'not an image')).status, 400);
+  const big = 'data:image/jpeg;base64,' + Buffer.alloc(2 * 1024 * 1024, 1).toString('base64');
+  assert.equal((await photo(c, 'u2', big)).status, 413);
+  const huge = 'data:image/jpeg;base64,' + 'A'.repeat(7 * 1024 * 1024);
+  assert.equal((await photo(c, 'u2', huge)).status, 413, 'beyond the body limit, still an answer');
+  assert.equal((await call(c, 'GET', '/api/coach/status', 'u2')).body.used, before, 'nothing was taken');
 });

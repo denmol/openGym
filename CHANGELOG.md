@@ -1,5 +1,13 @@
 # Changelog
 
+## Log a meal by photo
+
+Meal form → "Log by photo": take a picture of the plate and an AI proposes the dishes and their weights.
+Each dish is looked up in the food database and uses its values when it matches; the rest keep the
+AI's estimate, marked as such. You check and edit every row before it is saved. The photo is shrunk on
+the phone, used once, never stored, and costs two of the day's AI calls. Not offered while a health flag
+or safety review is open (unless clinician mode is on).
+
 ## A simpler tab bar
 
 The bottom bar now has five places: Home, Plan, Start, Food and Menu. Stats, History, Exercises and

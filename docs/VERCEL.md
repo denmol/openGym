@@ -44,7 +44,8 @@ as before.
 | `RP_NAME` | display name shown in the passkey prompt |
 | `BLOB_READ_WRITE_TOKEN` | set automatically when a Blob store is connected to the project |
 | `INVITE_ONLY` | `1` is sensible on a public URL: otherwise anyone can create a profile |
-| `OPENAI_API_KEY` etc. | optional, for the AI coach and trainer check-in (see `.env.example`) |
+| `OPENAI_API_KEY` etc. | optional, for the AI coach, the trainer check-in and meal photos (see `.env.example`) |
+| `VISION_MODEL` | optional, the model that reads meal photos; defaults to `COACH_MODEL` |
 
 **Passkeys are bound to one domain.** A passkey made on `gym.example.com` does not work on a preview
 deployment's `*.vercel.app` URL, so passkey sign-in only works on the domain `RP_ID`/`ORIGIN` name.
@@ -74,3 +75,10 @@ wrote its secret and push keys to the Blob store.
 
 Passkey registration and sign-in, and data sync, have not been exercised on the deployed site. Blob
 free-plan limits have not been checked.
+
+## Meal photos
+
+`POST /api/food/photo` takes a base64 JPEG in the JSON body. The app shrinks the photo to about 1024 px
+(150–400 KB) first, because Vercel Functions reject request bodies over about 4.5 MB. A photo costs two
+of the day's AI calls and is never stored or logged; only counts reach the quality statistics. The first
+real photo shows whether the configured model accepts images — if not, set `VISION_MODEL`.
