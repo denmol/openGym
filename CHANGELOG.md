@@ -1,5 +1,14 @@
 # Changelog
 
+## Import activities from Apple Health and Garmin
+
+Settings → Data → "Import activities": pick an Apple Health `export.zip` (or `export.xml`), a Garmin Connect
+Activities CSV or account-data export, or TCX / GPX files. Each walk, run, ride, swim or hike becomes its own
+session with minutes, distance and average heart rate; nothing already logged (or overlapping a session you logged)
+is added twice, and "Undo the last activity import" removes the last batch. Large Apple exports are read in
+pieces, so the whole file is never held in memory. Imported sessions count toward the weekly aim and the streak
+like any other, and feed the energy estimate in Food.
+
 ## Energy from activity, shown in Food
 
 Food now shows an "Activity" block for the day: each logged session or activity with an estimated energy use
