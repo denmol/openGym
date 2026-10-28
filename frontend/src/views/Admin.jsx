@@ -118,6 +118,50 @@ function QualityCard({ data }) {
   </div>
 }
 
+// Everyone's data as a file. The copy in the store is for accidents; the file is for you to keep
+// somewhere else. Passkeys, secrets and invitation codes are never in it.
+function BackupCard({ users, status, toast }) {
+  const [busy, setBusy] = useState(null)
+  const download = async (key, path, fallback) => {
+    setBusy(key)
+    try {
+      const r = await fetch(path)
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status)
+      const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || fallback
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click(); URL.revokeObjectURL(a.href)
+    } catch (e) { toast(e.message || 'Download failed') } finally { setBusy(null) }
+  }
+  const last = status && status.last
+  const when = last ? new Date(last.at).toLocaleString() : null
+  return <div className="card" style={{ marginBottom: 14 }}>
+    <h4 className="sec" style={{ marginTop: 0 }}>Backup</h4>
+    <div className="small muted" style={{ marginBottom: 8, lineHeight: 1.5 }}>
+      Everyone's data as one file. It holds plans, workouts, food and weight, and who the users are, but no passkeys,
+      secrets or invitation codes. After a total loss people register again with an invitation and import their own file.
+    </div>
+    <div className="small" style={{ marginBottom: 10 }}>
+      {last
+        ? <>Automatic copy in the store: <b>{when}</b> ({last.users} {last.users === 1 ? 'user' : 'users'}), kept {status.keepDays} days.</>
+        : status
+          ? <span style={{ color: 'var(--orange-t)' }}>No automatic copy yet.{status.cron || status.auto ? ' The first one is made within a day.' : ' Set CRON_SECRET to turn on the daily copy (see docs/VERCEL.md).'}</span>
+          : <span className="dim">Loading…</span>}
+    </div>
+    <Button variant="primary" icon="download" disabled={busy !== null} onClick={() => download('all', '/api/admin/backup', 'pass-all.json')}>
+      {busy === 'all' ? 'Preparing…' : 'Download everything'}
+    </Button>
+    {(users || []).length > 0 && <div style={{ marginTop: 10 }}>
+      {users.map(u => <div key={u.id} className="row between" style={{ padding: '6px 2px', borderTop: '1px solid var(--sep)' }}>
+        <span className="small">{u.name}</span>
+        <Button size="sm" disabled={busy !== null}
+          onClick={() => download(u.id, '/api/admin/backup?user=' + encodeURIComponent(u.id), 'pass-backup.json')}>
+          {busy === u.id ? 'Preparing…' : 'Download'}
+        </Button>
+      </div>)}
+    </div>}
+  </div>
+}
+
 export default function Admin() {
   const nav = useNavigate()
   const user = useStore(s => s.user)
@@ -127,12 +171,14 @@ export default function Admin() {
   const [invites, setInvites] = useState(null)
   const [inviteOnly, setInviteOnly] = useState(false)
   const [qualityData, setQualityData] = useState(null)
+  const [backupStatus, setBackupStatus] = useState(null)
 
   const loadUsers = () => api('/api/admin/users').then(d => { setUsers(d.users); setInviteOnly(d.invite_only) }).catch(e => toast(e.message || 'Failed to load'))
   const loadInvites = () => api('/api/admin/invites').then(d => setInvites(d.invites)).catch(() => {})
   const loadQuality = () => api('/api/admin/quality').then(setQualityData).catch(() => {})
+  const loadBackup = () => api('/api/admin/backup/status').then(setBackupStatus).catch(() => {})
   // poll every 15s so the "training now" section stays live without a manual refresh
-  useEffect(() => { if (!user?.admin) return; loadUsers(); loadInvites(); loadQuality(); const iv = setInterval(loadUsers, 15000); return () => clearInterval(iv) }, [])
+  useEffect(() => { if (!user?.admin) return; loadUsers(); loadInvites(); loadQuality(); loadBackup(); const iv = setInterval(loadUsers, 15000); return () => clearInterval(iv) }, [])
   if (!user?.admin) return null
 
   const openUser = id => openSheet(close => <UserDetail id={id} onChanged={loadUsers} close={close} />)
@@ -166,6 +212,7 @@ export default function Admin() {
 
     <InvitesCard invites={invites} reload={loadInvites} />
     <QualityCard data={qualityData} />
+    <BackupCard users={users} status={backupStatus} toast={toast} />
 
     <h4 className="sec">Users</h4>
     <div className="list">

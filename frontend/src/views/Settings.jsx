@@ -7,7 +7,8 @@ import { effortOf, weightIn } from '../lib/history.js'
 import { api, webauthnOK, passkeyLogin, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush } from '../lib/push.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
-import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
+import { t, LANGS, INSTR_LANGS, dateLocale } from '../lib/i18n.js'
+import { buildBackup, parseBackup, stateFromBackup, saveSafetyCopy, readSafetyCopy, clearSafetyCopy } from '../lib/backup.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
@@ -34,8 +35,8 @@ export default function Settings() {
   const wakeOK = wakeLockSupported()
 
   const doExport = async () => {
-    const json = JSON.stringify(S, null, 2)
-    const name = 'dagsnav-backup-' + todayISO() + '.json'
+    const json = JSON.stringify(buildBackup(S), null, 2)
+    const name = 'pass-backup-' + todayISO() + '.json'
     // WKWebView can't download blob URLs — the native build hands the file to the share sheet.
     if (MOBILE) {
       try { await shareExport(json, name); toast(t('Backup exported')) } catch (e) { /* share sheet dismissed */ }
@@ -45,17 +46,45 @@ export default function Settings() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
     toast(t('Backup exported'))
   }
+  const backupError = r => ({
+    not_backup: t('this isn’t a Pass backup'),
+    too_big: t('the file is too large'),
+    bad_json: t('the file is not valid JSON'),
+    newer: t('this backup is from a newer version of Pass'),
+    bad_shape: t('the file has a damaged section: {0}', r.detail)
+  }[r.error] || r.error)
+  const [safety, setSafety] = useState(() => readSafetyCopy(localStorage))
   const doImport = ev => {
     const f = ev.target.files[0]; if (!f) return
     const rd = new FileReader()
     rd.onload = () => {
-      try {
-        const data = JSON.parse(rd.result)
-        if (!data.workouts || !data.routines) throw new Error(t('this isn’t a Pass backup'))
-        confirmSheet({ title: t('Import backup?'), message: t('This replaces all current data with the backup file.'), confirmText: t('Import'), danger: true, onConfirm: () => { replaceState(Object.assign(JSON.parse(JSON.stringify(DEF)), data), true); toast(t('Backup imported')) } })
-      } catch (e) { toast(t('Import failed: {0}', e.message)) }
+      const parsed = parseBackup(String(rd.result), DEF)
+      if (!parsed.ok) { toast(t('Import failed: {0}', backupError(parsed))); return }
+      const sm = parsed.summary
+      confirmSheet({
+        title: t('Import backup?'),
+        message: t('This replaces all current data with the backup file.') + ' ' +
+          t('The file holds {0} workouts, {1} meals and {2} weigh-ins.', sm.workouts, sm.meals, sm.weighIns) + ' ' +
+          t('Your current data is kept for 7 days so you can undo.'),
+        confirmText: t('Import'), danger: true,
+        onConfirm: () => {
+          const kept = saveSafetyCopy(S, localStorage)
+          replaceState(stateFromBackup(parsed, DEF), true)
+          setSafety(kept ? readSafetyCopy(localStorage) : null)
+          if (!kept) toast(t('Imported — but there was no room to keep your old data for undo.'))
+        }
+      })
     }
     rd.readAsText(f)
+  }
+  const undoBackupImport = () => {
+    const c = readSafetyCopy(localStorage); if (!c) { setSafety(null); return }
+    confirmSheet({
+      title: t('Undo the backup import?'),
+      message: t('Brings back what you had before the import on {0}. What you have now is replaced.', new Date(c.at).toLocaleDateString(dateLocale())),
+      confirmText: t('Undo'), danger: true,
+      onConfirm: () => { replaceState(stateFromBackup({ state: c.state }, DEF), true); clearSafetyCopy(localStorage); setSafety(null); toast(t('Import undone')) }
+    })
   }
   // Copying the id is the whole point of showing it: it goes into ADMIN_UIDS in .env, and
   // nobody retypes 16 characters of base64 correctly on a phone.
@@ -288,6 +317,8 @@ export default function Settings() {
         accessory="chevron" onClick={barcodeDiagnostics} />
       <Row icon="upload" iconTint="var(--blue)" title={t('Import backup')} accessory="chevron" onClick={() => fileRef.current.click()} />
       <Row icon="download" iconTint="var(--blue)" title={t('Export backup (JSON)')} accessory="chevron" onClick={doExport} />
+      {safety && <Row icon="reset" iconTint="var(--orange)" title={t('Undo the backup import')}
+        subtitle={t('Brings back your data from before the import. Kept for 7 days.')} accessory="chevron" onClick={undoBackupImport} />}
       <Row icon="trash" iconTint="var(--red)" title={t('Reset everything')} danger onClick={() => confirmSheet({ title: t('Reset everything?'), message: t('Deletes your plan, workouts and body weight on this device. This cannot be undone.'), confirmText: t('Delete everything'), danger: true, onConfirm: () => { replaceState(JSON.parse(JSON.stringify(DEF)), true); nav('/home'); toast(t('All data reset')) } })} />
     </Section>
     <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doImport} />

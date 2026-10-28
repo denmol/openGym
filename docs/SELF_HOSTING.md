@@ -110,14 +110,29 @@ Access…) in front still works, and composes with the above.
 
 ## 5. Backups
 
-Everything is in `./data` — or wherever `DATA_DIR` points, if you moved it out of the checkout:
+There are two kinds, and they are not the same thing.
+
+**A copy of the app's data** is safe to keep and to hand around. It holds plans, workouts, food and
+weight, and who the users are, but no secret, no passkeys, no push keys and no invitation codes.
+
+- Every night the server writes one to `data/backups/<date>.json` and keeps 14 days (it checks
+  hourly, so a machine that was off still gets today's copy).
+- As an admin you can download everyone's data from **Admin → Backup**, or one person's file, which
+  is in the format **Settings → Import backup** reads back.
+- Each person can also export their own data from **Settings → Export backup**. An import keeps the
+  data it replaces for 7 days, with an undo in Settings.
+- Restoring after a total loss: start a fresh server, register again with an invitation (passkeys
+  are tied to the device and the domain, so they are not part of any backup), then each person
+  imports their file.
+
+**A copy of the whole disk** is what you want if you need to bring the server back exactly as it was:
 
 ```bash
 tar czf opengym-backup-$(date +%F).tar.gz data/
 ```
 
-That archive contains all profiles, passkeys and workout history. Restore by unpacking it back
-into the project folder. (Individual users can also export their own data as JSON from Settings.)
+That archive contains all profiles, **passkeys and the session secret**. Treat it like a password
+and keep it somewhere only you can read. Restore by unpacking it back into the project folder.
 
 **`data/` must never be committed.** It is in `.gitignore`, and it should stay there. The
 directory holds three things a repository is the wrong place for:

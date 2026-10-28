@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "इस सर्वर पर AI सेट नहीं है।",
   "The photo is too large.": "फ़ोटो बहुत बड़ी है।",
   "Could not read the photo.": "फ़ोटो पढ़ी नहीं जा सकी।",
+  // --- backup and import ---
+  "the file is too large": "फ़ाइल बहुत बड़ी है",
+  "the file is not valid JSON": "फ़ाइल मान्य JSON नहीं है",
+  "this backup is from a newer version of Pass": "यह बैकअप Pass के नए संस्करण का है",
+  "the file has a damaged section: {0}": "फ़ाइल का एक हिस्सा खराब है: {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "फ़ाइल में {0} वर्कआउट, {1} भोजन और {2} वज़न दर्ज हैं।",
+  "Your current data is kept for 7 days so you can undo.": "आपका मौजूदा डेटा 7 दिन तक रखा जाता है ताकि आप इसे पूर्ववत कर सकें।",
+  "Imported — but there was no room to keep your old data for undo.": "आयात हो गया — लेकिन पूर्ववत करने के लिए पुराना डेटा रखने की जगह नहीं थी।",
+  "Undo the backup import?": "बैकअप आयात पूर्ववत करें?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "{0} को आयात से पहले जो आपके पास था, उसे वापस लाता है। अभी का डेटा बदल जाएगा।",
+  "Import undone": "आयात पूर्ववत किया गया",
+  "Undo the backup import": "बैकअप आयात पूर्ववत करें",
+  "Brings back your data from before the import. Kept for 7 days.": "आयात से पहले का आपका डेटा वापस लाता है। 7 दिन तक रखा जाता है।",
 }

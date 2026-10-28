@@ -14,6 +14,7 @@ import { dataDirProblem } from './deploy.js';
 import { storeFromEnv, ConflictError } from './store.js';
 import { createDailyCounter } from './counters.js';
 import { PHOTO_SCHEMA, PHOTO_CALL_COST, cleanPhotoRequest, cleanPhotoItems, photoMessages } from './meal-photo.js';
+import { buildServerBackup, personalBackup, backupName, expiredBackupName, KEEP_DAYS } from './backup.js';
 import { createQuality } from './quality.js';
 import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, trainerSystem } from './trainer.js';
 
@@ -546,6 +547,34 @@ async function askOpenAI(messages, name, schema, maxCompletionTokens = null, mod
   } finally { clearTimeout(timer); }
 }
 
+
+/* ---------- daily copy of everyone's data ---------- */
+// One document per day in the same private store as the data, kept KEEP_DAYS days. The names are
+// dates, so the copy that falls out of the window is deleted by name — the store cannot list.
+async function lastSnapshot() {
+  const r = await store.get('backups/latest.json');
+  try { return r ? JSON.parse(r.text) : null; } catch { return null; }
+}
+async function writeSnapshot(now = new Date()) {
+  const copy = await buildServerBackup(db, readState, now);
+  await store.put(backupName(now), JSON.stringify(copy), { private: true });
+  const info = { at: now.toISOString(), users: copy.users.length, name: backupName(now) };
+  await store.put('backups/latest.json', JSON.stringify(info), { private: true });
+  await store.del(expiredBackupName(now)).catch(() => {});
+  return info;
+}
+// On a machine of its own, make sure there is a copy for today (checked hourly, and shortly after start).
+if (!SERVERLESS) {
+  const tick = async () => {
+    try {
+      const last = await lastSnapshot();
+      if (!last || last.at.slice(0, 10) !== new Date().toISOString().slice(0, 10)) await writeSnapshot();
+    } catch (e) { console.error('backup', e.message); }
+  };
+  setTimeout(tick, 20000).unref();
+  setInterval(tick, 3600000).unref();
+}
+
 /* ---------- routes ---------- */
 const routes = {
   'GET /api/health': async (req, res) => json(res, 200, { ok: true, users: db.users.length }),
@@ -1001,6 +1030,37 @@ const routes = {
     if (u.disabled) presence.delete(u.id);   // drop them off "training now" at once
     await saveDb();
     json(res, 200, { ok: true, id: u.id, disabled: u.disabled });
+  },
+
+  // Everyone's data as one file, or one person's in the format Settings → Import reads back.
+  // Secrets, passkeys, push keys and invitation codes are never in it (see backup.js).
+  'GET /api/admin/backup': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const uid = new URL(req.url, 'http://x').searchParams.get('user');
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (uid) {
+      const u = db.users.find(x => x.id === uid);
+      const state = u && await readState(u.id);
+      if (!state) return json(res, 404, { error: 'no data for that user' });
+      return json(res, 200, personalBackup(state), { 'Content-Disposition': `attachment; filename="pass-backup-${stamp}.json"` });
+    }
+    json(res, 200, await buildServerBackup(db, readState), { 'Content-Disposition': `attachment; filename="pass-all-${stamp}.json"` });
+  },
+
+  'GET /api/admin/backup/status': async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    json(res, 200, { last: await lastSnapshot(), keepDays: KEEP_DAYS, cron: !!process.env.CRON_SECRET, auto: !SERVERLESS });
+  },
+
+  // Called once a day by Vercel Cron, which sends the CRON_SECRET as a bearer token.
+  'GET /api/cron/backup': async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return json(res, 501, { error: 'cron is not configured' });
+    const given = String(req.headers.authorization || '');
+    const want = 'Bearer ' + secret;
+    const ok = given.length === want.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want));
+    if (!ok) return json(res, 401, { error: 'not allowed' });
+    json(res, 200, await writeSnapshot());
   },
 
   // How often the models' answers pass their checks (quality.js): counts only, no content.

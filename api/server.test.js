@@ -174,3 +174,72 @@ test('a bad or oversized photo is refused before any call is taken', async () =>
   assert.equal((await photo(c, 'u2', huge)).status, 413, 'beyond the body limit, still an answer');
   assert.equal((await call(c, 'GET', '/api/coach/status', 'u2')).body.used, before, 'nothing was taken');
 });
+
+/* ---- backups ---- */
+const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'og-bak-'));
+const CRON = 'cron-secret-xyz';
+const today = new Date().toISOString().slice(0, 10);
+const longAgo = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+let bak, bakNoCron;
+
+test('set up a store with things that must never leave it', async () => {
+  fs.writeFileSync(path.join(dir2, 'secret'), SECRET);
+  fs.writeFileSync(path.join(dir2, 'db.json'), JSON.stringify({
+    users: [{ id: 'u1', name: 'Ann', sv: 0 }, { id: 'adm', name: 'Admin', admin: true }],
+    creds: [{ userId: 'u1', id: 'SUPERSECRETCRED', publicKey: 'PUBKEY' }],
+    subs: [{ userId: 'u1', endpoint: 'https://push.example/PUSHENDPOINT', keys: { auth: 'AUTHKEY', p256dh: 'P256' } }],
+    invites: [{ code: 'INVITECODE123', note: 'x', created: '2026-09-01' }]
+  }));
+  fs.writeFileSync(path.join(dir2, 'state-u1.json'), JSON.stringify({ workouts: [{ id: 1 }], routines: [], meals: [{ id: 'm1' }], active: { live: 1 } }));
+  fs.mkdirSync(path.join(dir2, 'backups'));
+  fs.writeFileSync(path.join(dir2, 'backups', longAgo + '.json'), '{}');
+  bak = await start({ DATA_DIR: dir2, CRON_SECRET: CRON });
+  bakNoCron = await start({ DATA_DIR: dir2 });
+});
+
+test('only an admin can download a backup, and it holds data but no way in', async () => {
+  assert.equal((await call(bak, 'GET', '/api/admin/backup')).status, 401);
+  assert.equal((await call(bak, 'GET', '/api/admin/backup', 'u1')).status, 403);
+  const r = await call(bak, 'GET', '/api/admin/backup', 'adm');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.users.map(u => u.id), ['u1', 'adm']);
+  assert.equal(r.body.users[0].state.workouts.length, 1);
+  const text = JSON.stringify(r.body);
+  for (const secret of ['SUPERSECRETCRED', 'PUBKEY', 'PUSHENDPOINT', 'AUTHKEY', 'INVITECODE123', SECRET, '"sv"']) {
+    assert.ok(!text.includes(secret), secret + ' leaked into the backup');
+  }
+});
+
+test('one person\'s data comes in the format Settings reads back; an unknown person is a 404', async () => {
+  const r = await call(bak, 'GET', '/api/admin/backup?user=u1', 'adm');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.pass_backup, 1);
+  assert.equal(r.body.state.meals[0].id, 'm1');
+  assert.equal(r.body.state.active, undefined);
+  assert.equal((await call(bak, 'GET', '/api/admin/backup?user=nobody', 'adm')).status, 404);
+  assert.equal((await call(bak, 'GET', '/api/admin/backup?user=adm', 'adm')).status, 404, 'no data, nothing to give');
+});
+
+test('the daily copy is refused without the cron secret, and written with it', async () => {
+  assert.equal((await call(bakNoCron, 'GET', '/api/cron/backup')).status, 501);
+  assert.equal((await call(bak, 'GET', '/api/cron/backup')).status, 401);
+  const wrong = await fetch(`http://localhost:${bak.port}/api/cron/backup`, { headers: { Authorization: 'Bearer nope' } });
+  assert.equal(wrong.status, 401);
+  const ok = await fetch(`http://localhost:${bak.port}/api/cron/backup`, { headers: { Authorization: 'Bearer ' + CRON } });
+  assert.equal(ok.status, 200);
+  const info = await ok.json();
+  assert.equal(info.name, `backups/${today}.json`);
+  assert.equal(info.users, 2);
+  const written = JSON.parse(fs.readFileSync(path.join(dir2, 'backups', today + '.json'), 'utf8'));
+  assert.equal(written.users[0].state.workouts.length, 1);
+  assert.ok(!fs.readFileSync(path.join(dir2, 'backups', today + '.json'), 'utf8').includes('SUPERSECRETCRED'));
+  assert.ok(!fs.existsSync(path.join(dir2, 'backups', longAgo + '.json')), 'the copy that fell out of the window is gone');
+});
+
+test('the admin can see when the last copy was made', async () => {
+  const r = await call(bak, 'GET', '/api/admin/backup/status', 'adm');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.last.name, `backups/${today}.json`);
+  assert.equal(r.body.cron, true);
+  assert.equal((await call(bak, 'GET', '/api/admin/backup/status', 'u1')).status, 403);
+});

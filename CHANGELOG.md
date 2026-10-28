@@ -1,5 +1,12 @@
 # Changelog
 
+## Backups
+
+Export and import are stricter and safer: the file says what it holds, a damaged or foreign file is refused with
+the reason, files from earlier versions still work, and an import keeps your old data for 7 days with an undo
+in Settings. Admin → Backup downloads everyone's data (or one person's, in the same format), and the server
+keeps a nightly copy for 14 days. No passkeys, secrets or invitation codes are ever in a copy.
+
 ## Log a meal by photo
 
 Meal form → "Log by photo": take a picture of the plate and an AI proposes the dishes and their weights.
