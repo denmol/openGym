@@ -12,6 +12,7 @@ import { buildBackup, parseBackup, stateFromBackup, saveSafetyCopy, readSafetyCo
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
+import { importActivities, undoActivityImport, lastActivityImport } from '../import-activity-sheet.jsx'
 import { coachWizardSheet, coachUndoAvailable, undoCoachPlan } from '../coach-sheets.jsx'
 import { trainerSheet } from '../trainer-sheets.jsx'
 import { creditsSheet } from '../credits-sheet.jsx'
@@ -31,6 +32,7 @@ export default function Settings() {
   const toast = useUI(s => s.toast)
   const fileRef = useRef(null)
   const importRef = useRef(null)
+  const activityRef = useRef(null)
   const glucoseRef = useRef(null)
   const wakeOK = wakeLockSupported()
 
@@ -312,6 +314,12 @@ export default function Settings() {
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
         accessory="chevron" onClick={() => importRef.current.click()} />
+      <Row icon="shuffle" iconTint="var(--teal)" title={t('Import activities')}
+        subtitle={t('Apple Health, Garmin Connect, TCX or GPX')}
+        accessory="chevron" onClick={() => activityRef.current.click()} />
+      {lastActivityImport(S) && <Row icon="reset" iconTint="var(--orange)" title={t('Undo the last activity import')}
+        subtitle={t('Removes the activities from the last file you imported.')} accessory="chevron"
+        onClick={() => confirmSheet({ title: t('Undo the last activity import'), message: t('Removes the activities from the last file you imported.'), confirmText: t('Remove'), danger: true, onConfirm: undoActivityImport })} />}
       <Row icon="barcode" iconTint="var(--teal)" title={t('Can this phone scan?')}
         subtitle={t('Checks the camera and the barcode decoder on this device')}
         accessory="chevron" onClick={barcodeDiagnostics} />
@@ -323,6 +331,8 @@ export default function Settings() {
     </Section>
     <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doImport} />
     <input ref={glucoseRef} type="file" data-import="glucose" accept=".csv,text/csv,text/plain" style={{ display: 'none' }} onChange={doGlucoseImport} />
+    <input ref={activityRef} type="file" multiple accept=".zip,.xml,.csv,.json,.tcx,.gpx"
+      style={{ display: 'none' }} onChange={ev => { importActivities([...ev.target.files]); ev.target.value = '' }} />
     {/* Reset after reading so picking the same file twice still fires onChange. */}
     <input ref={importRef} type="file" accept=".csv,.xml,text/csv,text/xml" style={{ display: 'none' }}
       onChange={ev => { const f = ev.target.files[0]; if (f) importFromApp(f); ev.target.value = '' }} />
