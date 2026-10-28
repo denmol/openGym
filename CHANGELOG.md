@@ -1,5 +1,11 @@
 # Changelog
 
+## Speed Insights on the Vercel deployment
+
+The Vercel build now loads Vercel Speed Insights, which reports real page-load timings (Core Web Vitals) from the
+devices using the app. It is anonymous, sets no cookies and sends no app data. It only exists in the Vercel build
+(`VITE_SPEED_INSIGHTS=1` in `vercel.json`); self-hosted, demo and mobile builds contain none of it.
+
 ## Password sign-in as a second way in
 
 Settings → Account → "Sign in with a password": choose a username and a password (at least 10 characters) on an
