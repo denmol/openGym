@@ -82,3 +82,14 @@ free-plan limits have not been checked.
 (150–400 KB) first, because Vercel Functions reject request bodies over about 4.5 MB. A photo costs two
 of the day's AI calls and is never stored or logged; only counts reach the quality statistics. The first
 real photo shows whether the configured model accepts images — if not, set `VISION_MODEL`.
+
+## Backups
+
+Vercel Cron calls `GET /api/cron/backup` every night (see `crons` in `vercel.json`). The route accepts
+only `Authorization: Bearer $CRON_SECRET`, which Vercel sends when a `CRON_SECRET` environment variable
+is set — add one (any long random string) under Settings → Environment Variables. It writes
+`backups/<date>.json` into the same private Blob store and deletes the one from 14 days ago.
+**Admin → Backup** shows the time of the last copy and downloads everyone's data (or one person's) as
+a file; keep a file somewhere else now and then, because a copy in the same store does not help if the
+store itself is lost. No passkeys, secrets or invitation codes are ever in a copy.
+

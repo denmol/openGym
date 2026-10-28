@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "此服务器未配置 AI。",
   "The photo is too large.": "照片太大。",
   "Could not read the photo.": "无法读取照片。",
+  // --- backup and import ---
+  "the file is too large": "文件太大",
+  "the file is not valid JSON": "文件不是有效的 JSON",
+  "this backup is from a newer version of Pass": "此备份来自更新版本的 Pass",
+  "the file has a damaged section: {0}": "文件有损坏的部分：{0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "文件包含 {0} 次训练、{1} 餐和 {2} 次称重。",
+  "Your current data is kept for 7 days so you can undo.": "你当前的数据会保留 7 天，以便撤销。",
+  "Imported — but there was no room to keep your old data for undo.": "已导入——但没有足够空间保留旧数据以便撤销。",
+  "Undo the backup import?": "撤销备份导入？",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "恢复你在 {0} 导入之前的数据。当前的数据将被替换。",
+  "Import undone": "已撤销导入",
+  "Undo the backup import": "撤销备份导入",
+  "Brings back your data from before the import. Kept for 7 days.": "恢复导入之前的数据。保留 7 天。",
 }

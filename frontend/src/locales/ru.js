@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "ИИ не настроен на этом сервере.",
   "The photo is too large.": "Фото слишком большое.",
   "Could not read the photo.": "Не удалось прочитать фото.",
+  // --- backup and import ---
+  "the file is too large": "файл слишком большой",
+  "the file is not valid JSON": "файл не является корректным JSON",
+  "this backup is from a newer version of Pass": "эта резервная копия создана в более новой версии Pass",
+  "the file has a damaged section: {0}": "в файле повреждён раздел: {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "В файле {0} тренировок, {1} приёмов пищи и {2} взвешиваний.",
+  "Your current data is kept for 7 days so you can undo.": "Твои текущие данные хранятся 7 дней, чтобы можно было отменить.",
+  "Imported — but there was no room to keep your old data for undo.": "Импортировано, но не хватило места сохранить старые данные для отмены.",
+  "Undo the backup import?": "Отменить импорт резервной копии?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "Возвращает то, что было до импорта {0}. Текущие данные будут заменены.",
+  "Import undone": "Импорт отменён",
+  "Undo the backup import": "Отменить импорт резервной копии",
+  "Brings back your data from before the import. Kept for 7 days.": "Возвращает твои данные до импорта. Хранятся 7 дней.",
 }

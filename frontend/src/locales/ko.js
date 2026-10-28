@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "이 서버에는 AI가 설정되어 있지 않습니다.",
   "The photo is too large.": "사진이 너무 큽니다.",
   "Could not read the photo.": "사진을 읽을 수 없습니다.",
+  // --- backup and import ---
+  "the file is too large": "파일이 너무 큽니다",
+  "the file is not valid JSON": "파일이 올바른 JSON이 아닙니다",
+  "this backup is from a newer version of Pass": "이 백업은 더 최신 버전의 Pass에서 만든 것입니다",
+  "the file has a damaged section: {0}": "파일의 일부가 손상되었습니다: {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "파일에는 운동 {0}회, 식사 {1}회, 체중 기록 {2}회가 들어 있습니다.",
+  "Your current data is kept for 7 days so you can undo.": "현재 데이터는 7일 동안 보관되어 되돌릴 수 있습니다.",
+  "Imported — but there was no room to keep your old data for undo.": "가져왔지만 되돌리기용으로 이전 데이터를 보관할 공간이 없었습니다.",
+  "Undo the backup import?": "백업 가져오기를 되돌릴까요?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "{0} 가져오기 이전의 데이터를 되살립니다. 현재 데이터는 대체됩니다.",
+  "Import undone": "가져오기를 되돌렸습니다",
+  "Undo the backup import": "백업 가져오기 되돌리기",
+  "Brings back your data from before the import. Kept for 7 days.": "가져오기 이전의 데이터를 되살립니다. 7일 동안 보관됩니다.",
 }

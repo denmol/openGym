@@ -1529,4 +1529,17 @@ export default {
   "AI is not set up on this server.": "AI är inte konfigurerat på den här servern.",
   "The photo is too large.": "Fotot är för stort.",
   "Could not read the photo.": "Kunde inte läsa fotot.",
+  // --- backup and import ---
+  "the file is too large": "filen är för stor",
+  "the file is not valid JSON": "filen är inte giltig JSON",
+  "this backup is from a newer version of Pass": "den här säkerhetskopian kommer från en nyare version av Pass",
+  "the file has a damaged section: {0}": "filen har en skadad del: {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "Filen innehåller {0} pass, {1} måltider och {2} vägningar.",
+  "Your current data is kept for 7 days so you can undo.": "Din nuvarande data sparas i 7 dagar så att du kan ångra.",
+  "Imported — but there was no room to keep your old data for undo.": "Importerat – men det fanns inte plats att spara din gamla data för att ångra.",
+  "Undo the backup import?": "Ångra importen av säkerhetskopian?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "Återställer det du hade före importen den {0}. Det du har nu ersätts.",
+  "Import undone": "Importen ångrad",
+  "Undo the backup import": "Ångra importen av säkerhetskopian",
+  "Brings back your data from before the import. Kept for 7 days.": "Återställer din data från före importen. Sparas i 7 dagar.",
 }

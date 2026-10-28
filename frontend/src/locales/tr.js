@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "Bu sunucuda yapay zekâ kurulu değil.",
   "The photo is too large.": "Fotoğraf çok büyük.",
   "Could not read the photo.": "Fotoğraf okunamadı.",
+  // --- backup and import ---
+  "the file is too large": "dosya çok büyük",
+  "the file is not valid JSON": "dosya geçerli bir JSON değil",
+  "this backup is from a newer version of Pass": "bu yedek Pass'in daha yeni bir sürümünden",
+  "the file has a damaged section: {0}": "dosyanın bir bölümü bozuk: {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "Dosyada {0} antrenman, {1} öğün ve {2} tartı var.",
+  "Your current data is kept for 7 days so you can undo.": "Mevcut verilerin 7 gün saklanır, böylece geri alabilirsin.",
+  "Imported — but there was no room to keep your old data for undo.": "İçe aktarıldı, ancak geri almak için eski verilerini saklayacak yer yoktu.",
+  "Undo the backup import?": "Yedek içe aktarma geri alınsın mı?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "{0} tarihindeki içe aktarmadan önce sahip olduklarını geri getirir. Şu an sahip olduklarının yerine geçer.",
+  "Import undone": "İçe aktarma geri alındı",
+  "Undo the backup import": "Yedek içe aktarmayı geri al",
+  "Brings back your data from before the import. Kept for 7 days.": "İçe aktarmadan önceki verilerini geri getirir. 7 gün saklanır.",
 }

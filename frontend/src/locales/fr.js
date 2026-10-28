@@ -1481,4 +1481,17 @@ export default {
   "AI is not set up on this server.": "L'IA n'est pas configurée sur ce serveur.",
   "The photo is too large.": "La photo est trop volumineuse.",
   "Could not read the photo.": "Impossible de lire la photo.",
+  // --- backup and import ---
+  "the file is too large": "le fichier est trop volumineux",
+  "the file is not valid JSON": "le fichier n'est pas un JSON valide",
+  "this backup is from a newer version of Pass": "cette sauvegarde provient d'une version plus récente de Pass",
+  "the file has a damaged section: {0}": "le fichier a une section endommagée : {0}",
+  "The file holds {0} workouts, {1} meals and {2} weigh-ins.": "Le fichier contient {0} séances, {1} repas et {2} pesées.",
+  "Your current data is kept for 7 days so you can undo.": "Tes données actuelles sont conservées 7 jours pour que tu puisses annuler.",
+  "Imported — but there was no room to keep your old data for undo.": "Importé, mais il n'y avait pas de place pour garder tes anciennes données et pouvoir annuler.",
+  "Undo the backup import?": "Annuler l'import de la sauvegarde ?",
+  "Brings back what you had before the import on {0}. What you have now is replaced.": "Restaure ce que tu avais avant l'import du {0}. Ce que tu as maintenant est remplacé.",
+  "Import undone": "Import annulé",
+  "Undo the backup import": "Annuler l'import de la sauvegarde",
+  "Brings back your data from before the import. Kept for 7 days.": "Restaure tes données d'avant l'import. Conservées 7 jours.",
 }

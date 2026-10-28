@@ -25,5 +25,11 @@
         "service": "frontend"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/backup",
+      "schedule": "17 3 * * *"
+    }
   ]
 }
