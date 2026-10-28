@@ -1,5 +1,12 @@
 # Changelog
 
+## Energy from activity, shown in Food
+
+Food now shows an "Activity" block for the day: each logged session or activity with an estimated energy use
+(MET values from the Compendium of Physical Activities, minus resting energy) and a total. When your calorie
+target is a personal one, it also says how much extra you could eat to hold that target. It is only a suggestion:
+targets never change by themselves, and without a logged body weight no number is shown.
+
 ## Log walks, runs and other activities
 
 "Log an activity" on Home and in Start: a walk, a run, cycling, swimming, a hike or anything else, with minutes and

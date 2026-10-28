@@ -1557,4 +1557,10 @@ export default {
   "Swimming": "Simning",
   "Hike": "Vandring",
   "Other activity": "Annan aktivitet",
+  "Activity": "Aktivitet",
+  "Total": "Totalt",
+  "{0} min": "{0} min",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "Uppskattning. Din plan räknar redan med en vanlig aktivitetsnivå, så du behöver inte äta hela summan extra.",
+  "To keep your target you can eat up to about {0} kcal extra.": "Vill du hålla ditt mål kan du äta upp till cirka {0} kcal extra.",
+  "Log your body weight to see an energy estimate.": "Logga din kroppsvikt för att se en energiuppskattning.",
 }

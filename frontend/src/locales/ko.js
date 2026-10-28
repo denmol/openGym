@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "수영",
   "Hike": "하이킹",
   "Other activity": "기타 활동",
+  "Activity": "활동",
+  "Total": "합계",
+  "{0} min": "{0}분",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "추정치입니다. 계획에는 이미 일반적인 활동 수준이 반영되어 있으므로 전체 합계를 추가로 먹을 필요는 없습니다.",
+  "To keep your target you can eat up to about {0} kcal extra.": "목표를 유지하려면 약 {0} kcal까지 추가로 먹을 수 있습니다.",
+  "Log your body weight to see an energy estimate.": "에너지 추정치를 보려면 체중을 기록하세요.",
 }

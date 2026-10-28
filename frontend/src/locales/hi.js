@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "तैराकी",
   "Hike": "पैदल यात्रा",
   "Other activity": "अन्य गतिविधि",
+  "Activity": "गतिविधि",
+  "Total": "कुल",
+  "{0} min": "{0} मिनट",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "अनुमान। आपकी योजना में पहले से सामान्य गतिविधि स्तर शामिल है, इसलिए पूरा योग अतिरिक्त खाने की ज़रूरत नहीं है।",
+  "To keep your target you can eat up to about {0} kcal extra.": "अपना लक्ष्य बनाए रखने के लिए आप लगभग {0} kcal तक अतिरिक्त खा सकते हैं।",
+  "Log your body weight to see an energy estimate.": "ऊर्जा का अनुमान देखने के लिए अपना शरीर का वजन दर्ज करें।",
 }

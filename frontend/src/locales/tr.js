@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "Yüzme",
   "Hike": "Doğa yürüyüşü",
   "Other activity": "Diğer aktivite",
+  "Activity": "Aktivite",
+  "Total": "Toplam",
+  "{0} min": "{0} dk",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "Tahmin. Planın zaten olağan bir aktivite düzeyini içeriyor, bu yüzden toplamın tamamını fazladan yemen gerekmez.",
+  "To keep your target you can eat up to about {0} kcal extra.": "Hedefini korumak için yaklaşık {0} kcal’ye kadar fazladan yiyebilirsin.",
+  "Log your body weight to see an energy estimate.": "Enerji tahminini görmek için vücut ağırlığını kaydet.",
 }

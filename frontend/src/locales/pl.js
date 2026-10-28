@@ -1509,4 +1509,10 @@ export default {
   "Swimming": "Pływanie",
   "Hike": "Wędrówka",
   "Other activity": "Inna aktywność",
+  "Activity": "Aktywność",
+  "Total": "Razem",
+  "{0} min": "{0} min",
+  "Estimate. Your plan already assumes a usual activity level, so you do not need to eat the whole sum extra.": "Szacunek. Twój plan już zakłada zwykły poziom aktywności, więc nie musisz zjadać całej sumy dodatkowo.",
+  "To keep your target you can eat up to about {0} kcal extra.": "Aby utrzymać swój cel, możesz zjeść dodatkowo do około {0} kcal.",
+  "Log your body weight to see an energy estimate.": "Zapisz masę ciała, aby zobaczyć szacunek energii.",
 }
