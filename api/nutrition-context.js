@@ -78,7 +78,7 @@ export function cleanNutritionContext(raw) {
   };
 }
 
-function storedNutritionNeedsLocal(state, today) {
+export function storedNutritionNeedsLocal(state, today) {
   const goals = state?.nutritionGoals;
   if (!goals || typeof goals !== 'object' || !adult(state?.coachProfile?.age)) return true;
   const healthOff = Object.hasOwn(state, 'health') && (state.health === null ||

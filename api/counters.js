@@ -30,14 +30,14 @@ export function createDailyCounter(store, name, limit, { now = () => new Date(),
       const used = counts[uid] || 0;
       return { used, left: Math.max(0, limit - used) };
     },
-    /** Take one call. false when the user is at the limit. */
-    async reserve(uid) {
+    /** Take `n` calls (a photo costs more than a text question). false when that would pass the limit. */
+    async reserve(uid, n = 1) {
       for (let i = 0; i < retries; i++) {
         const day = utcDay(now());
         const { counts, etag } = await read(day);
         const used = counts[uid] || 0;
-        if (used >= limit) return false;
-        counts[uid] = used + 1;
+        if (used + n > limit) return false;
+        counts[uid] = used + n;
         try {
           await store.put(file(day), JSON.stringify({ counts }), etag === null ? { create: true } : { ifMatch: etag });
         } catch (e) {

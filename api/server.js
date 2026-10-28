@@ -8,11 +8,12 @@ import {
 } from '@simplewebauthn/server';
 import webpush from 'web-push';
 import {
-  decideNutritionAssist, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
+  decideNutritionAssist, storedNutritionNeedsLocal, nutritionAiPayload, nutritionAnswer, nutritionReviewAnswer
 } from './nutrition-context.js';
 import { dataDirProblem } from './deploy.js';
 import { storeFromEnv, ConflictError } from './store.js';
 import { createDailyCounter } from './counters.js';
+import { PHOTO_SCHEMA, PHOTO_CALL_COST, cleanPhotoRequest, cleanPhotoItems, photoMessages } from './meal-photo.js';
 import { createQuality } from './quality.js';
 import { decideTrainer, trainerSchema, trainerPayload, trainerProblems, trainerSystem } from './trainer.js';
 
@@ -47,6 +48,8 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 const COACH_MODEL = process.env.COACH_MODEL || 'gpt-5.6-luna';
 // Overridable for an OpenAI-compatible endpoint (Azure, a local gateway) — and it is what
 // makes this path testable without spending anything.
+// Which model reads meal photos. Defaults to the coach model; set it if that one cannot take images.
+const VISION_MODEL = process.env.VISION_MODEL || COACH_MODEL;
 const OPENAI_BASE = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const COACH_REASONING = process.env.COACH_REASONING || 'low';
 const COACH_DAILY_LIMIT = Math.max(1, +(process.env.COACH_DAILY_LIMIT || 20) || 20);
@@ -317,10 +320,17 @@ function json(res, code, obj, extraHeaders) {
 }
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
+    let size = 0, over = false; const chunks = [];
     req.on('data', d => {
       size += d.length;
-      if (size > MAX_BODY) { reject(new Error('body too large')); req.destroy(); return; }
+      if (over) return;
+      if (size > MAX_BODY) {
+        // Stop keeping the data, but let the sender finish (or give up after a few seconds) so the
+        // route can still answer 413 on the same connection instead of the socket just vanishing.
+        over = true; chunks.length = 0; reject(new Error('body too large'));
+        setTimeout(() => req.destroy(), 5000).unref();
+        return;
+      }
       chunks.push(d);
     });
     req.on('end', () => {
@@ -425,7 +435,7 @@ function weekToMap(week) {
 // the process would make the cap per instance on serverless hosting). See counters.js.
 const aiCounter = createDailyCounter(store, 'ai', COACH_DAILY_LIMIT);      // shared by coach, nutrition and trainer
 const aiQuota = uid => aiCounter.status(uid);
-const aiReserve = uid => aiCounter.reserve(uid);
+const aiReserve = (uid, n = 1) => aiCounter.reserve(uid, n);
 // How often the models' answers pass their checks — counts only, see quality.js.
 const quality = createQuality(store);
 // What a provider failure was, in words that say what to do about it.
@@ -503,12 +513,12 @@ async function offFetch(code) {
 // Open Food Facts rate-limits this server. Shared through the store like the AI cap.
 const offCounter = createDailyCounter(store, 'off', OFF_DAILY_LIMIT);
 
-async function askOpenAI(messages, name, schema, maxCompletionTokens = null) {
+async function askOpenAI(messages, name, schema, maxCompletionTokens = null, model = COACH_MODEL) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), COACH_TIMEOUT_MS);
   try {
     const request = {
-      model: COACH_MODEL,
+      model,
       reasoning_effort: COACH_REASONING,
       messages,
       response_format: {
@@ -660,6 +670,41 @@ const routes = {
       json(res, 200, { answer, usage: data.usage || null, ...(await aiQuota(user.id)) });
     } catch (e) {
       if (!(e instanceof ConflictError)) await quality.record('nutrition', 'error', [errKind(e)]);
+      json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
+    }
+  },
+
+  // A photo of a meal: the model names what is on the plate and guesses grams and values per
+  // 100 g; the browser matches each dish against the food catalogue and the person confirms every
+  // row before anything is saved. The photo is used once and never stored or logged.
+  'POST /api/food/photo': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return json(res, 401, { error: 'not signed in' });
+    const today = new Date().toISOString().slice(0, 10);
+    // Same rule as the nutrition assistant: with a health flag or a stale safety review the
+    // estimate is not offered, unless this is a clinician instance.
+    if (!CLINICIAN && storedNutritionNeedsLocal(await readState(user.id), today)) {
+      await quality.record('photo', 'local');
+      return json(res, 200, { local: true, reason: 'review', usage: null, ...(await aiQuota(user.id)) });
+    }
+    if (!OPENAI_KEY) return json(res, 501, { error: 'no api key configured' });
+    let body;
+    try { body = await readBody(req); }
+    catch (e) { return json(res, e.message === 'body too large' ? 413 : 400, { error: e.message === 'body too large' ? 'photo too large' : 'bad request' }); }
+    const asked = cleanPhotoRequest(body);
+    if (!asked.ok) return json(res, asked.error === 'photo too large' ? 413 : 400, { error: asked.error });
+    try {
+      if (!(await aiReserve(user.id, PHOTO_CALL_COST))) return json(res, 429, { error: 'daily limit reached', ...(await aiQuota(user.id)) });
+      const data = await askOpenAI(photoMessages(asked.image, asked.lang), 'pass_meal_photo', PHOTO_SCHEMA, 1500, VISION_MODEL);
+      const text = data?.choices?.[0]?.message?.content || '';
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { await quality.record('photo', 'rejected', ['not json']); return json(res, 502, { error: 'model did not return json' }); }
+      const { items, rejected } = cleanPhotoItems(parsed);
+      if (!items.length && !parsed.unclear) { await quality.record('photo', 'rejected', ['no plausible items']); return json(res, 502, { error: 'model returned nothing usable' }); }
+      await quality.record('photo', 'ok1', rejected ? ['dropped ' + rejected + ' implausible rows'] : []);
+      json(res, 200, { items, unclear: parsed.unclear === true || !items.length, usage: data.usage || null, ...(await aiQuota(user.id)) });
+    } catch (e) {
+      if (!(e instanceof ConflictError)) await quality.record('photo', 'error', [errKind(e)]);
       json(res, e.status || 502, { error: e.name === 'AbortError' ? 'the model took too long' : e.message });
     }
   },

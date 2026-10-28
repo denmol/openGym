@@ -51,6 +51,15 @@ for (const [label, make] of stores) {
     assert.equal(await a.reserve('u'), false);
   });
 
+  test(label + ': a call can cost more than one unit and is refused if it would pass the limit', async () => {
+    const c = createDailyCounter(make(), 'photo', 5);
+    assert.equal(await c.reserve('u', 2), true);
+    assert.equal(await c.reserve('u', 2), true);
+    assert.equal(await c.reserve('u', 2), false, '4 + 2 passes 5');
+    assert.equal(await c.reserve('u'), true, 'one still fits');
+    assert.deepEqual(await c.status('u'), { used: 5, left: 0 });
+  });
+
   test(label + ': concurrent reservations never exceed the limit', async () => {
     const store = make();
     const counters = [0, 1, 2, 3].map(() => createDailyCounter(store, 'ai', 5, { retries: 20 }));

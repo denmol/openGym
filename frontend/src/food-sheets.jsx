@@ -4,7 +4,7 @@
 // still be logging in March? The answer is not a better search box — it is that the meal
 // they eat four mornings a week is one tap, not eleven. Search exists for the other days.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { t } from './lib/i18n.js'
@@ -13,6 +13,9 @@ import { Button, Segmented, Stepper } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
 import { searchFoods, foodMap, foodOf, hasFoodDb, cleanPer100, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
 import { scanSheet } from './barcode-sheets.jsx'
+import { photoMealSheet } from './photo-sheets.jsx'
+import { coachStatus } from './lib/coach-api.js'
+import { MOBILE } from './lib/mobile.js'
 import { totalsOf, nutrientTotal, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
 import {
   unitsFor, unitById, gramsOf, lastAmounts, defaultAmount, amountLabel,
@@ -133,6 +136,15 @@ function MealForm({ existing, preset, close }) {
   const [kind, setKind] = useState(existing?.kind || preset?.kind || kindForNow())
   const [items, setItems] = useState(existing?.items ? [...existing.items] : (preset?.items ? [...preset.items] : []))
   const [q, setQ] = useState('')
+  // The photo button needs a server with a model behind it; hidden for guests and in the no-backend build.
+  const signedIn = useStore(s => !!s.user)
+  const [aiOn, setAiOn] = useState(false)
+  useEffect(() => {
+    if (MOBILE || !signedIn) return
+    let live = true
+    coachStatus().then(r => { if (live) setAiOn(!!r.enabled) })
+    return () => { live = false }
+  }, [signedIn])
 
   const totals = totalsOf(items, foods)
   const hits = q.trim() ? searchFoods(st, q, 25) : []
@@ -146,6 +158,8 @@ function MealForm({ existing, preset, close }) {
     setQ('')
   }
   const drop = i => setItems(x => x.filter((_, n) => n !== i))
+  // Foods from a photo arrive with the weight the person confirmed, in grams.
+  const addWeighed = list => setItems(x => [...x, ...list.map(({ food, g }) => ({ fid: food.id, u: 'g', q: g, g }))])
 
   // Grams are recomputed from unit × count on every change and stored alongside, so the
   // nutrition arithmetic never has to know that portions exist and a portion reweighed
@@ -245,6 +259,10 @@ function MealForm({ existing, preset, close }) {
 
     <div style={{ height: 6 }} />
     <Button icon="barcode" onClick={() => scanSheet(add)}>{t('Scan a barcode')}</Button>
+    {aiOn && <>
+      <div style={{ height: 8 }} />
+      <Button icon="camera" onClick={() => photoMealSheet(addWeighed)}>{t('Log by photo')}</Button>
+    </>}
     <div style={{ height: 8 }} />
     <Button icon="plus" onClick={() => ui().openSheet(c => <OwnFoodForm close={c} onDone={add} prefill={q} />)}>
       {t('Create my own food')}
