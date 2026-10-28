@@ -23,7 +23,8 @@ function cleanEx(e) {
   const mode = modeOf(e)
   if (mode === 'cardio') {
     if (e.min != null) o.min = e.min
-    if (e.speed != null) o.speed = e.speed
+    if (e.km != null) o.km = e.km
+    if (e.speed != null) o.speed = e.speed          // plans written before distance was planned
   } else if (mode === 'time') {
     // Written out even though 'reps' is the fallback for a non-cardio id: a plan file that
     // dropped the mode would turn a 45-second plank into a 45-rep one at the other end.
@@ -149,7 +150,8 @@ function scheme(e, unit) {
   const sets = e.sets || 1
   const mode = modeOf(e)
   if (mode === 'cardio') {
-    const body = `${e.min || 20} min @ ${fmtNum(e.speed || 8)} km/h`
+    // A speed only appears for plans that carry one; a new plan asks for minutes and, if wanted, a distance.
+    const body = `${e.min || 20} min` + (e.km ? ` · ${fmtNum(e.km)} km` : e.speed ? ` @ ${fmtNum(e.speed)} km/h` : '')
     return sets > 1 ? `${sets} × ${body}` : body
   }
   let s = mode === 'time' ? `${sets} × ${fmtSec(e.sec || 45)}` : `${sets} × ${e.reps ?? 10}`

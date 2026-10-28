@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
-import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
+import { EXDB, EXIDX, BODYPARTS, ACTIVITY_IDS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
 import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
-import { formatKm } from './lib/cardio.js'
+import { formatKm, buildActivityWorkout } from './lib/cardio.js'
 import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, workoutCardio, setsDone, setsDoneActive, lastBW, weightIn, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
@@ -398,7 +398,7 @@ function CustomExForm({ existing, prefill, onDone, close }) {
     <div className="chips" style={{ margin: '12px 0' }}>
       {BODYPARTS.map(b => <button key={b} className={'chip' + (bp === b ? ' on' : '')} onClick={() => setBp(b)}>{t(b)}</button>)}
     </div>
-    {bp === 'cardio' && <div className="small dim row" style={{ marginBottom: 10, gap: 5 }}><Icon name="figureRun" style={{ fontSize: 13 }} />{t('Cardio exercises log time + speed instead of weight × reps.')}</div>}
+    {bp === 'cardio' && <div className="small dim row" style={{ marginBottom: 10, gap: 5 }}><Icon name="figureRun" style={{ fontSize: 13 }} />{t('Cardio exercises log time + distance instead of weight × reps.')}</div>}
     <textarea className="input" rows={4} maxLength={1000} placeholder={t('Description (optional) — setup, cues, anything you want to remember')}
       value={desc} onChange={e => setDesc(e.target.value)} />
     <div style={{ height: 14 }} />
@@ -514,7 +514,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
   const st = useStore(s => s.S)
   const cardio = isCardio(ex.id)
   const [c, setC] = useState(existing || defaultConfig(ex.id))
-  // Cardio keeps its own duration+speed form; the reps/time choice (issue #16) is offered for
+  // Cardio keeps its own duration+distance form; the reps/time choice (issue #16) is offered for
   // everything else, which is where the gap was — planks, hangs, wall sits, loaded carries.
   const mode = cardio ? 'cardio' : modeOf({ ...c, id: ex.id })
   // Both default from the dataset and are then whatever the config says — see isBw.
@@ -537,7 +537,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
     // rather than carrying a flag nothing downstream can read.
     const flags = {}
     if (bw !== isBodyweightEq(ex.id)) flags.bodyweight = bw
-    if (cardio) onSave({ sets, min: Math.max(1, Math.round(c.min) || 20), speed: Math.max(0, c.speed || 8) })
+    if (cardio) onSave({ sets, min: Math.max(1, Math.round(c.min) || 20), ...(c.km > 0 ? { km: Math.round(c.km * 100) / 100 } : {}) })
     else if (mode === 'time') onSave({ sets, mode: 'time', sec: Math.max(1, Math.round(c.sec) || 45), weight: Math.max(0, c.weight || 0), ...flags, ...prog })
     else {
       // A unilateral target is stored even: the split has to divide, and a typed 15 would
@@ -567,7 +567,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
       {cardio ? <>
         <Stepper label={t('Intervals')} value={c.sets} step={1} decimal={false} onChange={v => setC(x => ({ ...x, sets: v }))} />
         <Stepper label={t('Minutes')} value={c.min} step={1} decimal={false} onChange={v => setC(x => ({ ...x, min: v }))} />
-        <Stepper label={t('Speed (km/h)')} value={c.speed} step={0.5} onChange={v => setC(x => ({ ...x, speed: v }))} />
+        <Stepper label={t('Distance (km)')} value={c.km || 0} step={0.5} onChange={v => setC(x => ({ ...x, km: v }))} />
       </> : mode === 'time' ? <>
         <Stepper label={t('Sets')} value={c.sets} step={1} decimal={false} onChange={v => setC(x => ({ ...x, sets: v }))} />
         <Stepper label={t('Seconds')} value={c.sec} step={5} decimal={false} onChange={v => setC(x => ({ ...x, sec: v }))} />
@@ -863,6 +863,55 @@ export function WorkoutRow({ w, onClick }) {
     {w.prs && w.prs.length > 0 && <span className="pr"><Icon name="trophy" />{w.prs.length} PR</span>}
     <Icon name="chevronRight" className="chev" />
   </div>
+}
+
+
+/* ============================ log an activity without a workout ============================ */
+// A walk, a run or a swim logged after the fact: minutes, optionally a distance and a pulse. It is
+// saved as a finished session of one cardio exercise, so history, stats and the weekly count treat
+// it like any other session. No weigh-in prompt and no live timer.
+export function activitySheet() {
+  ui().openSheet(close => <ActivitySheet close={close} />)
+}
+function ActivitySheet({ close }) {
+  const [exId, setExId] = useState('act-walk')
+  const [name, setName] = useState('')
+  const [min, setMin] = useState(30)
+  const [km, setKm] = useState(0)
+  const [hr, setHr] = useState(0)
+  const [day, setDay] = useState(todayISO())
+  const save = () => {
+    const ex = EXIDX[exId]
+    const today = todayISO()
+    const endMs = day === today ? Date.now() : new Date(day + 'T12:00:00').getTime()
+    const w = buildActivityWorkout({ id: uid(), exId, name: exId === 'act-other' && name.trim() ? name : ex.n, day, endMs, min, km, hr })
+    if (!w) { toast(t('Enter how many minutes it lasted')); return }
+    update(s => { s.workouts.push(w) })
+    close()
+    toast(t('Activity logged'))
+  }
+  return <>
+    <h3>{t('Log an activity')}</h3>
+    <div className="muted small" style={{ lineHeight: 1.5, marginBottom: 12 }}>
+      {t('A walk, a run or anything else that is not a lifting session. It counts as a session in your history and stats.')}
+    </div>
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      {ACTIVITY_IDS.map(id => <Button key={id} size="sm" variant={id === exId ? 'primary' : 'plain'} onClick={() => setExId(id)}>{EXIDX[id].n}</Button>)}
+    </div>
+    {exId === 'act-other' && <input className="input" style={{ marginBottom: 12 }} placeholder={t('What was it? (optional)')} value={name} maxLength={60} onChange={e => setName(e.target.value)} />}
+    <div className="row cfgrow" style={{ marginBottom: 12 }}>
+      <Stepper label={t('Minutes')} value={min} step={5} decimal={false} onChange={setMin} />
+      <Stepper label={t('Distance (km)')} value={km} step={0.5} onChange={setKm} />
+      <Stepper label={t('Heart rate (optional)')} value={hr} step={5} decimal={false} onChange={setHr} />
+    </div>
+    <div className="row between" style={{ marginBottom: 14, gap: 12 }}>
+      <span className="small muted">{t('Day')}</span>
+      <input className="input" type="date" style={{ width: 170 }} max={todayISO()} value={day} onChange={e => e.target.value && setDay(e.target.value)} />
+    </div>
+    <Button variant="primary" onClick={save}>{t('Log it')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </>
 }
 
 /* ============================ workout lifecycle ============================ */

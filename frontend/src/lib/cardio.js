@@ -123,3 +123,24 @@ export function sumCardio(sets) {
     anyDistanceDerived: derived
   }
 }
+
+/**
+ * A finished session made of one activity, for logging a walk or a run after the fact without
+ * starting a live workout. Same shape as a workout that was finished in the app, so history,
+ * stats and everything that reads workouts treat it alike. null when there is no duration.
+ *
+ * `endMs` is when it ended; it started `min` minutes before.
+ */
+export function buildActivityWorkout({ id, exId, name, day, endMs, min, km, hr }) {
+  const m = positive(min)
+  if (m == null || m > 1440 || !exId || !day || !Number.isFinite(endMs)) return null
+  const set = { min: Math.round(m), km: positive(km) != null && positive(km) <= 1000 ? round(positive(km), 2) : null, done: true }
+  const pulse = positive(hr)
+  if (pulse != null && pulse <= 250) set.hr = Math.round(pulse)
+  return {
+    id, d: day, start: endMs - Math.round(m) * 60000, end: endMs, routineId: null,
+    name: String(name || '').trim().slice(0, 60) || exId, bw: null, bwu: null,
+    entries: [{ id: exId, sets: [set], topW: null, target: { mode: 'cardio' } }],
+    prs: [], vol: 0
+  }
+}

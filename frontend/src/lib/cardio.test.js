@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cardioSet, formatCardioSet, formatPace, sumCardio } from './cardio.js'
+import { buildActivityWorkout, cardioSet, formatCardioSet, formatPace, sumCardio } from './cardio.js'
 
 describe('cardioSet', () => {
   it('derives speed and pace from a measured duration and distance', () => {
@@ -97,5 +97,37 @@ describe('sumCardio', () => {
     for (const value of [[], null, undefined, [{}, { done: true }]]) {
       expect(sumCardio(value)).toMatchObject({ sets: 0, minutes: 0, km: 0, pace: null, hr: null })
     }
+  })
+})
+
+describe('buildActivityWorkout', () => {
+  const base = { id: 'w1', exId: 'act-walk', name: 'Walk', day: '2026-10-28', endMs: Date.UTC(2026, 9, 28, 12, 0), min: 40, km: 3.2, hr: 112 }
+  it('is a finished session of one cardio exercise', () => {
+    const w = buildActivityWorkout(base)
+    expect(w).toMatchObject({ id: 'w1', d: '2026-10-28', routineId: null, name: 'Walk', prs: [], vol: 0, bw: null })
+    expect(w.entries).toEqual([{ id: 'act-walk', sets: [{ min: 40, km: 3.2, done: true, hr: 112 }], topW: null, target: { mode: 'cardio' } }])
+    expect(w.end - w.start).toBe(40 * 60000)
+    expect(w.end).toBe(base.endMs)
+  })
+  it('leaves out a distance or pulse nobody entered', () => {
+    const w = buildActivityWorkout({ ...base, km: 0, hr: 0 })
+    expect(w.entries[0].sets[0]).toEqual({ min: 40, km: null, done: true })
+  })
+  it('refuses what cannot be a session', () => {
+    for (const bad of [{ min: 0 }, { min: -5 }, { min: 'x' }, { min: 2000 }, { exId: '' }, { day: '' }, { endMs: NaN }]) {
+      expect(buildActivityWorkout({ ...base, ...bad })).toBeNull()
+    }
+  })
+  it('ignores an absurd distance or pulse rather than saving it', () => {
+    const set = buildActivityWorkout({ ...base, km: 5000, hr: 900 }).entries[0].sets[0]
+    expect(set.km).toBeNull()
+    expect(set.hr).toBeUndefined()
+  })
+  it('falls back to the exercise id when no name is given', () => {
+    expect(buildActivityWorkout({ ...base, name: '  ' }).name).toBe('act-walk')
+  })
+  it('counts as cardio for the readers that sum it', () => {
+    const w = buildActivityWorkout(base)
+    expect(sumCardio(w.entries[0].sets)).toMatchObject({ minutes: 40, km: 3.2 })
   })
 })

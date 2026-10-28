@@ -12,7 +12,7 @@ import Icon from '../components/Icon.jsx'
 import BodyMap, { BodyMapLegend } from '../components/BodyMap.jsx'
 import { loadOfWorkouts, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
-import { formatKm } from '../lib/cardio.js'
+import { formatKm, cardioSet } from '../lib/cardio.js'
 import { cardioSummary, cardioWeeks, hasCardio, paceLabel } from '../lib/cardio-stats.js'
 import { hasSteps, stepSummary, stepWeeks } from '../lib/steps.js'
 import { hasSleep, sleepSummary, sleepWeeks } from '../lib/sleep.js'
@@ -279,7 +279,7 @@ export default function Stats() {
   })() : 'reps'
   const curCardio = curMode === 'cardio'
   const curTimed = curMode === 'time'
-  const metric = s => curCardio ? (s.speed || 0) : curTimed ? (s.sec || 0) : (s.w || 0)
+  const metric = s => curCardio ? (cardioSet(s).speed || 0) : curTimed ? (s.sec || 0) : (s.w || 0)
   const exUnit = curCardio ? 'km/h' : curTimed ? 's' : S.unit
   let exPts = [], exList = [], exBest = 0
   if (curEx) {

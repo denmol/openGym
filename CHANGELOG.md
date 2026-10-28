@@ -1,5 +1,13 @@
 # Changelog
 
+## Log walks, runs and other activities
+
+"Log an activity" on Home and in Start: a walk, a run, cycling, swimming, a hike or anything else, with minutes and
+optionally distance and heart rate, saved as a session without a live workout or a weigh-in. The same
+activities can be added inside a lifting session from the exercise picker. A cardio plan now asks for minutes and an
+optional distance (it used to store a speed that nothing used), and the per-exercise cardio chart reads the speed
+from minutes and distance. Every logged session, walks included, still counts toward the weekly aim and the streak.
+
 ## Backups
 
 Export and import are stricter and safer: the file says what it holds, a damaged or foreign file is refused with
