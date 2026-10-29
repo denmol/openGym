@@ -1557,4 +1557,10 @@ export default {
   "Remove password": "Удалить пароль",
   "Remove password?": "Удалить пароль?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "Вы по-прежнему сможете входить с passkey. Другие устройства, где вход выполнен по паролю, будут отключены.",
+  "Logged for {0}": "Записывается на {0}",
+  "A workout is already in progress — finish or discard it first": "Тренировка уже идёт — сначала завершите или отмените её",
+  "Pick a day that has already passed": "Выберите уже прошедший день",
+  "Log a workout you missed": "Добавить пропущенную тренировку",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Выберите день и тренировку, отметьте сделанное и завершите. Она сохранится в этот день.",
+  "How long did it last? (min)": "Сколько она длилась? (мин)",
 }

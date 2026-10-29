@@ -1557,4 +1557,10 @@ export default {
   "Remove password": "पासवर्ड हटाएँ",
   "Remove password?": "पासवर्ड हटाएँ?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "आप अब भी अपनी पासकी से साइन इन कर सकते हैं। पासवर्ड से साइन इन किए गए दूसरे डिवाइस साइन आउट हो जाएँगे।",
+  "Logged for {0}": "{0} के लिए दर्ज हो रहा है",
+  "A workout is already in progress — finish or discard it first": "एक वर्कआउट पहले से चल रहा है — पहले उसे पूरा करें या छोड़ें",
+  "Pick a day that has already passed": "बीता हुआ दिन चुनें",
+  "Log a workout you missed": "छूटा हुआ वर्कआउट दर्ज करें",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "दिन और रूटीन चुनें, जो किया उसे टिक करें और समाप्त करें। यह उसी दिन सहेजा जाएगा।",
+  "How long did it last? (min)": "यह कितनी देर चला? (मिनट)",
 }

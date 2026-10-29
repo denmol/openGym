@@ -1557,4 +1557,10 @@ export default {
   "Remove password": "비밀번호 삭제",
   "Remove password?": "비밀번호를 삭제할까요?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "패스키로는 계속 로그인할 수 있습니다. 비밀번호로 로그인한 다른 기기는 로그아웃됩니다.",
+  "Logged for {0}": "{0}에 기록됩니다",
+  "A workout is already in progress — finish or discard it first": "이미 진행 중인 운동이 있습니다. 먼저 끝내거나 취소하세요",
+  "Pick a day that has already passed": "이미 지난 날짜를 선택하세요",
+  "Log a workout you missed": "놓친 운동 기록하기",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "날짜와 루틴을 고르고, 한 것을 체크한 뒤 종료하세요. 해당 날짜에 저장됩니다.",
+  "How long did it last? (min)": "얼마나 걸렸나요? (분)",
 }

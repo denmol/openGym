@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   totalsOf, nutrientTotal, mealTotals, mealsOn, dayTotals, hasMeals,
-  scaleItems, newMeal, kindForNow, bmr, MEAL_KINDS
+  scaleItems, newMeal, kindForNow, bmr, MEAL_KINDS, mealTimeFor
 } from './nutrition.js'
 
 // Per 100 g, rounded the way a label is.
@@ -191,5 +191,18 @@ describe('bmr', () => {
   it('rejects unknown sex and non-finite measurements', () => {
     expect(bmr({ sex: 'other', age: 30, heightCm: 175, weightKg: 70 })).toBeNull()
     expect(bmr({ sex: 'male', age: 30, heightCm: Infinity, weightKg: 70 })).toBeNull()
+  })
+})
+
+describe('meals logged for an earlier day', () => {
+  it('suggests a clock time per kind of meal', () => {
+    expect(['breakfast', 'lunch', 'dinner', 'snack', 'x'].map(mealTimeFor)).toEqual(['08:00', '12:00', '18:00', '15:00', '12:00'])
+  })
+  it('keeps the given day and time, and lands only on that day', () => {
+    const m = newMeal({ kind: 'lunch', items: [{ fid: 'a', g: 100 }], d: '2026-10-20', t: '12:00' })
+    expect(m).toMatchObject({ d: '2026-10-20', t: '12:00', kind: 'lunch' })
+    const st = { meals: [{ id: '1', ...m }] }
+    expect(mealsOn(st, '2026-10-20')).toHaveLength(1)
+    expect(mealsOn(st, '2026-10-21')).toHaveLength(0)
   })
 })

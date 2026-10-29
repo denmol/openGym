@@ -102,6 +102,11 @@ export function newMeal({ kind, items, note, d, t } = {}) {
   }
 }
 
+/** A plausible clock time for a meal logged after the fact, so the day reads in order. */
+export function mealTimeFor(kind) {
+  return { breakfast: '08:00', lunch: '12:00', dinner: '18:00', snack: '15:00' }[kind] || '12:00'
+}
+
 /** Which meal it probably is, by the clock. Saves a tap four times a day. */
 export function kindForNow(d = new Date()) {
   const h = d.getHours()

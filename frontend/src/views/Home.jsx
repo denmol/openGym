@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive, weightIn } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
-import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor, activitySheet } from '../sheets.jsx'
+import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadStarterPlan, bwDeltaColor, activitySheet, pastWorkoutSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -84,7 +84,10 @@ export default function Home() {
           : routine ? <span className="tag acc">{t('Start')}</span>
           : <Icon name="plus" className="chev" />}
       </div>
-      <div style={{ marginTop: 10 }}><Button size="sm" icon="figureRun" onClick={activitySheet}>{t('Log an activity')}</Button></div>
+      <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: 'wrap' }}>
+        <Button size="sm" icon="figureRun" onClick={activitySheet}>{t('Log an activity')}</Button>
+        <Button size="sm" icon="calendar" onClick={pastWorkoutSheet}>{t('Log a workout you missed')}</Button>
+      </div>
     </div>
 
     {/* Food, two taps from the home screen. Anything further away does not get logged. */}

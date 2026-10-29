@@ -240,6 +240,19 @@ export function workoutCardio(w) {
   return sumCardio(sets)
 }
 
+/**
+ * Add a finished workout so the list stays in date order. A session logged afterwards for an
+ * earlier day goes where it belongs, not at the end, because readers take the last element to be
+ * the latest session.
+ */
+export function insertWorkout(workouts, w) {
+  const key = x => (x.d || '') + ':' + String(x.start || 0).padStart(15, '0')
+  let i = workouts.length
+  while (i > 0 && key(workouts[i - 1]) > key(w)) i--
+  workouts.splice(i, 0, w)
+  return workouts
+}
+
 export function setsDone(w) {
   let n = 0
   w.entries.forEach(e => e.sets.forEach(s => { if (s.done) n++ }))
