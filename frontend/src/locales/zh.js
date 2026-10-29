@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "补记错过的训练",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "选择日期和训练，勾选你完成的内容后结束，将保存到当天。",
   "How long did it last? (min)": "持续了多久？（分钟）",
+  "Enter a valid past date, start time and duration": "请输入已完成训练的有效日期、开始时间和时长",
+  "Start time": "开始时间",
+  "This time occurs twice. Choose the UTC offset.": "这个时间出现两次。请选择 UTC 时差。",
+  "Energy estimate capped at {0} min of strength work.": "能量估算最多计入 {0} 分钟力量训练。",
 }

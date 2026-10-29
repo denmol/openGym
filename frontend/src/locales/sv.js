@@ -1611,4 +1611,8 @@ export default {
   "Log a workout you missed": "Logga ett missat pass",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Välj dag och pass, bocka av det du gjorde och avsluta. Det sparas på den dagen.",
   "How long did it last? (min)": "Hur länge varade det? (min)",
+  "Enter a valid past date, start time and duration": "Ange giltigt datum, starttid och längd för ett avslutat pass",
+  "Start time": "Starttid",
+  "This time occurs twice. Choose the UTC offset.": "Den här tiden inträffar två gånger. Välj UTC-offset.",
+  "Energy estimate capped at {0} min of strength work.": "Energiberäkningen begränsas till {0} min styrketräning.",
 }

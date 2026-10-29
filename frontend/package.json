@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prebuild": "node scripts/third-party-notices.mjs"
+    "prebuild": "node scripts/third-party-notices.mjs",
+    "test:backfill:timezones": "node scripts/backfill-timezones.mjs",
+    "test:backfill:browser": "node scripts/backfill-browser.mjs"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
@@ -30,6 +32,7 @@
     "@capacitor/cli": "^7.6.8",
     "@capacitor/ios": "^7.6.8",
     "@vitejs/plugin-react": "^6.0.3",
+    "playwright": "1.56.1",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }

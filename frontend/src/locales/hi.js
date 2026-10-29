@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "छूटा हुआ वर्कआउट दर्ज करें",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "दिन और रूटीन चुनें, जो किया उसे टिक करें और समाप्त करें। यह उसी दिन सहेजा जाएगा।",
   "How long did it last? (min)": "यह कितनी देर चला? (मिनट)",
+  "Enter a valid past date, start time and duration": "पूरे हो चुके वर्कआउट की सही तारीख, शुरू होने का समय और अवधि दर्ज करें",
+  "Start time": "शुरू होने का समय",
+  "This time occurs twice. Choose the UTC offset.": "यह समय दो बार आता है। UTC ऑफ़सेट चुनें।",
+  "Energy estimate capped at {0} min of strength work.": "ऊर्जा का अनुमान {0} मिनट के शक्ति प्रशिक्षण तक सीमित है।",
 }

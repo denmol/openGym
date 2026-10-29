@@ -1,5 +1,15 @@
 # Changelog
 
+## Protect history when logging missed workouts
+
+Missed workouts now accept a start time and preserve the entered duration, validate dates and
+handle daylight-saving clock changes. Historical defaults use preceding sessions; confirming
+then discarding an old session leaves current working weights alone. Adding a session also
+repairs older append-order histories. Historical activity energy uses the recorded workout
+weight or the latest weigh-in on/before that day. Food shows the full logged duration and
+explains its existing 180-minute strength-energy cap. Backfill regression runs in five time
+zones and a synthetic browser flow in three, including meals moved between days.
+
 ## Log missed meals and workouts for earlier days
 
 Food: the "Log a meal" and "My meals" buttons now show on every day you browse to (they used to appear only on today),

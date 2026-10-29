@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "놓친 운동 기록하기",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "날짜와 루틴을 고르고, 한 것을 체크한 뒤 종료하세요. 해당 날짜에 저장됩니다.",
   "How long did it last? (min)": "얼마나 걸렸나요? (분)",
+  "Enter a valid past date, start time and duration": "완료한 운동의 올바른 날짜, 시작 시간, 소요 시간을 입력하세요",
+  "Start time": "시작 시간",
+  "This time occurs twice. Choose the UTC offset.": "이 시간은 두 번 발생합니다. UTC 오프셋을 선택하세요.",
+  "Energy estimate capped at {0} min of strength work.": "에너지 추정은 근력 운동 {0}분으로 제한됩니다.",
 }
