@@ -1574,4 +1574,10 @@ export default {
   "Remove password": "Passwort entfernen",
   "Remove password?": "Passwort entfernen?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "Du kannst dich weiterhin mit deinem Passkey anmelden. Andere Geräte, die mit dem Passwort angemeldet sind, werden abgemeldet.",
+  "Logged for {0}": "Wird für {0} erfasst",
+  "A workout is already in progress — finish or discard it first": "Ein Training läuft bereits — beende oder verwirf es zuerst",
+  "Pick a day that has already passed": "Wähle einen Tag, der schon vorbei ist",
+  "Log a workout you missed": "Verpasstes Training nachtragen",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Wähle Tag und Einheit, hake ab, was du gemacht hast, und beende. Es wird an diesem Tag gespeichert.",
+  "How long did it last? (min)": "Wie lange dauerte es? (Min.)",
 }

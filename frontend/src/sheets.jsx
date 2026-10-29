@@ -4,7 +4,7 @@ import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, ACTIVITY_IDS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
 import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
 import { formatKm, buildActivityWorkout } from './lib/cardio.js'
-import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, workoutCardio, setsDone, setsDoneActive, lastBW, weightIn, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
+import { insertWorkout, lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, workoutCardio, setsDone, setsDoneActive, lastBW, weightIn, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
@@ -886,7 +886,7 @@ function ActivitySheet({ close }) {
     const endMs = day === today ? Date.now() : new Date(day + 'T12:00:00').getTime()
     const w = buildActivityWorkout({ id: uid(), exId, name: exId === 'act-other' && name.trim() ? name : ex.n, day, endMs, min, km, hr })
     if (!w) { toast(t('Enter how many minutes it lasted')); return }
-    update(s => { s.workouts.push(w) })
+    update(s => { insertWorkout(s.workouts, w) })
     close()
     toast(t('Activity logged'))
   }
@@ -923,6 +923,9 @@ export function startFlow(routineId, opts) {
 // lighter session is judged against what it asked for and never reads as a string of misses.
 export function beginWorkout(routineId, bw, opts) {
   const st = S()
+  // A session logged afterwards: its own day, a length instead of a running clock, no weigh-in
+  // and no rest timer (see beginPastWorkout).
+  const past = opts && opts.past
   const r = routineId ? st.routines.find(x => x.id === routineId) : null
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards. `plan` is
@@ -939,10 +942,54 @@ export function beginWorkout(routineId, bw, opts) {
     return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
   })
   update(s => {
-    s.active = { id: uid(), d: todayISO(), start: Date.now(), routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, bwu: bw ? st.unit : null, cur: 0, entries }
+    s.active = {
+      id: uid(), d: past ? past.day : todayISO(), start: past ? new Date(past.day + 'T12:00:00').getTime() : Date.now(),
+      routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, bwu: bw ? st.unit : null, cur: 0, entries,
+      ...(past ? { backdated: { minutes: past.minutes } } : {})
+    }
   })
   useUI.getState().stopRest()
   nav('/workout')
+}
+
+/* ============================ a session you forgot to log ============================ */
+// The ordinary workout, opened on an earlier day. You tick off what you did, then finish; the
+// session is saved on that day with the length you gave. Nothing is weighed and no clock runs.
+export function pastWorkoutSheet() {
+  if (S().active) { toast(t('A workout is already in progress — finish or discard it first')); return }
+  ui().openSheet(close => <PastWorkoutSheet close={close} />)
+}
+function PastWorkoutSheet({ close }) {
+  const st = useStore(s => s.S)
+  const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') })()
+  const [day, setDay] = useState(yesterday)
+  const [minutes, setMinutes] = useState(60)
+  const go = routineId => {
+    if (!day || day > todayISO()) { toast(t('Pick a day that has already passed')); return }
+    close()
+    beginWorkout(routineId, null, { past: { day, minutes: Math.max(5, Math.min(300, Math.round(minutes) || 60)) } })
+  }
+  return <>
+    <h3>{t('Log a workout you missed')}</h3>
+    <div className="muted small" style={{ lineHeight: 1.5, marginBottom: 12 }}>
+      {t('Pick the day and the routine, tick off what you did and finish. It is saved on that day.')}
+    </div>
+    <div className="row between" style={{ marginBottom: 12, gap: 12 }}>
+      <span className="small muted">{t('Day')}</span>
+      <input className="input" type="date" style={{ width: 170 }} max={todayISO()} value={day} onChange={e => e.target.value && setDay(e.target.value)} />
+    </div>
+    <div className="row cfgrow" style={{ marginBottom: 14 }}>
+      <Stepper label={t('How long did it last? (min)')} value={minutes} step={5} decimal={false} onChange={setMinutes} />
+    </div>
+    {st.routines.map(r => <button key={r.id} className="lrow tap" onClick={() => go(r.id)}>
+      <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+      <span className="lrow-m"><span className="lrow-t">{r.name}</span><span className="lrow-s">{exCount(r.ex.length)}</span></span>
+    </button>)}
+    <div style={{ height: 8 }} />
+    <Button icon="shuffle" onClick={() => go(null)}>{t('Freestyle workout (pick as you go)')}</Button>
+    <div style={{ height: 8 }} />
+    <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
+  </>
 }
 function TopWeight({ entryIdx, close }) {
   const st = useStore(s => s.S)
@@ -1054,7 +1101,7 @@ function doFinishWorkout() {
     if (rec && !prs.includes(e.id)) e1prs.push({ id: e.id, ...rec })
   })
   const w = {
-    id: A.id, d: A.d, start: A.start, end: Date.now(), routineId: A.routineId, name: A.name, bw: A.bw, bwu: A.bwu,
+    id: A.id, d: A.d, start: A.start, end: A.backdated ? A.start + A.backdated.minutes * 60000 : Date.now(), routineId: A.routineId, name: A.name, bw: A.bw, bwu: A.bwu,
     // `target` (what the session prescribed) is kept alongside the sets: without it a
     // finished workout cannot say whether it hit its reps, and a timed session reads back
     // as "0 reps". It is what the progression engine works from.
@@ -1067,7 +1114,7 @@ function doFinishWorkout() {
       const mx = Math.max(0, ...e.sets.filter(x => x.done).map(x => x.w || 0), e.topW || 0)
       if (mx > 0) { const cur = s.exWeights[e.id]; if (!cur || mx > cur.w) s.exWeights[e.id] = { w: mx, d: w.d } }
     })
-    s.workouts.push(w)
+    insertWorkout(s.workouts, w)
     s.active = null
   })
   useUI.getState().stopRest()

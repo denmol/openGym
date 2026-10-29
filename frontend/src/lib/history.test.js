@@ -415,3 +415,19 @@ describe('planned cardio distance', () => {
     expect(buildSets({ workouts: [] }, { id: walk, sets: 1, min: 30, speed: 8 })[0].km).toBeNull()
   })
 })
+
+import { insertWorkout } from './history.js'
+describe('insertWorkout', () => {
+  const w = (d, start) => ({ id: d + start, d, start })
+  it('places a session for an earlier day where it belongs', () => {
+    const list = [w('2026-10-20', 1), w('2026-10-25', 5), w('2026-10-27', 9)]
+    insertWorkout(list, w('2026-10-22', 3))
+    expect(list.map(x => x.d)).toEqual(['2026-10-20', '2026-10-22', '2026-10-25', '2026-10-27'])
+  })
+  it('appends the newest, and orders two on the same day by start', () => {
+    const list = [w('2026-10-20', 5)]
+    insertWorkout(list, w('2026-10-20', 2))
+    insertWorkout(list, w('2026-10-28', 1))
+    expect(list.map(x => x.start)).toEqual([2, 5, 1])
+  })
+})

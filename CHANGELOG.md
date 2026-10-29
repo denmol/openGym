@@ -1,5 +1,13 @@
 # Changelog
 
+## Log missed meals and workouts for earlier days
+
+Food: the "Log a meal" and "My meals" buttons now show on every day you browse to (they used to appear only on today),
+log onto the day on screen, and the meal form has Day and Time fields so a meal can be moved to another day. On
+a past day the time follows the kind of meal (breakfast 08:00 … dinner 18:00) so the day reads in order. Workout and
+Home: "Log a workout you missed" opens your routine on an earlier day; you tick off what you did, say how long
+it lasted, and it is saved on that day (no weigh-in, no clock, no rest timer). Sessions are inserted in date order.
+
 ## Speed Insights on the Vercel deployment
 
 The Vercel build now loads Vercel Speed Insights, which reports real page-load timings (Core Web Vitals) from the

@@ -197,17 +197,17 @@ export default function Food() {
         <div className="dim small" style={{ marginTop: 10 }}>{t('Nothing logged yet')}</div>}
     </div>
 
-    {isToday && <div className="card">
-      <Button variant="primary" icon="star" onClick={quickLogSheet}>{t('My meals')}</Button>
+    <div className="card">
+      <Button variant="primary" icon="star" onClick={() => quickLogSheet(day)}>{t('My meals')}</Button>
       <div style={{ height: 8 }} />
-      <Button icon="plus" onClick={() => mealSheet()}>{t('Log a meal')}</Button>
-      {dia && <>
+      <Button icon="plus" onClick={() => mealSheet(undefined, undefined, day)}>{t('Log a meal')}</Button>
+      {dia && isToday && <>
         <div style={{ height: 8 }} />
         <Button icon="dot" onClick={() => glucoseSheet()}>{t('Log a reading')}</Button>
         <div style={{ height: 8 }} />
         <Button icon="plus" onClick={() => doseSheet()}>{t('Log a dose')}</Button>
       </>}
-    </div>}
+    </div>
 
     {meals.length > 0 && <div className="card">
       <h2 style={{ margin: '0 0 4px', fontSize: 17 }}>{t('Meals')}</h2>

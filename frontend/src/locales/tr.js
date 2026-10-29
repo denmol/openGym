@@ -1557,4 +1557,10 @@ export default {
   "Remove password": "Parolayı kaldır",
   "Remove password?": "Parola kaldırılsın mı?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "Geçiş anahtarınla giriş yapmaya devam edebilirsin. Parolayla giriş yapmış diğer cihazların oturumu kapatılır.",
+  "Logged for {0}": "{0} için kaydediliyor",
+  "A workout is already in progress — finish or discard it first": "Zaten devam eden bir antrenman var — önce bitir veya vazgeç",
+  "Pick a day that has already passed": "Geçmiş bir gün seç",
+  "Log a workout you missed": "Kaçırdığın antrenmanı ekle",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Günü ve rutini seç, yaptıklarını işaretle ve bitir. O güne kaydedilir.",
+  "How long did it last? (min)": "Ne kadar sürdü? (dk)",
 }

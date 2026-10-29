@@ -1605,4 +1605,10 @@ export default {
   "Remove password": "Ta bort lösenord",
   "Remove password?": "Ta bort lösenordet?",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "Du kan fortfarande logga in med din passkey. Andra enheter som är inloggade med lösenordet loggas ut.",
+  "Logged for {0}": "Loggas för {0}",
+  "A workout is already in progress — finish or discard it first": "Ett pass pågår redan — avsluta eller kasta det först",
+  "Pick a day that has already passed": "Välj en dag som redan har varit",
+  "Log a workout you missed": "Logga ett missat pass",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Välj dag och pass, bocka av det du gjorde och avsluta. Det sparas på den dagen.",
+  "How long did it last? (min)": "Hur länge varade det? (min)",
 }

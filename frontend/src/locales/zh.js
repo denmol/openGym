@@ -1557,4 +1557,10 @@ export default {
   "Remove password": "移除密码",
   "Remove password?": "移除密码？",
   "You can still sign in with your passkey. Other devices signed in with the password are signed out.": "你仍可使用通行密钥登录。使用密码登录的其他设备将被退出。",
+  "Logged for {0}": "记录到 {0}",
+  "A workout is already in progress — finish or discard it first": "已有训练正在进行——请先结束或放弃",
+  "Pick a day that has already passed": "请选择已经过去的日期",
+  "Log a workout you missed": "补记错过的训练",
+  "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "选择日期和训练，勾选你完成的内容后结束，将保存到当天。",
+  "How long did it last? (min)": "持续了多久？（分钟）",
 }

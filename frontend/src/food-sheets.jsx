@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { t } from './lib/i18n.js'
-import { uid, fmtNum } from './lib/format.js'
+import { uid, fmtNum, fmtDate, todayISO } from './lib/format.js'
 import { Button, Segmented, Stepper } from './components/ui.jsx'
 import Icon from './components/Icon.jsx'
 import { searchFoods, foodMap, foodOf, hasFoodDb, cleanPer100, NUTRIENTS, NUTRIENT_NAME, NUTRIENT_UNIT } from './lib/foods.js'
@@ -16,7 +16,7 @@ import { scanSheet } from './barcode-sheets.jsx'
 import { photoMealSheet } from './photo-sheets.jsx'
 import { coachStatus } from './lib/coach-api.js'
 import { MOBILE } from './lib/mobile.js'
-import { totalsOf, nutrientTotal, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow } from './lib/nutrition.js'
+import { totalsOf, nutrientTotal, newMeal, scaleItems, MEAL_KINDS, MEAL_NAME, kindForNow, mealTimeFor } from './lib/nutrition.js'
 import {
   unitsFor, unitById, gramsOf, lastAmounts, defaultAmount, amountLabel,
   newPortion, densityFor, UNIT_LABEL
@@ -130,12 +130,19 @@ const unitSheet = (food, current, onPick) =>
 
 /* ============================ add / edit a meal ============================ */
 
-function MealForm({ existing, preset, close }) {
+function MealForm({ existing, preset, day, close }) {
   const st = useStore(s => s.S)
   const foods = foodMap(st)
   const [kind, setKind] = useState(existing?.kind || preset?.kind || kindForNow())
   const [items, setItems] = useState(existing?.items ? [...existing.items] : (preset?.items ? [...preset.items] : []))
   const [q, setQ] = useState('')
+  // A meal is logged on the day on screen, which may be one that has gone by. The time follows the
+  // kind of meal until it is set by hand, so an old day still reads breakfast-lunch-dinner.
+  const today = todayISO()
+  const [d, setD] = useState(existing?.d || (day && day <= today ? day : today))
+  const [tm, setTm] = useState(existing?.t || '')
+  const clock = () => { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0') }
+  const timeShown = tm || (d === today ? clock() : mealTimeFor(kind))
   // The photo button needs a server with a model behind it; hidden for guests and in the no-backend build.
   const signedIn = useStore(s => !!s.user)
   const [aiOn, setAiOn] = useState(false)
@@ -177,10 +184,10 @@ function MealForm({ existing, preset, close }) {
     if (existing) {
       update(s => {
         const m = (s.meals || []).find(x => x.id === existing.id)
-        if (m) { m.items = clean; m.kind = kind }
+        if (m) { m.items = clean; m.kind = kind; m.d = d; m.t = timeShown }
       })
     } else {
-      update(s => { (s.meals = s.meals || []).push({ id: uid(), ...newMeal({ kind, items: clean }) }) })
+      update(s => { (s.meals = s.meals || []).push({ id: uid(), ...newMeal({ kind, items: clean, d, t: tm || (d === today ? undefined : mealTimeFor(kind)) }) }) })
     }
     close()
     toast(existing ? t('Meal updated') : t('Meal logged'))
@@ -196,6 +203,13 @@ function MealForm({ existing, preset, close }) {
     <h3>{existing ? t('Edit meal') : t('Log a meal')}</h3>
     <Segmented className="seg-inline" value={kind} onChange={setKind}
       options={MEAL_KINDS.map(k => ({ value: k, label: t(MEAL_NAME[k]) }))} />
+    <div className="row between" style={{ gap: 10, margin: '10px 0 0' }}>
+      <input className="input" type="date" aria-label={t('Day')} style={{ flex: 1 }} max={today} value={d}
+        onChange={e => e.target.value && setD(e.target.value <= today ? e.target.value : today)} />
+      <input className="input" type="time" aria-label={t('Time')} style={{ width: 120 }} value={timeShown}
+        onChange={e => setTm(e.target.value)} />
+    </div>
+    {d !== today && <div className="dim small" style={{ marginTop: 6 }}>{t('Logged for {0}', fmtDate(d, true))}</div>}
 
     {items.length > 0 && <div style={{ margin: '14px 0' }}>
       {items.map((it, i) => {
@@ -279,8 +293,8 @@ function MealForm({ existing, preset, close }) {
   </>
 }
 
-export const mealSheet = (existing, preset) =>
-  ui().openSheet(close => <MealForm existing={existing} preset={preset} close={close} />)
+export const mealSheet = (existing, preset, day) =>
+  ui().openSheet(close => <MealForm existing={existing} preset={preset} day={typeof day === 'string' ? day : undefined} close={close} />)
 
 /* ============================ saved meals ============================ */
 
@@ -310,7 +324,7 @@ function NameTemplate({ items, kind, close }) {
 // is exactly the friction this feature exists to remove.
 const SCALES = [0.5, 1, 1.5, 2]
 
-function QuickLog({ close }) {
+function QuickLog({ day, close }) {
   const st = useStore(s => s.S)
   const foods = foodMap(st)
   const [scale, setScale] = useState(1)
@@ -318,7 +332,8 @@ function QuickLog({ close }) {
 
   const log = m => {
     update(s => {
-      (s.meals = s.meals || []).push({ id: uid(), ...newMeal({ kind: m.kind, items: scaleItems(m.items, scale) }) })
+      const past = day && day < todayISO()
+      ;(s.meals = s.meals || []).push({ id: uid(), ...newMeal({ kind: m.kind, items: scaleItems(m.items, scale), ...(past ? { d: day, t: mealTimeFor(m.kind) } : {}) }) })
     })
     close()
     toast(t('{0} logged', m.n))
@@ -329,7 +344,7 @@ function QuickLog({ close }) {
     <div className="muted small" style={{ marginBottom: 16, lineHeight: 1.45 }}>
       {t('Log a meal, then tap “Save as a meal I eat often”. After that it is one tap — which is the difference between logging in January and logging in March.')}
     </div>
-    <Button variant="primary" onClick={() => { close(); mealSheet() }}>{t('Log a meal')}</Button>
+    <Button variant="primary" onClick={() => { close(); mealSheet(undefined, undefined, day) }}>{t('Log a meal')}</Button>
     <div style={{ height: 8 }} />
     <Button variant="ghost" className="dim" onClick={close}>{t('Cancel')}</Button>
   </>
@@ -354,7 +369,7 @@ function QuickLog({ close }) {
   </>
 }
 
-export const quickLogSheet = () => ui().openSheet(close => <QuickLog close={close} />)
+export const quickLogSheet = day => ui().openSheet(close => <QuickLog day={typeof day === 'string' ? day : undefined} close={close} />)
 
 export function deleteMyMeal(m) {
   update(s => { s.myMeals = (s.myMeals || []).filter(x => x.id !== m.id) })
