@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "Добавить пропущенную тренировку",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Выберите день и тренировку, отметьте сделанное и завершите. Она сохранится в этот день.",
   "How long did it last? (min)": "Сколько она длилась? (мин)",
+  "Enter a valid past date, start time and duration": "Укажи верные дату, время начала и длительность завершённой тренировки",
+  "Start time": "Время начала",
+  "This time occurs twice. Choose the UTC offset.": "Это время повторяется дважды. Выбери смещение UTC.",
+  "Energy estimate capped at {0} min of strength work.": "Расчёт энергии ограничен {0} мин силовой работы.",
 }

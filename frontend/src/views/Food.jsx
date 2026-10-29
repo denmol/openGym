@@ -164,9 +164,14 @@ export default function Food() {
       {restRows.length > 0 && <NutrientDetails rows={restRows} onInfo={openInfo} />}
       {activity.rows.length > 0 && <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--sep)' }}>
         <div className="small" style={{ fontWeight: 600, marginBottom: 4 }}>{t('Activity')}</div>
-        {activity.rows.map((r, i) => <div key={i} className="row between small">
-          <span>{r.name} · {t('{0} min', fmtNum(r.minutes))}</span>
-          <span className="dim">{r.kcal != null ? `≈ ${fmtNum(r.kcal)} kcal` : ''}</span>
+        {activity.rows.map((r, i) => <div key={i}>
+          <div className="row between small">
+            <span>{r.name} · {t('{0} min', fmtNum(r.minutes))}</span>
+            <span className="dim">{r.kcal != null ? `≈ ${fmtNum(r.kcal)} kcal` : ''}</span>
+          </div>
+          {r.kcal != null && r.strengthEstimateMinutes && <div className="dim small">
+            {t('Energy estimate capped at {0} min of strength work.', r.strengthEstimateMinutes)}
+          </div>}
         </div>)}
         {activity.total != null
           ? <>

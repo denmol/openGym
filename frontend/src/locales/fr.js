@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "Ajouter une séance oubliée",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Choisis le jour et la séance, coche ce que tu as fait et termine. Elle est enregistrée à cette date.",
   "How long did it last? (min)": "Combien de temps a-t-elle duré ? (min)",
+  "Enter a valid past date, start time and duration": "Saisis une date, une heure de début et une durée valides pour une séance terminée",
+  "Start time": "Heure de début",
+  "This time occurs twice. Choose the UTC offset.": "Cette heure se produit deux fois. Choisis le décalage UTC.",
+  "Energy estimate capped at {0} min of strength work.": "L’estimation énergétique est limitée à {0} min de musculation.",
 }

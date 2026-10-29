@@ -21,12 +21,15 @@ function kindOf(id) {
 
 /** { rows: [{ name, minutes, kcal }], total, weightKg } for one date. */
 export function dayActivity(S, date) {
-  const last = S.bodyweight?.length ? S.bodyweight[S.bodyweight.length - 1] : null
+  // A later weigh-in must not rewrite the estimated expenditure of every earlier day.
+  const last = (S.bodyweight || []).filter(b => b.d <= date && weightKgOf(b) != null)
+    .sort((a, b) => a.d.localeCompare(b.d) || (a.t || 0) - (b.t || 0)).at(-1)
   const weightKg = weightKgOf(last)
   const rows = []
   for (const w of S.workouts || []) {
     if (w.d !== date) continue
-    let minutes = 0, kcal = 0, cardioMin = 0, strength = false
+    const kg = weightKgOf({ w: w.bw, u: w.bwu }) ?? weightKg
+    let minutes = 0, kcal = 0, cardioMin = 0, strength = false, capped = false
     for (const e of w.entries || []) {
       const done = (e.sets || []).filter(s => s.done)
       if (!done.length) continue
@@ -37,7 +40,7 @@ export function dayActivity(S, date) {
           if (c.min == null) continue
           cardioMin += c.min
           minutes += c.min
-          const v = activityKcal({ kind, minutes: c.min, km: c.km, kg: weightKg })
+          const v = activityKcal({ kind, minutes: c.min, km: c.km, kg })
           if (v != null) kcal += v
         }
       } else strength = true
@@ -46,13 +49,15 @@ export function dayActivity(S, date) {
       const span = Math.round((w.end - w.start) / 60000) - cardioMin
       const m = Math.min(MAX_STRENGTH_MIN, span)
       if (m > 0) {
-        minutes += m
-        const v = activityKcal({ kind: 'strength', minutes: m, kg: weightKg })
+        minutes += span
+        capped = span > m
+        const v = activityKcal({ kind: 'strength', minutes: m, kg })
         if (v != null) kcal += v
       }
     }
-    if (minutes > 0) rows.push({ name: w.name || (w.entries?.[0] && exOr(w.entries[0].id)?.n) || '', minutes, kcal: weightKg ? kcal : null })
+    if (minutes > 0) rows.push({ name: w.name || (w.entries?.[0] && exOr(w.entries[0].id)?.n) || '', minutes, kcal: kg ? kcal : null,
+      ...(capped ? { strengthEstimateMinutes: MAX_STRENGTH_MIN } : {}) })
   }
-  const total = weightKg ? rows.reduce((a, r) => a + r.kcal, 0) : null
+  const total = rows.some(r => r.kcal == null) || (!rows.length && !weightKg) ? null : rows.reduce((a, r) => a + r.kcal, 0)
   return { rows, total, weightKg }
 }

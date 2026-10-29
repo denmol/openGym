@@ -1563,4 +1563,8 @@ export default {
   "Log a workout you missed": "Kaçırdığın antrenmanı ekle",
   "Pick the day and the routine, tick off what you did and finish. It is saved on that day.": "Günü ve rutini seç, yaptıklarını işaretle ve bitir. O güne kaydedilir.",
   "How long did it last? (min)": "Ne kadar sürdü? (dk)",
+  "Enter a valid past date, start time and duration": "Tamamlanmış bir antrenman için geçerli tarih, başlangıç saati ve süre gir",
+  "Start time": "Başlangıç saati",
+  "This time occurs twice. Choose the UTC offset.": "Bu saat iki kez yaşanır. UTC farkını seç.",
+  "Energy estimate capped at {0} min of strength work.": "Enerji tahmini {0} dakika kuvvet çalışmasıyla sınırlıdır.",
 }
