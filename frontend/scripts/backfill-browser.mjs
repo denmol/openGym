@@ -133,6 +133,18 @@ try {
       assert.equal(requests.includes('/api/activity'), true)
       assert.equal(requests.includes('/api/push/rest-timer'), true)
     })
+    await test('a discarded live work timer cannot mark sets in a new historical draft', async () => {
+      await seed(true)
+      await page.evaluate(async () => (await import('/src/sheets.jsx')).beginWorkout('a'))
+      await page.getByRole('button', { name: 'Start set', exact: true }).first().click()
+      assert.notEqual(await page.evaluate(async () => (await import('/src/store/useUI.js')).useUI.getState().work), null)
+      await page.getByRole('button', { name: 'Discard', exact: true }).click()
+      await page.locator('.sheet, .center').getByRole('button', { name: 'Discard', exact: true }).click()
+      await openPast(60)
+      assert.equal(await page.evaluate(async () => (await import('/src/store/useUI.js')).useUI.getState().work), null)
+      await page.clock.runFor(31000)
+      assert.equal((await state()).active.entries[0].sets.some(s => s.done), false)
+    })
     if (timezoneId === 'Europe/Stockholm') await test('the repeated DST hour requires a choice and saves the selected occurrence', async () => {
       await seed()
       await page.getByRole('button', { name: 'Log a workout you missed', exact: true }).click()

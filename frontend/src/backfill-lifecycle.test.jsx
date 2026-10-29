@@ -82,3 +82,14 @@ it('does not save a resumed backfill whose duration was lost or corrupted', () =
   expect(useStore.getState().S.workouts).toHaveLength(2)
   expect(useStore.getState().S.active).not.toBeNull()
 })
+
+it('clears a leftover live work timer before it can modify a historical draft', () => {
+  // Discarding a timed live session used to leave this UI timer running.
+  const complete = vi.fn()
+  useUI.getState().startWork(30, 'Previous live set', complete)
+  beginWorkout('a', null, { past: { day: '2026-10-20', minutes: 60 } })
+  expect(useUI.getState().work).toBeNull()
+  vi.advanceTimersByTime(31000)
+  expect(complete).not.toHaveBeenCalled()
+  expect(useStore.getState().S.active.entries[0].sets[0].done).toBe(false)
+})

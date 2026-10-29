@@ -954,6 +954,7 @@ export function beginWorkout(routineId, bw, opts) {
     }
   })
   useUI.getState().stopRest()
+  useUI.getState().stopWork()
   nav('/workout')
   return true
 }
