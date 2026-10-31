@@ -19,6 +19,7 @@ import { trainerContext, trainerStatus, askTrainer, MAX_QUESTION, MAX_HISTORY } 
 import { weekSummary } from './lib/trainer-week.js'
 import { coachProfileOf, isCoachReady } from './lib/coach-profile.js'
 import { coachWizardSheet } from './coach-sheets.jsx'
+import { calibrationSheet } from './calibration-sheets.jsx'
 import { startFlow } from './sheets.jsx'
 import { EXIDX } from './lib/exercises.js'
 import { exLine } from './lib/history.js'
@@ -408,6 +409,15 @@ function Trainer({ close }) {
         <Button size="sm" icon="person" onClick={() => { close(); coachWizardSheet() }}>{t('Set up my training profile')}</Button>
       </div>
       : null}
+
+    {!analysis.ready && <div className="card" style={{ marginBottom: 12 }}>
+      <div className="small" style={{ lineHeight: 1.45, marginBottom: 8 }}>
+        {profile.calibration
+          ? t('Your level test is what the trainer goes on until you have logged enough workouts.')
+          : t('Want advice before you have a log? A five-minute level test tells your trainer where you are.')}
+      </div>
+      <Button size="sm" icon="checkCircle" onClick={calibrationSheet}>{profile.calibration ? t('Take the level test again') : t('Take the level test')}</Button>
+    </div>}
 
     <NextSession S={S} analysis={analysis} />
     <Review S={S} analysis={analysis} onApply={apply} />

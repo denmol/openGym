@@ -27,7 +27,10 @@ const FIXTURES = {
   weight_flat: F('weight_flat', { pct: 0, kgPerWeek: 0, weighIns: 5, fast: 1, slow: 0.25, trialSlow: 0.7, trialFast: 1.4 }, { kind: 'info' }),
   guideline_met: F('guideline_met', { perWeek: 2.5 }, { kind: 'good' }),
   protein_low: F('protein_low', { gPerKg: 1.1, avgG: 85, days: 9, kg: 78, target: 1.6, goal: 'muscle' }, { basis: 'evidence' }),
-  weight_down_muscle: F('weight_down_muscle', { pct: 0.4, kgPerWeek: 0.3, weighIns: 7, aimLowPct: 0.25, aimHighPct: 0.5 }, { basis: 'practice' })
+  weight_down_muscle: F('weight_down_muscle', { pct: 0.4, kgPerWeek: 0.3, weighIns: 7, aimLowPct: 0.25, aimHighPct: 0.5 }, { basis: 'practice' }),
+  calibration_start: F('calibration_start', { level: 'some', confidence: 'medium', tests: 4, retest: 8, unit: 'kg', squatStart: 80, benchStart: 55 }, { kind: 'act' }),
+  calibration_strong: F('calibration_strong', { area: 'Pushing' }, { kind: 'good' }),
+  calibration_weak: F('calibration_weak', { area: 'Legs' })
 }
 
 suite('fixed text', () => {
