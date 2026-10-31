@@ -33,6 +33,7 @@ export const DEF_COACH = {
   goal: null,
   limits: '',
   dislikes: '',
+  calibration: null,    // the level test result (lib/calibration.js), when taken
   updated: null
 }
 
@@ -74,6 +75,7 @@ export function cleanCoachProfile(p) {
   if (!GOALS.includes(out.goal)) out.goal = null
   if (out.sex !== 'male' && out.sex !== 'female') out.sex = null
   out.equipment = Array.isArray(out.equipment) ? [...new Set(out.equipment)] : []
+  out.calibration = out.calibration && typeof out.calibration === 'object' && out.calibration.v === 1 && LEVELS.includes(out.calibration.level) ? out.calibration : null
   out.limits = String(out.limits || '').trim().slice(0, 500)
   out.dislikes = String(out.dislikes || '').trim().slice(0, 500)
   return out

@@ -1,5 +1,17 @@
 # Changelog
 
+## A level test for the trainer
+
+"Take the level test" (in the trainer, and under Experience in the AI plan wizard): two questions about training
+history, three optional bodyweight checks (push-ups, squats in 60 s, plank) and three optional submaximal lifts
+(one set of 8 with about 2 reps left; barbell, dumbbell or machine). It gives a level — new, a year or two in, or training
+for years — with a confidence that says how much it rests on, a strongest and weakest area, and suggested first
+weights a little under what was tested, which are used only where no working weight exists. Until four workouts are
+logged the trainer used to say nothing; it now gives these as findings (marked as rule of thumb) that the written
+check-in can phrase, and the plan prompt includes the result. Adults only for the physical tests, skipped for
+anyone who noted a limitation, with stop-if-it-hurts guidance throughout. The thresholds are rules of thumb, not
+norms from a study, and are labelled that way.
+
 ## Log missed meals and workouts for earlier days
 
 Food: the "Log a meal" and "My meals" buttons now show on every day you browse to (they used to appear only on today),

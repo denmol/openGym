@@ -25,6 +25,7 @@ import { rirOf, MIN_RATED } from './effort.js'
 import { weightIn, modeOf } from './history.js'
 import { mondayOf, isoOf } from './format.js'
 import { coachProfileOf } from './coach-profile.js'
+import { calibrationFindings } from './calibration.js'
 import { flexOf } from './flex.js'
 import { proteinIntake, foodAdviceBlocked, MIN_FOOD_DAYS, PROTEIN_GKG } from './trainer-food.js'
 
@@ -264,7 +265,11 @@ export function analyze(S, now = Date.now()) {
   if (inWin.length < MIN_WORKOUTS) {
     return {
       ...base, ready: false,
-      findings: [{ code: 'data_thin', kind: 'info', basis: 'heuristic', evidence: [], facts: { workouts: inWin.length, needed: MIN_WORKOUTS, days: WINDOW_DAYS } }]
+      // The level test (lib/calibration.js) gives the trainer something true to say before a log exists.
+      findings: [
+        { code: 'data_thin', kind: 'info', basis: 'heuristic', evidence: [], facts: { workouts: inWin.length, needed: MIN_WORKOUTS, days: WINDOW_DAYS } },
+        ...calibrationFindings(profile.calibration)
+      ]
     }
   }
 

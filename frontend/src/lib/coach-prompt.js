@@ -15,6 +15,7 @@
 
 import { GLYPHS } from './glyphs.js'
 import { LEVEL_NAME, GOAL_NAME } from './coach-profile.js'
+import { calibrationSummary } from './calibration.js'
 import { shortlist, shortlistLines } from './coach-catalog.js'
 import { LANGS } from './i18n.js'
 
@@ -68,6 +69,7 @@ export function profileLines(p, unit = 'kg', bodyweight = null) {
     line('Height', p.heightCm ? p.heightCm + ' cm' : null),
     line('Body weight', bodyweight ? bodyweight + ' ' + unit : null),
     line('Experience', LEVEL_NAME[p.level]),
+    line('Level test', calibrationSummary(p.calibration)),
     line('Main goal', GOAL_NAME[p.goal]),
     line('Sessions per week', p.days),
     line('Minutes per session', p.minutes),
