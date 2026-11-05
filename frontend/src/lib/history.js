@@ -246,12 +246,14 @@ export function workoutCardio(w) {
  * the latest session.
  */
 export function insertWorkout(workouts, w) {
-  const key = x => (x.d || '') + ':' + String(x.start || 0).padStart(15, '0')
-  let i = workouts.length
-  while (i > 0 && key(workouts[i - 1]) > key(w)) i--
-  workouts.splice(i, 0, w)
+  // Older activity logging appended past days. Do not assume that existing history is sorted.
+  workouts.push(w)
+  workouts.sort(compareWorkouts)
   return workouts
 }
+
+export const compareWorkouts = (a, b) =>
+  (a.d || '').localeCompare(b.d || '') || (Number(a.start) || 0) - (Number(b.start) || 0)
 
 export function setsDone(w) {
   let n = 0

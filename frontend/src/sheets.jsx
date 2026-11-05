@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
+import { pastTiming, pastStarts, historyBefore, rememberWorkoutWeights } from './lib/backfill.js'
 import { EXDB, EXIDX, BODYPARTS, ACTIVITY_IDS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
-import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
+import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, localTZ, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
 import { formatKm, buildActivityWorkout } from './lib/cardio.js'
 import { insertWorkout, lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, workoutCardio, setsDone, setsDoneActive, lastBW, weightIn, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
@@ -926,6 +927,10 @@ export function beginWorkout(routineId, bw, opts) {
   // A session logged afterwards: its own day, a length instead of a running clock, no weigh-in
   // and no rest timer (see beginPastWorkout).
   const past = opts && opts.past
+  if (st.active) { toast(t('A workout is already in progress — finish or discard it first')); return false }
+  const timing = past ? pastTiming(past) : null
+  if (past && !timing) { toast(t('Enter a valid past date, start time and duration')); return false }
+  const history = past ? historyBefore(st, { d: past.day, start: timing.start, backdated: true }) : st
   const r = routineId ? st.routines.find(x => x.id === routineId) : null
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards. `plan` is
@@ -933,23 +938,25 @@ export function beginWorkout(routineId, bw, opts) {
   const light = !!(opts && opts.light)
   const entries = (r ? r.ex : []).map(cfg => {
     if (light && !isCardio(cfg.id)) {
-      const it = planItem(st, r, cfg, { deload: true })
+      const it = planItem(history, r, cfg, { deload: true })
       const target = { ...cfg, sets: it.sets, ...(it.weight != null ? { weight: it.weight } : {}) }
-      const sets = buildSets(st, target).slice(0, it.sets).map(x => (it.weight != null && !x.done ? { ...x, w: it.weight } : x))
+      const sets = buildSets(history, target).slice(0, it.sets).map(x => (it.weight != null && !x.done ? { ...x, w: it.weight } : x))
       return { id: cfg.id, sg: cfg.sg, target, plan: { policy: 'lighter', kind: 'lighter', why: it.why }, sets }
     }
-    const plan = nextPrescription(st, cfg, r)
-    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
+    const plan = nextPrescription(history, cfg, r)
+    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(history, cfg), plan) }
   })
   update(s => {
     s.active = {
-      id: uid(), d: past ? past.day : todayISO(), start: past ? new Date(past.day + 'T12:00:00').getTime() : Date.now(),
+      id: uid(), d: past ? past.day : todayISO(), start: past ? timing.start : Date.now(),
       routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, bwu: bw ? st.unit : null, cur: 0, entries,
-      ...(past ? { backdated: { minutes: past.minutes } } : {})
+      ...(past ? { backdated: { minutes: timing.minutes } } : {})
     }
   })
   useUI.getState().stopRest()
+  useUI.getState().stopWork()
   nav('/workout')
+  return true
 }
 
 /* ============================ a session you forgot to log ============================ */
@@ -964,10 +971,11 @@ function PastWorkoutSheet({ close }) {
   const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') })()
   const [day, setDay] = useState(yesterday)
   const [minutes, setMinutes] = useState(60)
+  const [time, setTime] = useState('12:00')
+  const [offset, setOffset] = useState(null)
+  const starts = pastStarts(day, time)
   const go = routineId => {
-    if (!day || day > todayISO()) { toast(t('Pick a day that has already passed')); return }
-    close()
-    beginWorkout(routineId, null, { past: { day, minutes: Math.max(5, Math.min(300, Math.round(minutes) || 60)) } })
+    if (beginWorkout(routineId, null, { past: { day, time, minutes, offset } })) close()
   }
   return <>
     <h3>{t('Log a workout you missed')}</h3>
@@ -976,8 +984,20 @@ function PastWorkoutSheet({ close }) {
     </div>
     <div className="row between" style={{ marginBottom: 12, gap: 12 }}>
       <span className="small muted">{t('Day')}</span>
-      <input className="input" type="date" style={{ width: 170 }} max={todayISO()} value={day} onChange={e => e.target.value && setDay(e.target.value)} />
+      <input className="input" type="date" aria-label={t('Day')} style={{ width: 170 }} max={todayISO()} value={day} onChange={e => { setDay(e.target.value); setOffset(null) }} />
     </div>
+    <div className="row between" style={{ marginBottom: 12, gap: 12 }}>
+      <span className="small muted">{t('Start time')}<br /><span className="dim">{localTZ()}</span></span>
+      <input className="input" type="time" aria-label={t('Start time')} style={{ width: 170 }} value={time} onChange={e => { setTime(e.target.value); setOffset(null) }} />
+    </div>
+    {starts.length > 1 && <div style={{ marginBottom: 12 }}>
+      <div className="small muted" style={{ marginBottom: 6 }}>{t('This time occurs twice. Choose the UTC offset.')}</div>
+      <div className="row">{starts.map(ms => {
+        const value = new Date(ms).getTimezoneOffset(), n = Math.abs(value)
+        const label = `UTC${value <= 0 ? '+' : '−'}${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+        return <Button key={value} variant={offset === value ? 'primary' : 'default'} aria-pressed={offset === value} onClick={() => setOffset(value)}>{label}</Button>
+      })}</div>
+    </div>}
     <div className="row cfgrow" style={{ marginBottom: 14 }}>
       <Stepper label={t('How long did it last? (min)')} value={minutes} step={5} decimal={false} onChange={setMinutes} />
     </div>
@@ -994,6 +1014,7 @@ function PastWorkoutSheet({ close }) {
 function TopWeight({ entryIdx, close }) {
   const st = useStore(s => s.S)
   const A = st.active
+  const history = historyBefore(st, A)
   // The workout can end underneath this sheet: finishing from the last exercise clears
   // `active`, and this re-renders before the sheet is torn down. Everything below is
   // read defensively and the sheet dismisses itself — reading A.entries straight took
@@ -1002,8 +1023,8 @@ function TopWeight({ entryIdx, close }) {
   const entry = A ? A.entries[entryIdx] : null
   const ex = entry && EXIDX[entry.id]
   const maxSet = entry ? Math.max(0, ...entry.sets.filter(s => s.done).map(s => s.w || 0)) : 0
-  const prevBest = entry ? Math.max((st.exWeights[entry.id] || {}).w || 0, bestWeightFor(st, entry.id)) : 0
-  const [v, setV] = useState(entry ? (Math.max(maxSet, prevBest) || entry.target.weight || 0) : 0)
+  const prevBest = entry ? Math.max((history.exWeights[entry.id] || {}).w || 0, bestWeightFor(history, entry.id)) : 0
+  const [v, setV] = useState(entry ? (A.backdated ? maxSet : Math.max(maxSet, prevBest)) || entry.target.weight || 0 : 0)
   useEffect(() => { if (!entry) close() }, [!entry])
 
   const units = supersetUnits(A ? A.entries : [])
@@ -1018,14 +1039,16 @@ function TopWeight({ entryIdx, close }) {
     if (!isFinite(n) || n < 0) { toast(t('Enter a valid weight')); return }
     update(s => {
       s.active.entries[entryIdx].topW = n
-      const cur = s.exWeights[entry.id]
-      s.exWeights[entry.id] = { w: Math.max(n, cur ? cur.w : 0), d: todayISO() }
+      if (!A.backdated) {
+        const cur = s.exWeights[entry.id]
+        s.exWeights[entry.id] = { w: Math.max(n, cur ? cur.w : 0), d: todayISO() }
+      }
     })
     close()
     if (advance && unitDone) {
       if (isLastUnit) workoutCompleteSheet()               // whole workout done → finish/continue prompt
       else update(s => { s.active.cur = units[unitIdx + 1][0] })
-    } else toast(t('Tracked — next time starts at {0}', fmtNum(S().exWeights[entry.id].w) + ' ' + st.unit))
+    } else if (!A.backdated) toast(t('Tracked — next time starts at {0}', fmtNum(S().exWeights[entry.id].w) + ' ' + st.unit))
   }
   return <>
     <h3 className="capitalize row" style={{ gap: 8 }}><Icon name="checkCircle" style={{ color: 'var(--acc-t)' }} />{t('{0} done', ex.n)}</h3>
@@ -1090,6 +1113,10 @@ function doFinishWorkout() {
   const st = S()
   const A = st.active
   if (!A) return
+  const end = A.backdated ? A.start + A.backdated.minutes * 60000 : Date.now()
+  if (A.backdated && (!Number.isFinite(end) || !(A.backdated.minutes > 0) || end <= A.start || end > Date.now())) {
+    toast(t('Enter a valid past date, start time and duration')); return
+  }
   const prs = []
   const e1prs = []
   A.entries.forEach(e => {
@@ -1101,7 +1128,8 @@ function doFinishWorkout() {
     if (rec && !prs.includes(e.id)) e1prs.push({ id: e.id, ...rec })
   })
   const w = {
-    id: A.id, d: A.d, start: A.start, end: A.backdated ? A.start + A.backdated.minutes * 60000 : Date.now(), routineId: A.routineId, name: A.name, bw: A.bw, bwu: A.bwu,
+    id: A.id, d: A.d, start: A.start, end, routineId: A.routineId, name: A.name, bw: A.bw, bwu: A.bwu,
+    ...(A.backdated ? { backdated: { ...A.backdated } } : {}),
     // `target` (what the session prescribed) is kept alongside the sets: without it a
     // finished workout cannot say whether it hit its reps, and a timed session reads back
     // as "0 reps". It is what the progression engine works from.
@@ -1110,10 +1138,7 @@ function doFinishWorkout() {
   }
   w.vol = workoutVolume(w)
   update(s => {
-    w.entries.forEach(e => {
-      const mx = Math.max(0, ...e.sets.filter(x => x.done).map(x => x.w || 0), e.topW || 0)
-      if (mx > 0) { const cur = s.exWeights[e.id]; if (!cur || mx > cur.w) s.exWeights[e.id] = { w: mx, d: w.d } }
-    })
+    rememberWorkoutWeights(s, w)
     insertWorkout(s.workouts, w)
     s.active = null
   })
