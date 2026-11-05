@@ -47,7 +47,8 @@ jobs:
 
   backfill-browser:
     name: Backfill — synthetic browser regression
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04, but not the 26.04 ubuntu-latest image.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
