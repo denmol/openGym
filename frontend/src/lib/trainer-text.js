@@ -9,6 +9,7 @@
 
 import { t } from './i18n.js'
 import { fmtNum } from './format.js'
+import { LEVEL_NAME } from './coach-profile.js'
 
 export const BASIS_LABEL = {
   evidence: 'Study finding',
@@ -26,7 +27,8 @@ export const BASIS_NOTE = {
 export const CODES = [
   'data_thin', 'volume_none', 'volume_low', 'volume_high', 'frequency_low', 'progressing', 'stalled',
   'falling', 'fatigue', 'block_long', 'adherence', 'effort_far', 'rate_effort', 'weight_fast',
-  'weight_on_track', 'weight_flat', 'guideline_met', 'protein_low', 'weight_down_muscle'
+  'weight_on_track', 'weight_flat', 'guideline_met', 'protein_low', 'weight_down_muscle',
+  'calibration_start', 'calibration_strong', 'calibration_weak'
 ]
 
 // Numbers go through the locale (a decimal comma in Swedish), like the rest of the app.
@@ -141,6 +143,28 @@ export function describe(f) {
       return {
         title: t('You’re meeting the basic guideline'),
         body: t('About {0} strength sessions a week. The WHO recommends regular muscle-strengthening activity for adults, and you’re doing it.', n(x.perWeek))
+      }
+    case 'calibration_start': {
+      const weights = [['squat', 'Squat'], ['bench', 'Bench press'], ['row', 'Row']]
+        .filter(([k]) => x[k + 'Start'] != null).map(([k, name]) => m(name) + ' ' + n(x[k + 'Start']) + ' ' + x.unit).join(', ')
+      return {
+        title: t('Your level test: {0}', t(LEVEL_NAME[x.level])),
+        body: t(x.confidence === 'high' ? 'A starting point from your level test, based on your training history and several tests. It is a rule of thumb, not a measure of your limits.'
+          : x.confidence === 'medium' ? 'A starting point from your level test, based on your training history and some tests. It is a rule of thumb, not a measure of your limits.'
+            : 'A starting point from your level test, based mostly on your answers about training history. It is a rule of thumb, not a measure of your limits.') +
+          (weights ? ' ' + t('Suggested first weights: {0}. Start there and add weight when every rep feels solid.', weights) : '') +
+          ' ' + t('Until you have logged enough workouts this is what your trainer goes on. Take the test again in about {0} weeks.', x.retest)
+      }
+    }
+    case 'calibration_strong':
+      return {
+        title: t('{0} looks like a strength', t(x.area)),
+        body: t('In the level test, {0} scored clearly above your other areas. That is a rule of thumb from your own test results, not a diagnosis.', ml(x.area))
+      }
+    case 'calibration_weak':
+      return {
+        title: t('{0} lags behind your other areas', t(x.area)),
+        body: t('In the level test, {0} scored clearly below your other areas, so it is a good place to build first. That is a rule of thumb from your own test results, not a diagnosis.', ml(x.area))
       }
     default:
       return { title: f.code, body: '' }

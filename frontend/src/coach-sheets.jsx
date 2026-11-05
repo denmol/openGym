@@ -28,6 +28,7 @@ import { parseCoachReply } from './lib/coach-parse.js'
 import { validateCoachPlan, problemText } from './lib/coach-validate.js'
 import { coachStatus, generatePlan } from './lib/coach-api.js'
 import { parsePlan, mergePlan } from './lib/plan-share.js'
+import { calibrationSheet } from './calibration-sheets.jsx'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -115,6 +116,11 @@ function CoachWizard({ close }) {
         <div className="chips">
           {LEVELS.map(l => <button key={l} className={'chip nocap' + (p.level === l ? ' on' : '')}
             onClick={() => set('level', l)}>{t(LEVEL_NAME[l])}</button>)}
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <Button size="sm" icon="checkCircle" onClick={() => calibrationSheet({ onApply: cal => { set('level', cal.level); set('calibration', cal) } })}>
+            {p.calibration ? t('Take the level test again') : t('Not sure? Take the level test')}
+          </Button>
         </div>
       </Field>
     </>}

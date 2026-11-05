@@ -86,3 +86,44 @@ Ingen produktionsdriftsättning eller sammanslagning ingår i denna ändring.
 - Veckomål räknar fortsatt sparade pass, även två pass samma dag. Befintlig möjlighet att avsluta ett tomt pass med särskild bekräftelse är oförändrad.
 - Befintliga historiska PR-markeringar är sparade ögonblicksbilder och räknas inte om retroaktivt. Uppgifterna i redan sparade set skrivs inte om.
 - Ingen automatisk datamigrering eller ”reparation” av verkliga användares poster har körts.
+
+
+## Konfliktlösning och omtest 5 november 2026
+
+PR #38 hade två egna commits (`9daede4`, `bb401d7`) efter gemensam bas
+`c8dde79`. Main hade fått `d9f6ad4` (nivåtest, PR #39). En lokal merge
+reproducerade innehållskonflikter i `CHANGELOG.md` och tolv språkfiler
+(de/es/fr/hi/it/ko/pl/pt/ru/sv/tr/zh): båda grenarna hade lagt till olika
+texter på samma plats. Ingen konflikt fanns i programkod eller tester.
+
+Main har integrerats i PR-grenen med en merge-commit, utan rebase eller
+force push. Båda textblocken behålls. En separat jämförelse mot båda
+föräldrarna verifierade att alla övriga ändrade filer är byte-identiska
+med ursprungsgrenen och att varje konfliktfil innehåller båda tilläggen.
+Regressionsfixarna och deras tester har inte skrivits om.
+
+Färska lokala kontroller på det kombinerade trädet, endast syntetiska data:
+
+- `TZ=Europe/Stockholm npm test` i frontend: **993/993**, 58 testfiler.
+  Ökningen från 970 kommer från mains nivåtest och dess tester.
+- `npm run test:backfill:timezones`: Stockholm **49/49**; UTC,
+  Los Angeles, Kolkata och Kiritimati **45/45 per zon**, med fyra
+  uttryckligen svenska DST-fall överhoppade i varje annan zon.
+- `npm test` i api: **126/126**.
+- `npm run build`: lyckas; befintlig varning om stora JS-paket kvarstår.
+- `git diff --check --cached`: inga whitespacefel.
+- Webbläsarregressionen försöktes men kördes **inte**: Playwrights
+  förväntade Chromium saknades. Systemets Chromium försöktes med
+  `CHROMIUM_PATH=/usr/bin/chromium`, men miljön nekade dess socket
+  (`process_singleton_posix.cc`, `Operation not permitted`) före första
+  testfallet. De tidigare 28 godkända fallen är äldre evidens, inte en
+  ny godkänd körning. GitHubs befintliga browser-jobb måste därför
+  kontrolleras på den nya committen.
+
+Lokalt användes Node 24.22.1 och redan installerade beroenden från
+föregående PR-checkout (samma oförändrade lockfiler). GitHub CI använder
+Node 22 och `npm ci`, vilket ger separat kontroll av ren installation.
+Inga konton, verkliga användardata, migrationskörningar eller
+produktionsanrop användes. PR #38 har inte slagits ihop med main och
+ingen produktionsdriftsättning har begärts. Kvarstående kontroll av
+verklig serversynk och Safari/iPhone/PWA enligt ovan gäller fortfarande.
