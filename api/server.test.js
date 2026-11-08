@@ -47,7 +47,7 @@ async function start(extraEnv = {}) {
   const port = await free();
   const child = spawn(process.execPath, ['server.js'], {
     cwd: path.dirname(new URL(import.meta.url).pathname),
-    env: { ...process.env, PORT: String(port), DATA_DIR: dir, OPENAI_API_KEY: 'k', OPENAI_BASE_URL: 'http://localhost:' + modelPort, COACH_DAILY_LIMIT: '3', VERCEL: '', ...extraEnv },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dir, STORAGE_DRIVER: 'files', OPENAI_API_KEY: 'k', OPENAI_BASE_URL: 'http://localhost:' + modelPort, COACH_DAILY_LIMIT: '3', VERCEL: '', ...extraEnv },
     stdio: 'ignore'
   });
   const s = { port, child }; servers.push(s);

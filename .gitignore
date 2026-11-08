@@ -1,6 +1,8 @@
 # Dependencies and build output
 node_modules/
 dist/
+test-results/
+playwright-report/
 
 # Local configuration. .env holds RP_ID/ORIGIN and, once the coach talks to an
 # API directly, a secret key — it must never be committed. .env.example is the

@@ -75,8 +75,9 @@ test('blob store keeps everything under its prefix', async () => {
 test('storeFromEnv: blob only on Vercel with a store configured', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'og-env-'));
   const fake = async () => fakeBlob();
-  assert.equal((await storeFromEnv({ DATA_DIR: dir }, fake)).kind, 'file');
-  assert.equal((await storeFromEnv({ VERCEL: '1', DATA_DIR: dir }, fake)).kind, 'file');
+  assert.equal((await storeFromEnv({ DATA_DIR: dir }, fake)).kind, 'sqlite');
+  assert.equal((await storeFromEnv({ VERCEL: '1', DATA_DIR: dir }, fake)).kind, 'sqlite');
+  assert.equal((await storeFromEnv({ DATA_DIR: dir, STORAGE_DRIVER: 'files' }, fake)).kind, 'file');
   assert.equal((await storeFromEnv({ VERCEL: '1', BLOB_STORE_ID: 'store_x' }, fake)).kind, 'blob');
   assert.equal((await storeFromEnv({ VERCEL: '1', BLOB_READ_WRITE_TOKEN: 't' }, fake)).kind, 'blob');
   assert.equal(blobConfigured({}), false);

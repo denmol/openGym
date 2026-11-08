@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createSqliteStore } from './sqlite-store.js';
 
 export class ConflictError extends Error {
   constructor(name) { super('conflict writing ' + name); this.name = 'ConflictError'; this.code = 'CONFLICT'; }
@@ -75,5 +76,6 @@ export const blobConfigured = env => !!(env.BLOB_READ_WRITE_TOKEN || env.BLOB_ST
 
 export async function storeFromEnv(env, loadBlob = () => import('@vercel/blob')) {
   if (env.VERCEL && blobConfigured(env)) return createBlobStore(await loadBlob());
-  return createFileStore(env.DATA_DIR || '/data');
+  if (env.STORAGE_DRIVER === 'files') return createFileStore(env.DATA_DIR || '/data');
+  return createSqliteStore(env.DATA_DIR || '/data', ConflictError);
 }

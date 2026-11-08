@@ -12,8 +12,8 @@ export const DEF = {
   glass: 'frosted',
   unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: detectLang(),
   theme: 'dark', accent: 'lime', body: 'male', targetW: null, targetWU: null,
-  bodyweight: [], routines: [], week: {}, dayPlan: {},
-  exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
+  bodyweight: [], measurements: [], routines: [], week: {}, dayPlan: {},
+  exWeights: {}, exNotes: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
   // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
@@ -72,7 +72,7 @@ function loadState() {
 }
 
 const hasData = st => !!(st && (
-  ['workouts', 'routines', 'bodyweight', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses', 'steps', 'sleep']
+  ['workouts', 'routines', 'bodyweight', 'measurements', 'customEx', 'meals', 'myMeals', 'myFoods', 'portions', 'glucose', 'doses', 'steps', 'sleep']
     .some(key => (st[key] || []).length) ||
   st.coachProfile || st.health || st.nutritionGoals || st.targetW != null || st.active
 ))

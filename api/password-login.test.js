@@ -36,7 +36,7 @@ before(async () => {
   s = await free();
   child = spawn(process.execPath, ['server.js'], {
     cwd: path.dirname(new URL(import.meta.url).pathname),
-    env: { ...process.env, PORT: String(s), DATA_DIR: dir, VERCEL: '' }, stdio: 'ignore'
+    env: { ...process.env, PORT: String(s), DATA_DIR: dir, STORAGE_DRIVER: 'files', VERCEL: '' }, stdio: 'ignore'
   });
   for (let i = 0; i < 100; i++) {
     try { if ((await fetch(`http://localhost:${s}/api/health`)).ok) return; } catch {}

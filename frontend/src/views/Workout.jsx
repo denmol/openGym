@@ -15,6 +15,7 @@ import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { nextPrescription, applyPrescription } from '../lib/progression.js'
 import { glyphOf } from '../lib/glyphs.js'
+import { plateSummary } from '../lib/plates.js'
 
 /* ---------- start chooser (no active workout) ---------- */
 function StartChooser() {
@@ -61,6 +62,7 @@ function Elapsed({ start }) {
 /* ---------- one exercise block (reps: weight×reps · time: a held duration · cardio: duration+speed) ---------- */
 function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemoveSet, onStartTimed }) {
   const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
   const working = useUI(s => s.work)
   const entry = S.active.entries[entryIdx]
   const ex = exOr(entry.id)
@@ -135,6 +137,14 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
       {best > 0 && <span className="tag nocap">{t('Best:')} {fmtNum(best)} {S.unit}</span>}
     </div>
     {last && <div className="small dim" style={{ marginBottom: 4 }}>{t('Last time')} ({fmtDate(last.d)}): {last.sets.map(s => setLabel(entry.id, s, last.target)).join(', ')}</div>}
+    {!cardio && !timed && !bw && entry.sets[0]?.w > 0 && /barbell/i.test(ex.eq || '') && <div className="small accent" style={{ marginBottom: 6 }}>
+      {t('Plates:')} {plateSummary(entry.sets[0].w, S.unit)}
+    </div>}
+    <label className="small dim" style={{ display: 'block', margin: '8px 0' }}>
+      {t('Exercise note')}
+      <textarea className="input" rows="2" value={S.exNotes?.[entry.id] || ''} placeholder={t('Technique cues, setup or reminders')}
+        onChange={event => update(state => { state.exNotes ||= {}; state.exNotes[entry.id] = event.target.value.slice(0, 500) })} />
+    </label>
     {plan && plan.why && plan.kind !== 'off' && <div className={'progline' + (plan.kind === 'deload' ? ' warn' : '')}>
       <Icon name={plan.kind === 'up' ? 'arrowUp' : plan.kind === 'deload' ? 'arrowDown' : 'lightbulb'} />
       <span>{t(...plan.why)}</span>

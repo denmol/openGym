@@ -8,7 +8,7 @@ import { insertWorkout, lastEntryFor, bestWeightFor, buildSets, effectiveRoutine
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
-import { starterRoutines } from './lib/starter.js'
+import { starterRoutines, STARTER_PROGRAMS } from './lib/starter.js'
 import Media, { Thumb } from './components/Media.jsx'
 import Stepper from './components/Stepper.jsx'
 import Icon from './components/Icon.jsx'
@@ -45,13 +45,14 @@ export function confirmSheet(opts) {
 }
 
 /* ============================ starter plan ============================ */
-export function loadStarterPlan() {
-  const [push, pull, legs] = starterRoutines()
+export function loadStarterPlan(program = 'ppl') {
+  const meta = STARTER_PROGRAMS.find(item => item.id === program) || STARTER_PROGRAMS[0]
+  const routines = starterRoutines(meta.id)
   update(st => {
-    st.routines.push(push, pull, legs)
-    st.week[1] = push.id; st.week[3] = pull.id; st.week[5] = legs.id
+    st.routines.push(...routines)
+    meta.days.forEach((day, index) => { if (routines[index]) st.week[day] = routines[index].id })
   })
-  toast(t('Starter plan loaded — Mon Push · Wed Pull · Fri Legs'))
+  toast(t('{0} starter plan loaded', meta.name))
 }
 
 /* ============================ weight picker (shared: body weight + goal) ============================ */

@@ -20,7 +20,8 @@ import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
   effortHistogram, isHardSet, HARD_RIR
 } from '../lib/effort.js'
-import { Button, Segmented, SelectRow } from '../components/ui.jsx'
+import { Button, NumberField, Segmented, SelectRow } from '../components/ui.jsx'
+import { MEASUREMENT_FIELDS, measurementSeries, saveMeasurement } from '../lib/measurements.js'
 
 // Which muscles the training in a window actually hit — and, the point of the card,
 // which ones it keeps missing. Shading is relative within the window (lib/muscles.js).
@@ -242,6 +243,27 @@ function EffortCard({ S }) {
   </div>
 }
 
+function MeasurementsCard({ S }) {
+  const update = useStore(s => s.update)
+  const [field, setField] = useState('waist')
+  const [draft, setDraft] = useState({})
+  const points = measurementSeries(S.measurements, field, 365)
+  const labels = { waist: t('Waist'), chest: t('Chest'), arms: t('Arms'), thighs: t('Thighs') }
+  const save = () => {
+    update(state => { state.measurements = saveMeasurement(state.measurements, { ...draft, d: todayISO(), u: 'cm' }) })
+    setDraft({})
+  }
+  return <div className="card">
+    <div className="row between" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>{t('Body measurements')}</h2><span className="tag">cm</span></div>
+    <div className="cols" style={{ gap: 8 }}>
+      {MEASUREMENT_FIELDS.map(key => <label key={key} className="small dim">{labels[key]}<NumberField decimal nullable value={draft[key] ?? ''} onChange={value => setDraft(current => ({ ...current, [key]: value }))} /></label>)}
+    </div>
+    <Button size="sm" variant="tinted" icon="plus" disabled={!MEASUREMENT_FIELDS.some(key => draft[key] > 0)} onClick={save}>{t('Save today')}</Button>
+    <Segmented className="seg-range" value={field} onChange={setField} options={MEASUREMENT_FIELDS.map(key => ({ value: key, label: labels[key] }))} />
+    {points.length > 1 ? <div className="chart"><LineChart points={points} h={140} unit="cm" color="var(--teal)" /></div> : <div className="muted small">{t('Log two measurements to see a trend.')}</div>}
+  </div>
+}
+
 // Stats = the analytics hub: all charts, progress and history live here.
 export default function Stats() {
   const nav = useNavigate()
@@ -333,6 +355,7 @@ export default function Stats() {
     {anyCardio && <CardioCard S={S} />}
     {anySteps && <StepsCard S={S} />}
     {anySleep && <SleepCard S={S} />}
+    <MeasurementsCard S={S} />
 
     <div className="cols">
       <div className="card">
